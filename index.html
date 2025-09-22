@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Auto-man Driving School</title>
+  <title>Auto-Man Driving School</title>
   <meta name="description" content="Learn to drive in Geelong and surrounding suburbs. Friendly instructors and flexible bookings." />
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <!-- Calendly embed -->
@@ -20,7 +20,7 @@
   <!-- Top Bar -->
   <header class="bg-white shadow-sm sticky top-0 z-50">
     <div class="container mx-auto px-4 py-3 flex items-center justify-between">
-      <a href="#top" class="text-xl font-bold tracking-tight">Auto-man Driving School</a>
+      <a href="#top" class="text-xl font-bold tracking-tight">Auto-Man Driving School</a>
       <nav class="hidden md:flex gap-6 text-sm">
         <a href="#services" class="hover:text-blue-700">Services</a>
         <a href="#ethos" class="hover:text-blue-700">Our Ethos</a>
@@ -68,24 +68,90 @@
   <!-- Services -->
   <section id="services" class="py-16">
     <div class="container mx-auto px-4">
-      <h2 class="text-2xl font-bold">Our Services</h2>
-      <p class="text-gray-600 mt-1">Geelong + surrounding suburbs</p>
-      <div class="mt-8 grid md:grid-cols-3 gap-6">
-        <div class="bg-white rounded-xl shadow p-6">
-          <h3 class="font-semibold text-lg">1-hour Lesson</h3>
-          <p class="text-sm text-gray-600 mt-2">Build confidence and skills at your pace. Pick-up and drop-off available.</p>
+      <h2 class="text-3xl font-bold mb-8">Our Services</h2>
+      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Beginner Driver -->
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden group hover:shadow-xl transition-shadow duration-300">
+          <div class="aspect-w-16 aspect-h-10 bg-gray-200">
+            <img src="https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=800&auto=format&fit=crop" 
+                 alt="Beginner driver learning" 
+                 class="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300" />
+          </div>
+          <div class="p-6">
+            <h3 class="font-semibold text-lg mb-2 flex items-center justify-between">
+              Beginner Drivers
+              <span class="text-blue-600">→</span>
+            </h3>
+            <p class="text-sm text-gray-600">Learn with patient, experienced instructors at your own pace in a safe and supportive environment.</p>
+          </div>
         </div>
-        <div class="bg-white rounded-xl shadow p-6">
-          <h3 class="font-semibold text-lg">Lesson Packages</h3>
-          <p class="text-sm text-gray-600 mt-2">Save with multi-lesson packs. Great for consistent progress.</p>
+
+        <!-- Driving Test Package -->
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden group hover:shadow-xl transition-shadow duration-300">
+          <div class="aspect-w-16 aspect-h-10 bg-gray-200">
+            <img src="https://images.unsplash.com/photo-1542038784456-1ea8e935640e?q=80&w=800&auto=format&fit=crop" 
+                 alt="Driving test preparation" 
+                 class="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300" />
+          </div>
+          <div class="p-6">
+            <h3 class="font-semibold text-lg mb-2 flex items-center justify-between">
+              Driving Test Package
+              <span class="text-blue-600">→</span>
+            </h3>
+            <p class="text-sm text-gray-600">Get a warm-up lesson and use of our instructor's car for your driving test. Maximise your chances of success with confidence.</p>
+          </div>
         </div>
-        <div class="bg-white rounded-xl shadow p-6">
-          <h3 class="font-semibold text-lg">Driving Test Package</h3>
-          <p class="text-sm text-gray-600 mt-2">Pre-test warm-up and car use for your test day.</p>
+
+        <!-- Overseas Licence -->
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden group hover:shadow-xl transition-shadow duration-300">
+          <div class="aspect-w-16 aspect-h-10 bg-gray-200">
+            <img src="https://images.unsplash.com/photo-1551836022-deb4988cc6c0?q=80&w=800&auto=format&fit=crop" 
+                 alt="Overseas licence conversion" 
+                 class="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300" />
+          </div>
+          <div class="p-6">
+            <h3 class="font-semibold text-lg mb-2 flex items-center justify-between">
+              Overseas Licence Conversion
+              <span class="text-blue-600">→</span>
+            </h3>
+            <p class="text-sm text-gray-600">Convert your overseas licence to Australian standards and gain confidence with local road rules.</p>
+          </div>
+        </div>
+
+        <!-- Driver Anxiety -->
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden group hover:shadow-xl transition-shadow duration-300">
+          <div class="aspect-w-16 aspect-h-10 bg-gray-200">
+            <img src="https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=800&auto=format&fit=crop" 
+                 alt="Overcoming driving anxiety" 
+                 class="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300" />
+          </div>
+          <div class="p-6">
+            <h3 class="font-semibold text-lg mb-2 flex items-center justify-between">
+              Nervous Drivers
+              <span class="text-blue-600">→</span>
+            </h3>
+            <p class="text-sm text-gray-600">Specialised support for nervous or anxious drivers. Build confidence with patient and understanding instruction.</p>
+          </div>
+        </div>
+
+        <!-- Support for Senior Drivers -->
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden group hover:shadow-xl transition-shadow duration-300">
+          <div class="aspect-w-16 aspect-h-10 bg-gray-200">
+            <img src="images/older-driver.jpg" 
+                 alt="Senior Driver Retests" 
+                 class="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300" />
+          </div>
+          <div class="p-6">
+            <h3 class="font-semibold text-lg mb-2 flex items-center justify-between">
+              Senior Driver Retests
+              <span class="text-blue-600">→</span>
+            </h3>
+            <p class="text-sm text-gray-600">Refresher lessons and test preparation tailored for senior drivers. Maintain your independence with confidence.</p>
+          </div>
         </div>
       </div>
-      <div class="mt-8">
-        <button class="bg-blue-700 text-white px-5 py-3 rounded-lg shadow hover:bg-blue-800" onclick="openCalendlyPopup()">Book online</button>
+      <div class="mt-12 text-center">
+        <button class="bg-blue-700 text-white px-8 py-3 rounded-lg shadow-lg hover:bg-blue-800 transition-colors duration-200" onclick="openCalendlyPopup()">Book Your Lesson Today</button>
       </div>
     </div>
   </section>
@@ -190,7 +256,7 @@
   <!-- Footer -->
   <footer class="bg-white border-t">
     <div class="container mx-auto px-4 py-8 text-sm text-gray-600 flex flex-col md:flex-row items-center justify-between gap-4">
-      <p>© <span id="year"></span> Auto-man Driving School.  All rights reserved.</p>
+      <p>© <span id="year"></span> Auto-Man Driving School.  All rights reserved.</p>
       <nav class="flex gap-4">
         <a href="#services" class="hover:text-blue-700">Services</a>
         <a href="#pricing" class="hover:text-blue-700">Packages</a>

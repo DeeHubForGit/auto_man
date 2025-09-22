@@ -6,9 +6,6 @@
   <title>Auto-Man Driving School</title>
   <meta name="description" content="Learn to drive in Geelong and surrounding suburbs. Friendly instructors and flexible bookings." />
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <!-- Calendly embed -->
-  <link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet">
-  <script src="https://assets.calendly.com/assets/external/widget.js" async></script>
   <style>
     /* Simple container width */
     .container { max-width: 1100px; }
@@ -28,8 +25,7 @@
         <a href="#contact" class="hover:text-blue-700">Contact</a>
       </nav>
       <div class="flex items-center gap-3">
-        <button class="hidden md:inline-block bg-blue-700 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-800 focus:ring"
-                onclick="openCalendlyPopup()">Book online</button>
+        <a href="book.html" class="hidden md:inline-block bg-blue-700 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-800 focus:ring">Book Now</a>
         <button class="md:hidden px-3 py-2 border rounded" onclick="toggleMenu()" aria-label="Toggle menu">☰</button>
       </div>
     </div>
@@ -40,7 +36,7 @@
         <a href="#ethos" class="hover:text-blue-700" onclick="toggleMenu()">Our Ethos</a>
         <a href="#pricing" class="hover:text-blue-700" onclick="toggleMenu()">Lesson Packages</a>
         <a href="#contact" class="hover:text-blue-700" onclick="toggleMenu()">Contact</a>
-        <button class="bg-blue-700 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-800" onclick="openCalendlyPopup()">Book online</button>
+        <a href="book.html" class="bg-blue-700 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-800" onclick="toggleMenu()">Book Now</a>
       </nav>
     </div>
   </header>
@@ -52,7 +48,7 @@
         <h1 class="text-4xl md:text-5xl font-extrabold leading-tight">Learn to drive with us.</h1>
         <p class="mt-4 text-lg">Friendly, patient instructors in <strong>Geelong</strong> and surrounding suburbs. Flexible lesson packages and test-day support.</p>
         <div class="mt-6 flex gap-3">
-          <button class="bg-blue-700 text-white px-6 py-3 rounded-lg shadow hover:bg-blue-800 focus:ring" onclick="openCalendlyPopup()">Book online</button>
+          <a href="book.html" class="bg-blue-700 text-white px-6 py-3 rounded-lg shadow hover:bg-blue-800 focus:ring">Book Now</a>
           <a href="#pricing" class="px-6 py-3 rounded-lg border hover:bg-white">View packages</a>
         </div>
       </div>
@@ -73,7 +69,7 @@
         <!-- Beginner Driver -->
         <div class="bg-white rounded-2xl shadow-lg overflow-hidden group hover:shadow-xl transition-shadow duration-300">
           <div class="aspect-w-16 aspect-h-10 bg-gray-200">
-            <img src="https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=800&auto=format&fit=crop" 
+            <img src="images/beginner-driver.jpg" 
                  alt="Beginner driver learning" 
                  class="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300" />
           </div>
@@ -89,7 +85,7 @@
         <!-- Driving Test Package -->
         <div class="bg-white rounded-2xl shadow-lg overflow-hidden group hover:shadow-xl transition-shadow duration-300">
           <div class="aspect-w-16 aspect-h-10 bg-gray-200">
-            <img src="https://images.unsplash.com/photo-1542038784456-1ea8e935640e?q=80&w=800&auto=format&fit=crop" 
+            <img src="images/driving-test.jpg" 
                  alt="Driving test preparation" 
                  class="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300" />
           </div>
@@ -105,7 +101,7 @@
         <!-- Overseas Licence -->
         <div class="bg-white rounded-2xl shadow-lg overflow-hidden group hover:shadow-xl transition-shadow duration-300">
           <div class="aspect-w-16 aspect-h-10 bg-gray-200">
-            <img src="https://images.unsplash.com/photo-1551836022-deb4988cc6c0?q=80&w=800&auto=format&fit=crop" 
+            <img src="images/overseas-driver.jpg" 
                  alt="Overseas licence conversion" 
                  class="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300" />
           </div>
@@ -121,7 +117,7 @@
         <!-- Driver Anxiety -->
         <div class="bg-white rounded-2xl shadow-lg overflow-hidden group hover:shadow-xl transition-shadow duration-300">
           <div class="aspect-w-16 aspect-h-10 bg-gray-200">
-            <img src="https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=800&auto=format&fit=crop" 
+            <img src="images/nervous-driver.jpg" 
                  alt="Overcoming driving anxiety" 
                  class="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300" />
           </div>
@@ -151,7 +147,7 @@
         </div>
       </div>
       <div class="mt-12 text-center">
-        <button class="bg-blue-700 text-white px-8 py-3 rounded-lg shadow-lg hover:bg-blue-800 transition-colors duration-200" onclick="openCalendlyPopup()">Book Your Lesson Today</button>
+        <a href="book.html" class="bg-blue-700 text-white px-8 py-3 rounded-lg shadow-lg hover:bg-blue-800 transition-colors duration-200">Book Your Lesson Today</a>
       </div>
     </div>
   </section>
@@ -190,7 +186,7 @@
             <li>3 × 1-hour lessons</li>
             <li>Valid 12 months</li>
           </ul>
-          <button class="mt-5 w-full bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800" onclick="openCalendlyPopup()">Book this</button>
+          <a href="book.html" class="mt-5 w-full bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 text-center block">Book this</a>
         </div>
         <div class="bg-white rounded-2xl shadow p-6 border relative">
           <span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-700 text-white text-xs px-3 py-1 rounded-full shadow">Popular</span>
@@ -200,7 +196,7 @@
             <li>5 × 1-hour lessons</li>
             <li>Valid 12 months</li>
           </ul>
-          <button class="mt-5 w-full bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800" onclick="openCalendlyPopup()">Book this</button>
+          <a href="book.html" class="mt-5 w-full bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 text-center block">Book this</a>
         </div>
         <div class="bg-white rounded-2xl shadow p-6 border">
           <h3 class="text-lg font-semibold">10 Lesson Pack</h3>
@@ -209,28 +205,17 @@
             <li>10 × 1-hour lessons</li>
             <li>Valid 12 months</li>
           </ul>
-          <button class="mt-5 w-full bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800" onclick="openCalendlyPopup()">Book this</button>
+          <a href="book.html" class="mt-5 w-full bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 text-center block">Book this</a>
         </div>
       </div>
       <div class="mt-8 bg-white rounded-xl border p-6">
-        <h3 class="font-semibold">Driving Test Package</h3>
-        <p class="text-sm text-gray-700 mt-2">Includes 45–60 min warm-up lesson before your test, and use of instructor car for the test.</p>
-        <button class="mt-4 bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800" onclick="openCalendlyPopup()">Book test package</button>
+        <h3 class="font-semibold text-lg">Driving Test Package</h3>
+        <p class="text-sm text-gray-700 mt-3 mb-4">Includes 45–60 min warm-up lesson before your test, and use of instructor car for the test.</p>
+        <a href="book.html" class="inline-block bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800">Book test package</a>
       </div>
     </div>
   </section>
 
-  <!-- Embedded Calendly (optional in-page) -->
-  <section id="book" class="py-16 bg-white">
-    <div class="container mx-auto px-4">
-      <h2 class="text-2xl font-bold">Book Online</h2>
-      <p class="text-gray-600 mt-1">Use the booking panel below or the blue button at the top.</p>
-      <div class="mt-6 bg-gray-100 rounded-xl p-4">
-        <!-- Replace data-url with your real Calendly link -->
-        <div class="calendly-inline-widget" data-url="https://calendly.com/YOUR_CALENDLY_USERNAME" style="min-width:320px;height:700px;"></div>
-      </div>
-    </div>
-  </section>
 
   <!-- Contact -->
   <section id="contact" class="py-16">
@@ -260,7 +245,7 @@
       <nav class="flex gap-4">
         <a href="#services" class="hover:text-blue-700">Services</a>
         <a href="#pricing" class="hover:text-blue-700">Packages</a>
-        <a href="#book" class="hover:text-blue-700">Book</a>
+        <a href="book.html" class="hover:text-blue-700">Book</a>
         <a href="#contact" class="hover:text-blue-700">Contact</a>
       </nav>
     </div>
@@ -270,10 +255,6 @@
     function toggleMenu(){
       const m = document.getElementById('mobileMenu');
       m.classList.toggle('hidden');
-    }
-    function openCalendlyPopup(){
-      // Replace with your live Calendly link
-      Calendly.initPopupWidget({ url: 'https://calendly.com/YOUR_CALENDLY_USERNAME' });
     }
     document.getElementById('year').textContent = new Date().getFullYear();
   </script>

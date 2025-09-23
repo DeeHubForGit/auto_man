@@ -58,6 +58,157 @@
         </div>
       </div>
     </div>
+
+    <!-- All Services -->
+    <div class="container mx-auto px-4 mt-12">
+      <h2 class="text-3xl font-bold mb-6">All Services</h2>
+
+      <!-- Filters -->
+      <div class="flex flex-wrap gap-3 mb-8">
+        <button class="px-4 py-2 rounded-full border bg-white text-gray-800 hover:bg-gray-50 filter-chip active" data-filter="all">All Services</button>
+        <button class="px-4 py-2 rounded-full border bg-green-100 text-green-900 hover:bg-green-200 filter-chip" data-filter="beginner">Beginner Driver</button>
+        <button class="px-4 py-2 rounded-full border bg-green-100 text-green-900 hover:bg-green-200 filter-chip" data-filter="elderly">Elderly Driver</button>
+        <button class="px-4 py-2 rounded-full border bg-green-100 text-green-900 hover:bg-green-200 filter-chip" data-filter="anxious">Anxious Driver</button>
+      </div>
+
+      <!-- Services List -->
+      <div id="servicesList" class="space-y-4">
+        <!-- Beginner 1hr -->
+        <div class="bg-white rounded-2xl border p-4 md:p-6 flex items-center gap-4 md:gap-6 service-item" data-cat="beginner">
+          <img src="images/beginner-driver.jpg" alt="Beginner Driving" class="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover">
+          <div class="flex-1">
+            <div class="flex items-center justify-between gap-4">
+              <h3 class="text-xl md:text-2xl font-semibold">Beginner Driving Lesson 1 hour</h3>
+              <div class="text-lg md:text-xl font-semibold text-gray-900">$85</div>
+            </div>
+            <p class="text-gray-600">Safe driving skills for life</p>
+          </div>
+          <a href="#calendar" data-service="Beginner Driving Lesson 1 hour" class="book-now whitespace-nowrap rounded-full border px-4 py-2 hover:bg-gray-50">Book Now</a>
+        </div>
+
+        <!-- Beginner 1.5hr -->
+        <div class="bg-white rounded-2xl border p-4 md:p-6 flex items-center gap-4 md:gap-6 service-item" data-cat="beginner">
+          <img src="images/beginner-driver.jpg" alt="Beginner Driving" class="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover">
+          <div class="flex-1">
+            <div class="flex items-center justify-between gap-4">
+              <h3 class="text-xl md:text-2xl font-semibold">Beginner Driving Lesson 1.5 hour</h3>
+              <div class="text-lg md:text-xl font-semibold text-gray-900">$125</div>
+            </div>
+            <p class="text-gray-600">Learn safe driving for life</p>
+          </div>
+          <a href="#calendar" data-service="Beginner Driving Lesson 1.5 hour" class="book-now whitespace-nowrap rounded-full border px-4 py-2 hover:bg-gray-50">Book Now</a>
+        </div>
+
+        <!-- Beginner 2hr -->
+        <div class="bg-white rounded-2xl border p-4 md:p-6 flex items-center gap-4 md:gap-6 service-item" data-cat="beginner">
+          <img src="images/beginner-driver.jpg" alt="Beginner Driving" class="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover">
+          <div class="flex-1">
+            <div class="flex items-center justify-between gap-4">
+              <h3 class="text-xl md:text-2xl font-semibold">Beginner Driving Lesson 2 hour</h3>
+              <div class="text-lg md:text-xl font-semibold text-gray-900">$165</div>
+            </div>
+            <p class="text-gray-600">Learn safe driving for life</p>
+          </div>
+          <a href="#calendar" data-service="Beginner Driving Lesson 2 hour" class="book-now whitespace-nowrap rounded-full border px-4 py-2 hover:bg-gray-50">Book Now</a>
+        </div>
+
+        <!-- Elderly 1hr -->
+        <div class="bg-white rounded-2xl border p-4 md:p-6 flex items-center gap-4 md:gap-6 service-item" data-cat="elderly">
+          <img src="images/older-driver.jpg" alt="Elderly Driver" class="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover">
+          <div class="flex-1">
+            <div class="flex items-center justify-between gap-4">
+              <h3 class="text-xl md:text-2xl font-semibold">Elderly Driver Lesson 1hr</h3>
+              <div class="text-lg md:text-xl font-semibold text-gray-900">$75</div>
+            </div>
+            <p class="text-gray-600">Get prepared to take a Licence re-test confidently.​ Includes Pensioner Discount.</p>
+          </div>
+          <a href="#calendar" data-service="Elderly Driver Lesson 1hr" class="book-now whitespace-nowrap rounded-full border px-4 py-2 hover:bg-gray-50">Book Now</a>
+        </div>
+
+        <!-- Anxious 1hr -->
+        <div class="bg-white rounded-2xl border p-4 md:p-6 flex items-center gap-4 md:gap-6 service-item" data-cat="anxious">
+          <img src="images/nervous-driver.jpg" alt="Anxious Driver" class="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover">
+          <div class="flex-1">
+            <div class="flex items-center justify-between gap-4">
+              <h3 class="text-xl md:text-2xl font-semibold">Anxious Driver Lesson 1hr</h3>
+              <div class="text-lg md:text-xl font-semibold text-gray-900">$85</div>
+            </div>
+            <p class="text-gray-600">Overcome driving fear and gain the freedom of the open road.</p>
+          </div>
+          <a href="#calendar" data-service="Anxious Driver Lesson 1hr" class="book-now whitespace-nowrap rounded-full border px-4 py-2 hover:bg-gray-50">Book Now</a>
+        </div>
+
+        <!-- Anxious 1.5hr -->
+        <div class="bg-white rounded-2xl border p-4 md:p-6 flex items-center gap-4 md:gap-6 service-item" data-cat="anxious">
+          <img src="images/nervous-driver.jpg" alt="Anxious Driver" class="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover">
+          <div class="flex-1">
+            <div class="flex items-center justify-between gap-4">
+              <h3 class="text-xl md:text-2xl font-semibold">Anxious Driver Lesson 1.5hr</h3>
+              <div class="text-lg md:text-xl font-semibold text-gray-900">$125</div>
+            </div>
+            <p class="text-gray-600">Overcome driving fear and gain the freedom of the open road.</p>
+          </div>
+          <a href="#calendar" data-service="Anxious Driver Lesson 1.5hr" class="book-now whitespace-nowrap rounded-full border px-4 py-2 hover:bg-gray-50">Book Now</a>
+        </div>
+
+        <!-- Anxious 2hr -->
+        <div class="bg-white rounded-2xl border p-4 md:p-6 flex items-center gap-4 md:gap-6 service-item" data-cat="anxious">
+          <img src="images/nervous-driver.jpg" alt="Anxious Driver" class="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover">
+          <div class="flex-1">
+            <div class="flex items-center justify-between gap-4">
+              <h3 class="text-xl md:text-2xl font-semibold">Anxious Driver Lesson 2hr</h3>
+              <div class="text-lg md:text-xl font-semibold text-gray-900">$165</div>
+            </div>
+            <p class="text-gray-600">Overcome driving fear and gain the freedom of the open road.</p>
+          </div>
+          <a href="#calendar" data-service="Anxious Driver Lesson 2hr" class="book-now whitespace-nowrap rounded-full border px-4 py-2 hover:bg-gray-50">Book Now</a>
+        </div>
+      </div>
+
+      <!-- Filter Script -->
+      <script>
+        document.addEventListener('DOMContentLoaded', function(){
+          const chips = document.querySelectorAll('.filter-chip');
+          const items = document.querySelectorAll('.service-item');
+          chips.forEach(chip => {
+            chip.addEventListener('click', () => {
+              chips.forEach(c => c.classList.remove('active', 'bg-green-600', 'text-white'));
+              chip.classList.add('active', 'bg-green-600', 'text-white');
+              const f = chip.getAttribute('data-filter');
+              items.forEach(it => {
+                const cat = it.getAttribute('data-cat');
+                it.style.display = (f === 'all' || f === cat) ? '' : 'none';
+              });
+            });
+          });
+          // Booking buttons: show calendar placeholder and selected service
+          const calTitle = document.getElementById('calendarService');
+          document.querySelectorAll('a.book-now').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const name = btn.getAttribute('data-service') || 'Selected Service';
+              if (calTitle) calTitle.textContent = name;
+            });
+          });
+        });
+      </script>
+    </div>
+  </section>
+
+  <!-- Calendar Placeholder -->
+  <section id="calendar" class="py-16 bg-white">
+    <div class="container mx-auto px-4">
+      <h2 class="text-3xl font-bold mb-4">Schedule your service</h2>
+      <div class="grid md:grid-cols-3 gap-6">
+        <div class="md:col-span-2 bg-gray-50 border rounded-2xl p-8 h-72 flex items-center justify-center text-gray-500 text-xl">
+          Calendar
+        </div>
+        <div class="bg-white border rounded-2xl p-6">
+          <h3 class="font-semibold mb-2">Service Details</h3>
+          <p class="text-gray-700" id="calendarService">Select a service</p>
+          <a href="#" class="mt-6 inline-block bg-blue-700 text-white px-5 py-2 rounded-lg hover:bg-blue-800">Next</a>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- Shared Footer -->

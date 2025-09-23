@@ -28,6 +28,12 @@
     }
   </style>
   <script src="assets/include.js" defer></script>
+  <!-- Load local Supabase config (git-ignored). Create assets/js/config.local.js to set
+       window.SUPABASE_URL and window.SUPABASE_ANON_KEY. -->
+  <script src="assets/js/config.local.js" defer></script>
+  <!-- Supabase client (CDN) -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2.44.4/dist/umd/supabase.js" defer></script>
+  <script src="assets/js/supabaseClient.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr" defer></script>
 </head>
 <body class="bg-gray-50 text-gray-900">
@@ -81,6 +87,8 @@
       // Parse service from query and infer duration
       const params = new URLSearchParams(location.search);
       const serviceName = params.get('service') || 'Driving Lesson';
+      const serviceId = params.get('service_id') || null; // optional if you have IDs
+      const scheduleId = params.get('schedule_id') || null; // select a schedule to read from
       const durationMinutes = (function(s){
         const txt = (s || '').toLowerCase();
         if (txt.includes('1.5')) return 90;
@@ -104,19 +112,48 @@
       const today = new Date();
       renderSlots(today);
 
-      function renderSlots(date){
+      async function renderSlots(date){
         const slotsEl = document.getElementById('slots');
         slotsEl.innerHTML = '';
         document.getElementById('availDate').textContent = date.toLocaleDateString(undefined, { weekday:'long', day:'numeric', month:'short' });
-        // Business hours example: 08:00–18:00
-        const startH = 8, endH = 18;
-        const d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), startH, 0, 0, 0);
-        const end = new Date(date.getFullYear(), date.getMonth(), date.getDate(), endH, 0, 0, 0);
+        // Require Supabase + IDs
+        const useSupabase = !!window.supabaseClient && !!scheduleId && !!serviceId;
+        let slotRanges = [];
+        if (useSupabase) {
+          try {
+            const y = date.getFullYear();
+            const m = String(date.getMonth()+1).padStart(2,'0');
+            const d = String(date.getDate()).padStart(2,'0');
+            const dayStart = `${y}-${m}-${d}T00:00:00`;
+            const dayEnd = `${y}-${m}-${d}T23:59:59`;
+            const { data, error } = await window.supabaseClient
+              .from('availability_slot')
+              .select('id, start_at, end_at')
+              .eq('schedule_id', scheduleId)
+              .eq('service_id', serviceId)
+              .eq('is_booked', false)
+              .gte('start_at', dayStart)
+              .lte('start_at', dayEnd)
+              .order('start_at', { ascending: true });
+            if (error) throw error;
+            slotRanges = (data || []).map(r => ({
+              start: new Date(r.start_at),
+              end: new Date(r.end_at),
+              id: r.id
+            }));
+          } catch (e) {
+            console && console.warn && console.warn('Supabase slots error:', e.message || e);
+          }
+        } else {
+          slotsEl.innerHTML = '<div class="text-sm text-amber-600">Live availability is not configured. Please provide schedule_id and service_id in the URL and ensure Supabase config is loaded.</div>';
+          return;
+        }
+
         let selectedBtn = null;
         const msgEl = document.getElementById('selectedMsg');
-        while (d.getTime() + durationMinutes*60000 <= end.getTime()){
-          const label = new Date(d);
-          const endLbl = new Date(d.getTime() + durationMinutes*60000);
+        for (const r of slotRanges){
+          const label = r.start;
+          const endLbl = r.end;
           const labelStr = label.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit', hour12: true});
           const endStr = endLbl.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit', hour12: true});
 
@@ -134,12 +171,9 @@
             msgEl.classList.remove('hidden');
           });
           slotsEl.appendChild(btn);
-
-          // next slot on 30-min grid
-          d.setMinutes(d.getMinutes() + 30);
         }
         if (!slotsEl.children.length){
-          slotsEl.innerHTML = '<div class="text-gray-500">No slots available for this day.</div>';
+          slotsEl.innerHTML = '<div class="text-gray-500">No availability for this date.</div>';
         }
 
         // Clear message if no slots

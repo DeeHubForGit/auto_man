@@ -1,6 +1,6 @@
-# Auto-man Driving School
+# Auto-Man Driving School
 
-Website for Auto-man Driving School in Geelong and surrounding suburbs.  
+Website for Auto-Man Driving School in Geelong and surrounding suburbs.  
 Provides lesson information, pricing packages, and online bookings via Calendly.
 
 ## Features

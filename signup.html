@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign Up - Auto-Man</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="assets/include.js" defer></script>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <div data-include="partials/header.html"></div>
+
+  <main class="py-16">
+    <div class="container mx-auto px-4">
+      <div class="max-w-md mx-auto bg-white rounded-2xl border p-8 shadow">
+        <h1 class="text-3xl font-extrabold mb-6 text-center">Sign Up</h1>
+
+        <form id="signupForm" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1" for="signupEmail">Email</label>
+            <input id="signupEmail" type="email" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring" required />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1" for="signupPassword">Password</label>
+            <input id="signupPassword" type="password" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring" required />
+            <p class="text-xs text-gray-500 mt-1">Minimum 6 characters (Supabase default).</p>
+          </div>
+          <button class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Create account</button>
+        </form>
+
+        <div class="mt-4 text-sm text-center">
+          <span class="text-gray-600">Already a member?</span>
+          <a href="login.html" class="text-blue-600 hover:underline">Log in</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div data-include="partials/footer.html"></div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function(){
+      const form = document.getElementById('signupForm');
+      form.addEventListener('submit', async function(e){
+        e.preventDefault();
+        const email = document.getElementById('signupEmail').value.trim();
+        const password = document.getElementById('signupPassword').value;
+        try {
+          await AuthUI.signUpWithEmail(email, password);
+        } catch (err) {
+          alert(err?.message || 'Sign up failed');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

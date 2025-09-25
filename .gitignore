@@ -28,6 +28,9 @@ node_modules/
 # Output of 'npm pack'
 *.tgz
 
+# Local frontend config (Supabase keys)
+assets/js/config.local.js
+
 # Yarn Integrity file
 .yarn-integrity
 

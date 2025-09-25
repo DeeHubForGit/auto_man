@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Log In - Auto-Man</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="assets/include.js" defer></script>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <div data-include="partials/header.html"></div>
+
+  <main class="py-16">
+    <div class="container mx-auto px-4">
+      <div class="max-w-md mx-auto bg-white rounded-2xl border p-8 shadow">
+        <h1 class="text-3xl font-extrabold mb-6 text-center">Log In</h1>
+
+        <form id="loginForm" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1" for="loginEmail">Email</label>
+            <input id="loginEmail" type="email" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring" required />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1" for="loginPassword">Password</label>
+            <input id="loginPassword" type="password" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring" required />
+          </div>
+          <button class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Log in</button>
+        </form>
+
+        <div class="mt-4 text-sm text-center">
+          <span class="text-gray-600">Don’t have an account?</span>
+          <a href="signup.html" class="text-blue-600 hover:underline">Sign up</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div data-include="partials/footer.html"></div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function(){
+      const form = document.getElementById('loginForm');
+      form.addEventListener('submit', async function(e){
+        e.preventDefault();
+        const email = document.getElementById('loginEmail').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        try {
+          await AuthUI.signInWithPassword(email, password);
+        } catch (err) {
+          alert(err?.message || 'Login failed');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

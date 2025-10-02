@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Auto-Man Driving School – Book a Lesson (SimplyBook)</title>
+  <meta name="description" content="Book a driving lesson with Auto-Man using SimplyBook. Choose a date to see available time slots." />
+  <!-- Site styles for header/footer consistency -->
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <!-- Optional: page-specific styling -->
+  <style>
+    :root{--brand:#dd3649;--bg:#0b1220;--card:#101828;--muted:#9aa4b2}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans",sans-serif;background:#0b1220;color:#e5e7eb}
+    .wrap{max-width:1100px;margin:40px auto;padding:0 20px}
+    .hero{display:flex;gap:24px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    .card{background:var(--card);border:1px solid #1f2937;border-radius:16px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    .btn{display:inline-flex;align-items:center;gap:8px;background:var(--brand);color:white;border:0;border-radius:999px;padding:12px 18px;font-weight:600;cursor:pointer}
+    .btn:hover{filter:brightness(1.1)}
+    .grid{display:grid;grid-template-columns:1fr;gap:24px}
+    @media(min-width:960px){.grid{grid-template-columns:1.1fr .9fr}}
+    /* SimplyBook widget container */
+    #simplybook-widget{min-height:700px;display:flex;align-items:center;justify-content:center}
+    .muted{color:var(--muted)}
+    /* spacer below the sticky site header */
+    .page-spacer { height: 16px; }
+  </style>
+  <script src="assets/include.js" defer></script>
+  <!-- SimplyBook Widget Script -->
+  <script src="//widget.simplybook.net/v2/widget/widget.js" type="text/javascript"></script>
+</head>
+<body>
+  <!-- Shared Header -->
+  <div data-include="partials/header.html"></div>
+  <div class="page-spacer"></div>
+
+  <div class="wrap">
+    <div class="hero">
+      <div>
+        <h1 style="margin:0;font-size:40px;line-height:1.1">Book a Driving Lesson</h1>
+      </div>
+    </div>
+
+    <div class="grid" style="margin-top:28px">
+      <section class="card">
+        <!-- SimplyBook Booking Widget - Embedded iframe (starts at services) -->
+        <iframe 
+          src="https://automands.simplybook.me/v2/#book/service" 
+          width="100%" 
+          height="900" 
+          frameborder="0"
+          style="border:0;border-radius:12px;background:#f2f2f2"
+          allowtransparency="true"
+          loading="lazy"
+        ></iframe>
+      </section>
+
+      <aside class="card">
+        <h3 style="margin-top:0">Need a hand booking?</h3>
+        <p class="muted" style="margin:0 0 12px 0">Pick a service and a time that suits you. If you're unsure which option to choose, use the tips below or contact us.</p>
+        <ul style="margin:0 0 14px 18px; line-height:1.5">
+          <li><strong>New to driving?</strong> Choose <em>1 Hour Lesson</em> to get started.</li>
+          <li><strong>Test coming up?</strong> Select the <em>Driving Test Package</em> for a warm-up and car use for the test.</li>
+          <li><strong>Nervous driver?</strong> We specialise in calm, patient instruction—just note this in the booking.</li>
+          <li><strong>Area covered:</strong> Geelong and surrounding suburbs.</li>
+        </ul>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin:12px 0 16px 0">
+          <a href="tel:04XXXXXXXX" class="btn" style="text-decoration:none">Call us</a>
+          <a href="mailto:info@auto-man.com.au" class="btn" style="background:#334155;text-decoration:none">Email</a>
+        </div>
+        <div class="muted" style="font-size:14px">
+          <p style="margin:0 0 8px 0"><strong>Hours:</strong> Weekdays and weekends available. If you can't find a suitable time, contact us and we'll try to help.</p>
+          <p style="margin:0 0 8px 0"><strong>Payment:</strong> Secure card payment via SimplyBook. Other options by arrangement.</p>
+          <p style="margin:0"><strong>Rescheduling:</strong> Please give at least 24 hours' notice where possible.</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Shared Footer -->
+  <div data-include="partials/footer.html"></div>
+</body>
+</html>

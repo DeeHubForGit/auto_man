@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Auto-Man Driving School – Book a Lesson (SimplyBook)</title>
   <meta name="description" content="Book a driving lesson with Auto-Man using SimplyBook. Choose a date to see available time slots." />
+  <!-- Preconnect to speed up SimplyBook widget loading -->
+  <link rel="preconnect" href="https://automands.simplybook.net" crossorigin>
+  <link rel="preconnect" href="https://widget.simplybook.net" crossorigin>
+  <link rel="dns-prefetch" href="//automands.simplybook.net">
+  <link rel="dns-prefetch" href="//widget.simplybook.net">
   <!-- Site styles for header/footer consistency -->
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <!-- Optional: page-specific styling -->
@@ -21,6 +26,17 @@
     @media(min-width:960px){.grid{grid-template-columns:1.1fr .9fr}}
     .muted{color:var(--muted)}
     .page-spacer { height: 16px; }
+    
+    /* SimplyBook skeleton loader */
+    .sb-shell{position:relative; min-height:700px; background:var(--card); border-radius:12px; overflow:hidden}
+    .sb-skeleton{
+      position:absolute; inset:0; display:grid; place-items:center;
+      background:linear-gradient(90deg,var(--card) 0,#0f172a 20%,var(--card) 40%) 0/200% 100%;
+      animation:shimmer 1.5s ease-in-out infinite;
+      color:var(--muted); font:600 16px/1.4 ui-sans-serif,system-ui,Segoe UI,Roboto,Arial;
+    }
+    @keyframes shimmer{to{background-position:-200% 0}}
+    .sb-shell.loaded .sb-skeleton{opacity:0; transition:opacity 0.3s; pointer-events:none}
   </style>
   <script src="assets/include.js" defer></script>
   <!-- SimplyBook Widget Script -->
@@ -40,8 +56,11 @@
 
     <div class="grid" style="margin-top:28px">
       <section class="card">
-        <!-- SimplyBook Booking Widget - JavaScript Widget -->
-        <div id="simplybook-widget" style="min-height:700px"></div>
+        <!-- SimplyBook Booking Widget with skeleton loader -->
+        <div class="sb-shell" id="sbShell">
+          <div class="sb-skeleton">Loading booking calendar…</div>
+          <div id="simplybook-widget"></div>
+        </div>
       </section>
 
       <aside class="card">
@@ -84,6 +103,14 @@
       "is_rtl": false,
       "container_id": "simplybook-widget"
     });
+    
+    // Hide skeleton when widget loads
+    setTimeout(function() {
+      var widgetEl = document.getElementById('simplybook-widget');
+      if (widgetEl && widgetEl.querySelector('iframe')) {
+        document.getElementById('sbShell').classList.add('loaded');
+      }
+    }, 1000);
   </script>
   
   <!-- Additional CSS to override widget styles -->

@@ -9,19 +9,19 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <!-- Optional: page-specific styling -->
   <style>
-    :root{--brand:#1f3f68;--bg:#0b1220;--card:#101828;--muted:#9aa4b2}
+    :root{--brand:#3b82f6;--bg:#0b1220;--card:#101828;--muted:#9aa4b2}
     body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans",sans-serif;background:#0b1220;color:#e5e7eb}
     .wrap{max-width:1100px;margin:40px auto;padding:0 20px}
     .hero{display:flex;gap:24px;align-items:center;justify-content:space-between;flex-wrap:wrap}
     .card{background:var(--card);border:1px solid #1f2937;border-radius:16px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
     .btn{display:inline-flex;align-items:center;gap:8px;background:var(--brand);color:white;border:0;border-radius:999px;padding:12px 18px;font-weight:600;cursor:pointer}
-    .btn:hover{filter:brightness(1.1)}
-    .grid{display:grid;grid-template-columns:1fr;gap:24px}
-    @media(min-width:960px){.grid{grid-template-columns:1.1fr .9fr}}
+    .btn:hover{background:#2563eb}
+    /* Single column layout for packages */
+    .single-col{display:flex;flex-direction:column;gap:24px}
     /* SimplyBook widget container */
-    #simplybook-widget{min-height:700px}
+    #simplybook-widget{min-height:0}
+    #simplybook-widget iframe{min-height:800px !important; display:block}
     .muted{color:var(--muted)}
-    /* spacer below the sticky site header */
     .page-spacer { height: 16px; }
   </style>
   <script src="assets/include.js" defer></script>
@@ -40,37 +40,15 @@
       </div>
     </div>
 
-    <div class="grid" style="margin-top:28px">
-      <section class="card">
-        <!-- SimplyBook Packages Widget -->
-        <div id="simplybook-widget"></div>
-      </section>
-
-      <aside class="card">
-        <h3 style="margin-top:0">Why Choose a Package?</h3>
-        <p class="muted" style="margin:0 0 12px 0">Save money and plan ahead with our lesson packages. Perfect for learners who want to commit to regular practice.</p>
-        <ul style="margin:0 0 14px 18px; line-height:1.5">
-          <li><strong>Better Value:</strong> Packages offer discounted rates compared to single lessons.</li>
-          <li><strong>Consistency:</strong> Regular lessons help build skills faster and retain knowledge better.</li>
-          <li><strong>Flexibility:</strong> Use your package lessons at your own pace within the validity period.</li>
-          <li><strong>Test Ready:</strong> Multi-lesson packages ensure you're fully prepared for your driving test.</li>
-        </ul>
-        <div style="display:flex; gap:10px; flex-wrap:wrap; margin:12px 0 16px 0">
-          <a href="tel:04XXXXXXXX" class="btn" style="text-decoration:none">Call us</a>
-          <a href="mailto:info@auto-man.com.au" class="btn" style="background:#334155;text-decoration:none">Email</a>
-        </div>
-        <div class="muted" style="font-size:14px">
-          <p style="margin:0 0 8px 0"><strong>Package Validity:</strong> Most packages are valid for 12 months from purchase date.</p>
-          <p style="margin:0 0 8px 0"><strong>Payment:</strong> Secure card payment via SimplyBook. Other options by arrangement.</p>
-          <p style="margin:0"><strong>Questions?</strong> Contact us if you need help choosing the right package for your needs.</p>
-        </div>
-      </aside>
+    <div class="single-col" style="margin-top:28px">
+      <!-- SimplyBook Packages Widget -->
+      <div id="simplybook-widget"></div>
     </div>
   </div>
 
   <!-- SimplyBook Widget Initialization -->
   <script type="text/javascript">
-    var widget = new SimplybookWidget({"widget_type":"iframe","url":"https:\/\/automands.simplybook.net","theme":"dainty","theme_settings":{"timeline_show_end_time":"1","timeline_hide_unavailable":"0","hide_past_days":"0","sb_base_color":"#1f3f68","secondary_color":"#eff5fd","sb_text_color":"#0f1926","display_item_mode":"list","body_bg_color":"#ffffff","sb_background_image":"","sb_review_image":"","dark_font_color":"#0f1926","light_font_color":"#ffffff","btn_color_1":"#385e8e","sb_company_label_color":"#ffffff","sb_cancellation_color":"#ff7a93","hide_img_mode":"1"},"timeline":null,"datepicker":null,"is_rtl":false,"app_config":{"clear_session":0,"allow_switch_to_ada":0,"predefined":[]},"navigate":"packages"});
+    var widget = new SimplybookWidget({"widget_type":"iframe","url":"https:\/\/automands.simplybook.net","theme":"dainty","theme_settings":{"timeline_show_end_time":"1","timeline_hide_unavailable":"0","hide_past_days":"0","sb_base_color":"#3b82f6","secondary_color":"#eff5fd","sb_text_color":"#0f1926","display_item_mode":"list","body_bg_color":"#ffffff","sb_background_image":"","sb_review_image":"","dark_font_color":"#0f1926","light_font_color":"#ffffff","btn_color_1":"#3b82f6","sb_company_label_color":"#ffffff","sb_cancellation_color":"#ff7a93","hide_img_mode":"1"},"timeline":null,"datepicker":null,"is_rtl":false,"app_config":{"clear_session":0,"allow_switch_to_ada":0,"predefined":[]},"navigate":"packages"});
   </script>
 
   <!-- Shared Footer -->

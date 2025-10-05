@@ -21,12 +21,18 @@
   --am-brand-dark: #2563eb;  /* hover state */
 }
 
-.sb-btn, .btn, button[type="submit"] {
+/* Button styling - colors and size */
+.sb-btn, .btn, button[type="submit"], button, .btn-primary {
   background: var(--am-brand) !important;
   border-color: var(--am-brand) !important;
   color: #fff !important;
+  padding: 10px 24px !important;
+  min-height: auto !important;
+  height: auto !important;
+  font-size: 15px !important;
+  line-height: 1.4 !important;
 }
-.sb-btn:hover, .btn:hover, button[type="submit"]:hover {
+.sb-btn:hover, .btn:hover, button[type="submit"]:hover, button:hover, .btn-primary:hover {
   background: var(--am-brand-dark) !important;
   border-color: var(--am-brand-dark) !important;
 }

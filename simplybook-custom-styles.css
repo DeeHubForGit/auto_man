@@ -44,13 +44,15 @@ body, .content, .sb__content {
 }
 
 /* =========================================
-   1) Hide hero/banner, reduce big gaps
+   1) Reduce top spacing (don't hide headers completely)
    ========================================= */
-.header, .sb-header, .hero, .top-banner, .page-banner {
-  display: none !important;
-}
 .section, .container, .sb__container {
   padding-top: 12px !important;
+  margin-top: 0 !important;
+}
+/* Only hide large banner images, not functional headers */
+.page-banner, .hero-image, .top-banner {
+  display: none !important;
 }
 
 /* =========================================
@@ -64,10 +66,7 @@ body, .content, .sb__content {
   border-radius: 8px !important;
 }
 
-/* Kill the big icon/image blocks */
-.service-item .image, .sb-card__media, .service-item svg {
-  display: none !important;
-}
+/* Note: Service images are now shown via hide_img_mode: 0 in widget settings */
 
 /* Tighter titles & meta */
 .service-item .title, .sb-card__title {

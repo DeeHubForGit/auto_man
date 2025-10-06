@@ -8,13 +8,7 @@
       <a href="index.html#contact" class="hover:text-blue-700">Contact</a>
     </nav>
     <div class="flex items-center gap-3">
-      <a href="book.html" class="hidden md:inline-block bg-blue-700 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-800 focus:ring">Book Now</a>
-      <!-- Auth controls: populated by assets/js/auth.js -->
-      <div id="authControls" class="hidden md:flex items-center gap-3 text-sm">
-        <span id="authUserEmail" class="text-gray-600"></span>
-        <button id="logoutBtn" class="px-3 py-1 rounded border hover:bg-gray-50">Log out</button>
-      </div>
-      <a id="loginLink" href="signup.html" class="hidden md:inline-block px-3 py-2 rounded border hover:bg-white">Log in</a>
+      <a href="simplybook.html" class="hidden md:inline-block bg-blue-700 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-800 focus:ring">Book Now</a>
       <button class="md:hidden px-3 py-2 border rounded" onclick="toggleMenu()" aria-label="Toggle menu">☰</button>
     </div>
   </div>
@@ -25,13 +19,7 @@
       <a href="index.html#ethos" class="hover:text-blue-700" onclick="toggleMenu()">Our Ethos</a>
       <a href="index.html#pricing" class="hover:text-blue-700" onclick="toggleMenu()">Lesson Packages</a>
       <a href="index.html#contact" class="hover:text-blue-700" onclick="toggleMenu()">Contact</a>
-      <a href="book.html" class="bg-blue-700 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-800" onclick="toggleMenu()">Book Now</a>
-      <a id="loginLinkMobile" href="signup.html" class="px-4 py-2 rounded border" onclick="toggleMenu()">Log in</a>
+      <a href="simplybook.html" class="bg-blue-700 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-800" onclick="toggleMenu()">Book Now</a>
     </nav>
   </div>
-  <!-- Supabase Auth scripts -->
-  <script src="assets/js/config.local.js"></script>
-  <script src="https://unpkg.com/@supabase/supabase-js@2.44.4/dist/umd/supabase.js"></script>
-  <script src="assets/js/supabaseClient.js"></script>
-  <script src="assets/js/auth.js"></script>
 </header>

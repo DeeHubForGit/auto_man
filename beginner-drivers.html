@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Beginner Driving Lessons - Auto-Man Driving School</title>
+  <meta name="description" content="Learn to drive with Auto-Man's beginner driving lessons in Geelong. Patient instructors, flexible scheduling, and personalized instruction for all levels." />
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    :root{--brand:#3b82f6;--bg:#0b1220;--card:#101828;--muted:#9aa4b2}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans",sans-serif;background:#0b1220;color:#e5e7eb}
+    .wrap{max-width:1100px;margin:40px auto;padding:0 20px}
+    .hero-service{background:linear-gradient(135deg,#1e3a8a 0%,#3b82f6 100%);padding:60px 20px;text-align:center;border-radius:16px;margin-bottom:40px}
+    .card{background:var(--card);border:1px solid #1f2937;border-radius:16px;padding:30px;box-shadow:0 10px 30px rgba(0,0,0,.25);margin-bottom:30px}
+    .btn{display:inline-flex;align-items:center;gap:8px;background:var(--brand);color:white;border:0;border-radius:999px;padding:14px 28px;font-weight:600;cursor:pointer;text-decoration:none;transition:all 0.3s}
+    .btn:hover{background:#2563eb;transform:translateY(-2px)}
+    .feature-list{list-style:none;padding:0;margin:20px 0}
+    .feature-list li{padding:12px 0;padding-left:30px;position:relative;line-height:1.6}
+    .feature-list li:before{content:"✓";position:absolute;left:0;color:var(--brand);font-weight:bold;font-size:20px}
+    .page-spacer{height:16px}
+  </style>
+  <script src="assets/include.js" defer></script>
+</head>
+<body>
+  <!-- Shared Header -->
+  <div data-include="partials/header.html"></div>
+  <div class="page-spacer"></div>
+
+  <div class="wrap">
+    <!-- Hero Section -->
+    <div class="hero-service">
+      <h1 style="margin:0 0 16px 0;font-size:48px;font-weight:700;line-height:1.1">Beginner Driving Lessons</h1>
+      <p style="font-size:20px;margin:0;opacity:0.9">Learn to drive with confidence in Geelong</p>
+    </div>
+
+    <!-- Main Content -->
+    <div class="card">
+      <h2 style="margin-top:0;font-size:28px;margin-bottom:20px">Beginner Driver Lessons (All Levels)</h2>
+      
+      <p style="font-size:18px;line-height:1.8;margin-bottom:24px">
+        Perfect for students learning to drive in preparation for their driving test. Our experienced instructors provide patient, 
+        personalized instruction tailored to your level of experience and ability.
+      </p>
+
+      <ul class="feature-list">
+        <li><strong>Suitable for all experience levels</strong> – Whether you're a complete beginner or need a refresher, we'll meet you where you are</li>
+        <li><strong>Personalized instruction</strong> – Lessons are adapted to your pace and learning style</li>
+        <li><strong>Modern, well-maintained vehicles</strong> – Learn in safe, reliable cars with dual controls</li>
+        <li><strong>Flexible pick-up and drop-off</strong> – We'll meet you at your chosen location to start and end your lesson</li>
+        <li><strong>Parents welcome</strong> – Parents are encouraged to observe lessons if desired</li>
+        <li><strong>Choose your lesson duration</strong> – 1 hour, 1.5 hours, or 2 hours to suit your schedule</li>
+        <li><strong>Package deals available</strong> – Save money with our multi-lesson packages</li>
+      </ul>
+    </div>
+
+    <!-- What You'll Learn -->
+    <div class="card">
+      <h2 style="margin-top:0;font-size:28px;margin-bottom:20px">What You'll Learn</h2>
+      
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px">
+        <div>
+          <h3 style="color:var(--brand);margin-bottom:10px">Basic Vehicle Control</h3>
+          <p style="color:var(--muted);line-height:1.6">Starting, stopping, steering, and smooth gear changes</p>
+        </div>
+        <div>
+          <h3 style="color:var(--brand);margin-bottom:10px">Road Awareness</h3>
+          <p style="color:var(--muted);line-height:1.6">Reading traffic, hazard perception, and defensive driving</p>
+        </div>
+        <div>
+          <h3 style="color:var(--brand);margin-bottom:10px">Parking Skills</h3>
+          <p style="color:var(--muted);line-height:1.6">Parallel parking, reverse parking, and three-point turns</p>
+        </div>
+        <div>
+          <h3 style="color:var(--brand);margin-bottom:10px">Test Preparation</h3>
+          <p style="color:var(--muted);line-height:1.6">Practice test routes and build confidence for your driving test</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing & Booking -->
+    <div class="card" style="text-align:center">
+      <h2 style="margin-top:0;font-size:28px;margin-bottom:20px">Ready to Get Started?</h2>
+      <p style="font-size:18px;margin-bottom:30px;color:var(--muted)">
+        Book your first lesson today and start your journey to becoming a confident driver
+      </p>
+      <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
+        <a href="simplybook.html" class="btn" style="font-size:18px">Book a Lesson</a>
+        <a href="simplybook-packages.html" class="btn" style="background:#334155;font-size:18px">View Packages</a>
+      </div>
+      <p style="margin-top:24px;font-size:14px;color:var(--muted)">
+        <strong>Area covered:</strong> Geelong and surrounding suburbs<br>
+        <strong>Hours:</strong> Weekdays and weekends available
+      </p>
+    </div>
+
+    <!-- What to Expect -->
+    <div data-include="partials/what-to-expect.html"></div>
+  </div>
+
+  <!-- Shared Footer -->
+  <div data-include="partials/footer.html"></div>
+</body>
+</html>

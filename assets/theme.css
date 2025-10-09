@@ -1,0 +1,115 @@
+/* Auto-Man Driving School - Dark Theme */
+:root {
+  --brand: #3b82f6;
+  --bg: #0b1220;
+  --card: #101828;
+  --header: #1a2332;
+  --muted: #9aa4b2;
+  --border: #374151;
+  --text-light: #e5e7eb;
+  --text-gray: #d1d5db;
+}
+
+/* Global styles */
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Ubuntu, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+  background-color: var(--bg) !important;
+  color: var(--text-light) !important;
+}
+
+/* Header */
+header {
+  background-color: var(--header) !important;
+  border-bottom: 1px solid var(--border);
+}
+
+header a.logo {
+  color: var(--text-light);
+}
+
+header nav a {
+  color: var(--text-gray);
+}
+
+header nav a:hover {
+  color: var(--brand);
+}
+
+header button {
+  color: var(--text-light);
+  border-color: var(--border);
+}
+
+/* Footer */
+footer {
+  background-color: var(--card) !important;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+}
+
+footer nav a {
+  color: var(--text-gray);
+}
+
+footer nav a:hover {
+  color: #60a5fa;
+}
+
+/* Sections */
+section {
+  background: transparent !important;
+}
+
+/* Cards */
+.bg-white,
+.rounded-xl {
+  background-color: var(--card) !important;
+  border: 1px solid var(--border);
+}
+
+/* Text colors */
+.text-gray-900 {
+  color: var(--text-light) !important;
+}
+
+.text-gray-700 {
+  color: #9ca3af !important;
+}
+
+.text-gray-600 {
+  color: var(--muted) !important;
+}
+
+/* Borders */
+.border {
+  border-color: var(--border) !important;
+}
+
+/* Shadows */
+.shadow,
+.shadow-lg {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* Gradients */
+.bg-gradient-to-br {
+  background: linear-gradient(135deg, #1e3a8a 0%, var(--brand) 100%) !important;
+}
+
+/* Buttons */
+a.bg-blue-700,
+a.px-6,
+button {
+  color: white !important;
+}
+
+/* Container */
+.container {
+  max-width: 1100px;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}

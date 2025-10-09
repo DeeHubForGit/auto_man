@@ -26,6 +26,9 @@
     if (isFileProtocol) {
       console.warn('[Auto-Man] You are opening the site via file:// which blocks loading shared header/footer. Start a local server and open http://localhost instead.');
     }
+
+    // Trigger an event after partials are loaded so config placeholders can be replaced
+    window.dispatchEvent(new CustomEvent('partialsLoaded'));
   }
 
   if (document.readyState === 'loading') {

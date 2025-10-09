@@ -214,4 +214,7 @@ window.SITE_CONFIG.loadFromAPI = async function(apiUrl) {
   } else {
     replacePhoneNumbers();
   }
+
+  // Re-run after partials are loaded
+  window.addEventListener('partialsLoaded', replacePhoneNumbers);
 })();

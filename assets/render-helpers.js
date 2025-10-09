@@ -76,7 +76,7 @@ function renderPackages(containerId = 'packages-container') {
         <ul class="mt-3 text-sm text-gray-700 list-disc list-inside">
           ${features}
         </ul>
-        <a href="book.html" class="${buttonClasses}">Book Now</a>
+        <a href="simplybook.html" class="${buttonClasses}">Book Now</a>
       </div>
     `;
   }).join('');

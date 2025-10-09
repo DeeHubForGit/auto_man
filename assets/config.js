@@ -25,8 +25,8 @@ const SITE_CONFIG = {
       description: 'Get a warm-up lesson and use of our instructor\'s car for your driving test. Maximise your chances of success with confidence.',
       image: 'images/driving-test.jpg',
       page: 'driving-test-package.html',
-      duration: '45-60 min warm-up + test',
-      cost: 250,
+      duration: '1 hour pre-test + test',
+      cost: 300,
       costNote: 'Our Driving Test Package fee does not include VicRoads testing fee.',
       // Legacy support
       price: 250,

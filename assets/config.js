@@ -64,6 +64,17 @@ const SITE_CONFIG = {
       duration: '1 hour',
       cost: 80,
       costNote: null
+    },
+    {
+      id: 'special-needs',
+      name: 'Special Requirements',
+      slug: 'special-needs',
+      description: 'Have unique needs or circumstances? We offer customised lessons tailored to your specific requirements. Contact us to discuss how we can help.',
+      image: 'images/medium-shot-smiley-woman-car.jpg',
+      page: null,
+      duration: 'Custom',
+      cost: null,
+      costNote: 'Contact us for pricing'
     }
   ],
   

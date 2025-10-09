@@ -133,6 +133,15 @@ a.hover\:bg-purple-50:hover {
   box-shadow: 0 4px 12px rgba(96, 165, 250, 0.6);
 }
 
+/* Contact section links */
+#contact a {
+  color: #e5e7eb !important;
+}
+
+#contact a:hover {
+  color: #60a5fa !important;
+}
+
 /* Container */
 .container {
   max-width: 1100px;

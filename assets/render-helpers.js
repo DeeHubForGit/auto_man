@@ -58,16 +58,25 @@ function renderPackages(containerId = 'packages-container') {
       : 'mt-5 w-full bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 text-center block';
     
     const features = pkg.features.map(f => `<li>${f}</li>`).join('');
+    const perLessonPrice = pkg.lessons ? (pkg.price / pkg.lessons).toFixed(0) : null;
+    const perLessonText = perLessonPrice ? `<p class="text-lg font-bold mt-1" style="color:#3b82f6">$${perLessonPrice}/lesson</p>` : '';
+    
+    // Calculate savings compared to individual lesson price ($85/lesson)
+    const individualPrice = 85;
+    const savings = pkg.lessons ? (individualPrice * pkg.lessons - pkg.price) : 0;
+    const savingsText = savings > 0 ? `<p class="text-base font-bold mt-1" style="color:#10b981">Save $${savings}</p>` : '';
     
     return `
       <div class="${cardClasses}">
         ${popularBadge}
         <h3 class="text-lg font-semibold text-gray-900">${pkg.name}</h3>
-        <p class="text-3xl font-extrabold mt-2 text-gray-900">${pkg.price}</p>
+        <p class="text-3xl font-extrabold mt-2 text-gray-900">$${pkg.price}</p>
+        ${perLessonText}
+        ${savingsText}
         <ul class="mt-3 text-sm text-gray-700 list-disc list-inside">
           ${features}
         </ul>
-        <a href="book.html" class="${buttonClasses}">Book this</a>
+        <a href="book.html" class="${buttonClasses}">Book Now</a>
       </div>
     `;
   }).join('');

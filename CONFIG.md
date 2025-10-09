@@ -46,6 +46,13 @@ const SITE_CONFIG = {
   // Bookable services (from booking system API)
   SERVICES: [],
   
+  // Individual lesson pricing
+  LESSON_PRICING: [
+    { duration: '1 hour', durationShort: '1hr', price: 85 },
+    { duration: '1.5 hour', durationShort: '1.5hr', price: 125 },
+    { duration: '2 hour', durationShort: '2hr', price: 165 }
+  ],
+  
   PACKAGES: [
     {
       id: '3-lesson-pack',
@@ -114,6 +121,12 @@ Use `{{PHONE}}` placeholder in HTML to automatically insert the phone number.
    - `costNote`: Optional note about pricing
 4. Save the file
 
+### Individual Lesson Pricing
+1. Open `assets/config.js`
+2. Update the `LESSON_PRICING` array
+3. Each lesson option should have: `duration`, `durationShort`, `price`
+4. Save the file
+
 ### Packages & Pricing
 1. Open `assets/config.js`
 2. Update the `PACKAGES` array
@@ -129,6 +142,7 @@ These will be services like "Auto Driving Lesson 1 hour", "Manual Driving Lesson
 - **Phone Number:** 0403 632 313
 - **Service Overviews:** 5 (Beginner Drivers, Driving Test Package, Overseas Licence, Nervous Drivers, Senior Drivers)
 - **Bookable Services:** 0 (will be loaded from booking system API)
+- **Lesson Pricing:** 3 options ($85/hr, $125/1.5hr, $165/2hr)
 - **Packages:** 3 ($240, $390, $760)
 
 ## Pages Updated

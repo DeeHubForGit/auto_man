@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nervous Drivers - Auto-Man Driving School</title>
+  <meta name="description" content="Overcome driving anxiety with Auto-Man's specialized lessons for nervous drivers in Geelong. Patient, understanding instruction to build your confidence." />
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    :root{--brand:#3b82f6;--bg:#0b1220;--card:#101828;--muted:#9aa4b2}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans",sans-serif;background:#0b1220;color:#e5e7eb}
+    .wrap{max-width:1100px;margin:40px auto;padding:0 20px}
+    .hero-service{background:linear-gradient(135deg,#1e3a8a 0%,#3b82f6 100%);padding:60px 20px;text-align:center;border-radius:16px;margin-bottom:40px}
+    .card{background:var(--card);border:1px solid #1f2937;border-radius:16px;padding:30px;box-shadow:0 10px 30px rgba(0,0,0,.25);margin-bottom:30px}
+    .btn{display:inline-flex;align-items:center;gap:8px;background:var(--brand);color:white;border:0;border-radius:999px;padding:14px 28px;font-weight:600;cursor:pointer;text-decoration:none;transition:all 0.3s}
+    .btn:hover{background:#2563eb;transform:translateY(-2px)}
+    .feature-list{list-style:none;padding:0;margin:20px 0}
+    .feature-list li{padding:12px 0;padding-left:30px;position:relative;line-height:1.6}
+    .feature-list li:before{content:"✓";position:absolute;left:0;color:var(--brand);font-weight:bold;font-size:20px}
+    .page-spacer{height:16px}
+    .info-box{background:#1e3a8a22;border:1px solid #3b82f655;border-radius:12px;padding:24px;margin:24px 0}
+    .two-col-layout{display:grid;grid-template-columns:1fr;gap:30px;margin-bottom:30px}
+    @media(min-width:768px){.two-col-layout{grid-template-columns:1fr 400px}}
+    .sidebar-booking{position:sticky;top:80px;align-self:start}
+  </style>
+  <script src="assets/config.js"></script>
+  <script src="assets/include.js" defer></script>
+</head>
+<body>
+  <!-- Shared Header -->
+  <div data-include="partials/header.html"></div>
+  <div class="page-spacer"></div>
+
+  <div class="wrap">
+    <!-- Hero Section -->
+    <div class="hero-service">
+      <h1 style="margin:0 0 16px 0;font-size:48px;font-weight:700;line-height:1.1">Nervous Drivers</h1>
+      <p style="font-size:20px;margin:0;opacity:0.9">Specialized support for nervous or anxious drivers</p>
+    </div>
+
+    <!-- Two Column Layout -->
+    <div class="two-col-layout">
+      <!-- Left Column - Main Content -->
+      <div>
+        <div class="card">
+          <h2 style="margin-top:0;font-size:28px;margin-bottom:20px">Nervous Driver Tailored Lesson (All Levels)</h2>
+          
+          <p style="font-size:18px;line-height:1.8;margin-bottom:24px">
+            Do you dream of learning to drive but anxiety holds you back? We get it!
+          </p>
+
+          <p style="font-size:16px;line-height:1.8;margin-bottom:24px;color:var(--muted)">
+            Our Nervous Driver lessons are specifically designed to help you conquer driving anxiety and gain the 
+            confidence to take to the roads comfortably and safely.
+          </p>
+
+          <ul class="feature-list">
+            <li><strong>We cater the lesson to your level of experience and ability</strong> – Personalized, patient instruction at your pace</li>
+            <li><strong>Lessons are undertaken in our certified 5-star ANCAP-rated Automatic Transmission Vehicle</strong> – Modern, safe, and reliable</li>
+            <li><strong>We will meet you at your chosen location</strong> – Convenient pick-up to commence your lesson and end the lesson at your selected location</li>
+            <li><strong>Parents are welcome to come along to the lesson</strong> – Family support is encouraged</li>
+            <li><strong>Choose the lesson duration that suits you</strong> – From 1 hr → 2 hrs</li>
+            <li><strong>Packages are also available for 1hr lessons</strong> – (scroll down for details)</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Right Column - Booking Sidebar -->
+      <div class="sidebar-booking">
+        <div class="card">
+          <h3 style="margin:0 0 16px 0;font-size:24px;font-weight:700">Book Your Lesson</h3>
+          <div id="lesson-pricing-grid" style="display:grid;grid-template-columns:1fr;gap:12px;margin-top:20px">
+            <!-- Pricing will be loaded from config -->
+          </div>
+          <div style="margin-top:24px">
+            <a href="tel:{{PHONE_LINK}}" class="btn" style="font-size:16px;width:100%;justify-content:center">📞 Call {{OWNER}} {{PHONE}}</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- What Makes Us Different -->
+    <div class="card">
+      <h2 style="margin-top:0;font-size:28px;margin-bottom:20px">Ready to Take the Wheel but Not Sure Where to Start?</h2>
+      
+      <p style="font-size:16px;line-height:1.8;margin-bottom:24px;color:var(--muted)">
+        Contact us for a free consultation and let's discuss how we can help you conquer your driving anxiety so you 
+        can become the confident driver you deserve to be.
+      </p>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px">
+        <div>
+          <h3 style="color:var(--brand);margin-bottom:10px">Understanding & Patient</h3>
+          <p style="color:var(--muted);line-height:1.6">We understand that driving anxiety is real and we take the time to work at your pace</p>
+        </div>
+        <div>
+          <h3 style="color:var(--brand);margin-bottom:10px">Safe Environment</h3>
+          <p style="color:var(--muted);line-height:1.6">Learn in a calm, supportive atmosphere with no pressure or judgment</p>
+        </div>
+        <div>
+          <h3 style="color:var(--brand);margin-bottom:10px">Build Confidence Gradually</h3>
+          <p style="color:var(--muted);line-height:1.6">Start with basics and progress at a comfortable pace until you feel ready</p>
+        </div>
+        <div>
+          <h3 style="color:var(--brand);margin-bottom:10px">Proven Techniques</h3>
+          <p style="color:var(--muted);line-height:1.6">Specialized methods to help manage anxiety and build driving skills simultaneously</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Booking Section -->
+    <div class="card" style="text-align:center">
+      <h2 style="margin-top:0;font-size:28px;margin-bottom:20px">Ready to Overcome Your Driving Anxiety?</h2>
+      <p style="font-size:18px;margin-bottom:30px;color:var(--muted)">
+        Take the first step towards confident, comfortable driving
+      </p>
+      <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
+        <a href="tel:{{PHONE_LINK}}" class="btn" style="font-size:18px">📞 Call {{OWNER}} {{PHONE}}</a>
+        <a href="simplybook.html" class="btn" style="background:#334155;font-size:18px">Book Online</a>
+      </div>
+      <p style="margin-top:24px;font-size:14px;color:var(--muted)">
+        <strong>Area covered:</strong> Geelong and surrounding suburbs<br>
+        <strong>Hours:</strong> Weekdays and weekends available
+      </p>
+    </div>
+
+    <!-- What to Expect -->
+    <div data-include="partials/what-to-expect.html"></div>
+
+    <!-- Meet Your Instructor -->
+    <div data-include="partials/meet-instructor.html"></div>
+  </div>
+
+  <!-- Shared Footer -->
+  <div data-include="partials/footer.html"></div>
+
+  <script>
+    // Load lesson pricing from config
+    (function() {
+      function renderLessonPricing() {
+        const container = document.getElementById('lesson-pricing-grid');
+        if (!container || !SITE_CONFIG.LESSON_PRICING) return;
+
+        container.innerHTML = SITE_CONFIG.LESSON_PRICING.map(lesson => `
+          <div style="padding:12px;background:#1e3a8a22;border:1px solid #3b82f655;border-radius:8px">
+            <p style="margin:0;font-size:14px;color:var(--muted)">${lesson.duration} lesson</p>
+            <p style="margin:4px 0 0 0;font-size:24px;font-weight:700;color:#e5e7eb">$${lesson.price}</p>
+          </div>
+        `).join('');
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', renderLessonPricing);
+      } else {
+        renderLessonPricing();
+      }
+
+      // Re-render if config is loaded from API
+      window.addEventListener('configUpdated', renderLessonPricing);
+    })();
+  </script>
+</body>
+</html>

@@ -71,6 +71,13 @@ const SITE_CONFIG = {
   // This will be populated from the booking system API
   SERVICES: [],
   
+  // Individual lesson pricing (by duration)
+  LESSON_PRICING: [
+    { duration: '1 hour', durationShort: '1hr', price: 85 },
+    { duration: '1.5 hour', durationShort: '1.5hr', price: 125 },
+    { duration: '2 hour', durationShort: '2hr', price: 165 }
+  ],
+  
   // Lesson packages
   PACKAGES: [
     {

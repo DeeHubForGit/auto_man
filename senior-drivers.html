@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Senior Driver Retests - Auto-Man Driving School</title>
+  <meta name="description" content="Refresher lessons and test preparation for senior drivers in Geelong. Maintain your independence with confidence." />
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    :root{--brand:#3b82f6;--bg:#0b1220;--card:#101828;--muted:#9aa4b2}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans",sans-serif;background:#0b1220;color:#e5e7eb}
+    .wrap{max-width:1100px;margin:40px auto;padding:0 20px}
+    .hero-service{background:linear-gradient(135deg,#1e3a8a 0%,#3b82f6 100%);padding:60px 20px;text-align:center;border-radius:16px;margin-bottom:40px}
+    .card{background:var(--card);border:1px solid #1f2937;border-radius:16px;padding:30px;box-shadow:0 10px 30px rgba(0,0,0,.25);margin-bottom:30px}
+    .btn{display:inline-flex;align-items:center;gap:8px;background:var(--brand);color:white;border:0;border-radius:999px;padding:14px 28px;font-weight:600;cursor:pointer;text-decoration:none;transition:all 0.3s}
+    .btn:hover{background:#2563eb;transform:translateY(-2px)}
+    .feature-list{list-style:none;padding:0;margin:20px 0}
+    .feature-list li{padding:12px 0;padding-left:30px;position:relative;line-height:1.6}
+    .feature-list li:before{content:"✓";position:absolute;left:0;color:var(--brand);font-weight:bold;font-size:20px}
+    .page-spacer{height:16px}
+    .two-col-layout{display:grid;grid-template-columns:1fr;gap:30px;margin-bottom:30px}
+    @media(min-width:768px){.two-col-layout{grid-template-columns:1fr 400px}}
+    .sidebar-booking{position:sticky;top:80px;align-self:start}
+    .info-section{background:#1e3a8a22;border-left:4px solid var(--brand);padding:16px;margin:20px 0;border-radius:4px}
+  </style>
+  <script src="assets/config.js"></script>
+  <script src="assets/include.js" defer></script>
+</head>
+<body>
+  <!-- Shared Header -->
+  <div data-include="partials/header.html"></div>
+  <div class="page-spacer"></div>
+
+  <div class="wrap">
+    <!-- Hero Section -->
+    <div class="hero-service">
+      <h1 style="margin:0 0 16px 0;font-size:48px;font-weight:700;line-height:1.1">Senior Driver Retests</h1>
+      <p style="font-size:20px;margin:0;opacity:0.9">Refresher lessons and test preparation tailored for senior drivers</p>
+    </div>
+
+    <!-- Two Column Layout -->
+    <div class="two-col-layout">
+      <!-- Left Column - Main Content -->
+      <div>
+        <div class="card">
+          <h2 style="margin-top:0;font-size:28px;margin-bottom:20px">Elderly Driver Re-test Preparation Lessons (All Levels)</h2>
+          
+          <p style="font-size:18px;line-height:1.8;margin-bottom:24px">
+            In Victoria, there is currently no mandatory re-testing for elderly drivers based solely on age. However, driver safety is a 
+            priority and there are ways to ensure older Victorians remain fit to drive. Certain circumstances such as Health conditions 
+            will require a driver to take a Licence re-test. If this happens to you we can help! We offer lessons designed specifically to 
+            prepare you to take the re-test confidently.
+          </p>
+
+          <div class="info-section">
+            <h3 style="margin:0 0 12px 0;font-size:20px;font-weight:600">Medical Conditions:</h3>
+            <ul style="margin:0;padding-left:20px;color:var(--muted)">
+              <li>Drivers in Victoria are legally responsible for disclosing any medical conditions that could affect their driving ability to VicRoads. Your doctor can advise if a medical assessment is needed.</li>
+            </ul>
+          </div>
+
+          <div class="info-section">
+            <h3 style="margin:0 0 12px 0;font-size:20px;font-weight:600">Driver Assessment:</h3>
+            <ul style="margin:0;padding-left:20px;color:var(--muted)">
+              <li>If VicRoads has concerns about a driver's fitness, they may request a driver assessment by an Occupational Therapist. This assessment evaluates your ability to handle the physical and cognitive demands of driving.</li>
+              <li>Drivers are responsible for the cost of this assessment.</li>
+            </ul>
+          </div>
+
+          <div class="info-section">
+            <h3 style="margin:0 0 12px 0;font-size:20px;font-weight:600">Self-Assessment:</h3>
+            <ul style="margin:0;padding-left:20px;color:var(--muted)">
+              <li>VicRoads encourages older drivers to assess their own fitness to drive regularly. This includes considering any changes in vision, hearing, reaction time, or physical limitations that could impact driving safety.</li>
+            </ul>
+          </div>
+
+          <div style="margin-top:30px;padding:20px;background:#0f172a;border-radius:8px">
+            <h3 style="margin:0 0 12px 0;font-size:20px;font-weight:600">Further Information</h3>
+            <p style="margin:0 0 12px 0;font-size:16px;color:var(--muted)">Download VicRoads resources for older drivers:</p>
+            <ul style="margin:0;padding-left:20px">
+              <li style="margin-bottom:8px">
+                <a href="https://www.vicroads.vic.gov.au/-/media/files/documents/safety-and-road-rules/older-drivers/fit-to-drive-fs-ageing--safe-driving-hrv1jan-19.ashx" 
+                   target="_blank" 
+                   rel="noopener noreferrer"
+                   style="color:var(--brand);text-decoration:underline;font-size:14px">
+                  Ageing and Safe Driving Fact Sheet
+                </a>
+              </li>
+              <li>
+                <a href="https://www.vicroads.vic.gov.au/licences/health-and-driving/information-for-health-professionals/" 
+                   target="_blank" 
+                   rel="noopener noreferrer"
+                   style="color:var(--brand);text-decoration:underline;font-size:14px">
+                  VicRoads Health and Driving Information
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column - Booking Sidebar -->
+      <div class="sidebar-booking">
+        <div class="card">
+          <img src="images/older-driver.jpg" alt="Senior Driver" style="width:100%;height:200px;object-fit:cover;border-radius:12px;margin-bottom:20px">
+          
+          <h3 style="margin:0 0 16px 0;font-size:24px;font-weight:700">Book Your Lesson</h3>
+          
+          <div style="padding:16px;background:#1e3a8a22;border:1px solid #3b82f655;border-radius:8px;margin-bottom:16px">
+            <p style="margin:0;font-size:14px;color:var(--muted)">1 hour lesson</p>
+            <p style="margin:4px 0 0 0;font-size:24px;font-weight:700;color:#e5e7eb">$75</p>
+            <p style="margin:8px 0 0 0;font-size:12px;color:var(--muted);font-style:italic">Incl pensioner discount</p>
+          </div>
+          
+          <div style="margin-top:20px">
+            <a href="tel:{{PHONE_LINK}}" class="btn" style="font-size:16px;width:100%;justify-content:center">📞 Call {{OWNER}} {{PHONE}}</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- What to Expect -->
+    <div data-include="partials/what-to-expect.html"></div>
+
+    <!-- Meet Your Instructor -->
+    <div data-include="partials/meet-instructor.html"></div>
+  </div>
+
+  <!-- Shared Footer -->
+  <div data-include="partials/footer.html"></div>
+</body>
+</html>

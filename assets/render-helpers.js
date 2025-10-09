@@ -44,21 +44,30 @@ function renderPackages(containerId = 'packages-container') {
   const packages = window.SITE_CONFIG.PACKAGES;
   
   container.innerHTML = packages.map(pkg => {
-    const popularBadge = pkg.popular 
-      ? '<span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-700 text-white text-xs px-3 py-1 rounded-full shadow">Popular</span>'
+    const isPopular = pkg.popular;
+    const popularBadge = isPopular 
+      ? '<span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-sky-400 to-blue-400 text-white text-base font-bold px-4 py-2 rounded-full shadow-lg flex items-center gap-1"><span class="text-xl">⭐</span> Most Popular</span>'
       : '';
+    
+    const cardClasses = isPopular
+      ? 'bg-white rounded-2xl shadow-xl p-6 border-2 border-sky-400 relative transform scale-105 ring-4 ring-sky-400/30'
+      : 'bg-white rounded-2xl shadow p-6 border relative';
+    
+    const buttonClasses = isPopular
+      ? 'mt-5 w-full bg-gradient-to-r from-sky-400 to-blue-500 text-white px-4 py-3 rounded-lg hover:from-sky-500 hover:to-blue-600 text-center block font-bold shadow-lg'
+      : 'mt-5 w-full bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 text-center block';
     
     const features = pkg.features.map(f => `<li>${f}</li>`).join('');
     
     return `
-      <div class="bg-white rounded-2xl shadow p-6 border relative">
+      <div class="${cardClasses}">
         ${popularBadge}
-        <h3 class="text-lg font-semibold">${pkg.name}</h3>
-        <p class="text-3xl font-extrabold mt-2">$${pkg.price}</p>
+        <h3 class="text-lg font-semibold text-gray-900">${pkg.name}</h3>
+        <p class="text-3xl font-extrabold mt-2 text-gray-900">${pkg.price}</p>
         <ul class="mt-3 text-sm text-gray-700 list-disc list-inside">
           ${features}
         </ul>
-        <a href="book.html" class="mt-5 w-full bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 text-center block">Book this</a>
+        <a href="book.html" class="${buttonClasses}">Book this</a>
       </div>
     `;
   }).join('');

@@ -18,6 +18,9 @@
     .feature-list li{padding:12px 0;padding-left:30px;position:relative;line-height:1.6}
     .feature-list li:before{content:"✓";position:absolute;left:0;color:var(--brand);font-weight:bold;font-size:20px}
     .page-spacer{height:16px}
+    .two-col-layout{display:grid;grid-template-columns:1fr;gap:30px;margin-bottom:30px}
+    @media(min-width:768px){.two-col-layout{grid-template-columns:1fr 400px}}
+    .sidebar-booking{position:sticky;top:80px;align-self:start}
   </style>
   <script src="assets/config.js"></script>
   <script src="assets/include.js" defer></script>
@@ -34,8 +37,11 @@
       <p style="font-size:20px;margin:0;opacity:0.9">Learn to drive with confidence in Geelong</p>
     </div>
 
-    <!-- Main Content -->
-    <div class="card">
+    <!-- Two Column Layout -->
+    <div class="two-col-layout">
+      <!-- Left Column - Main Content -->
+      <div>
+        <div class="card">
       <h2 style="margin-top:0;font-size:28px;margin-bottom:20px">Beginner Driver Lessons (All Levels)</h2>
       
       <p style="font-size:18px;line-height:1.8;margin-bottom:24px">
@@ -52,46 +58,48 @@
         <li><strong>Choose your lesson duration</strong> – 1 hour, 1.5 hours, or 2 hours to suit your schedule</li>
         <li><strong>Package deals available</strong> – Save money with our multi-lesson packages</li>
       </ul>
-    </div>
+        </div>
 
-    <!-- What You'll Learn -->
-    <div class="card">
-      <h2 style="margin-top:0;font-size:28px;margin-bottom:20px">What You'll Learn</h2>
-      
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px">
-        <div>
-          <h3 style="color:var(--brand);margin-bottom:10px">Basic Vehicle Control</h3>
-          <p style="color:var(--muted);line-height:1.6">Starting, stopping, steering, and smooth gear changes</p>
-        </div>
-        <div>
-          <h3 style="color:var(--brand);margin-bottom:10px">Road Awareness</h3>
-          <p style="color:var(--muted);line-height:1.6">Reading traffic, hazard perception, and defensive driving</p>
-        </div>
-        <div>
-          <h3 style="color:var(--brand);margin-bottom:10px">Parking Skills</h3>
-          <p style="color:var(--muted);line-height:1.6">Parallel parking, reverse parking, and three-point turns</p>
-        </div>
-        <div>
-          <h3 style="color:var(--brand);margin-bottom:10px">Test Preparation</h3>
-          <p style="color:var(--muted);line-height:1.6">Practice test routes and build confidence for your driving test</p>
+        <!-- What You'll Learn -->
+        <div class="card">
+          <h2 style="margin-top:0;font-size:28px;margin-bottom:20px">What You'll Learn</h2>
+          
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px">
+            <div>
+              <h3 style="color:var(--brand);margin-bottom:10px">Basic Vehicle Control</h3>
+              <p style="color:var(--muted);line-height:1.6">Starting, stopping, steering, and smooth gear changes</p>
+            </div>
+            <div>
+              <h3 style="color:var(--brand);margin-bottom:10px">Road Awareness</h3>
+              <p style="color:var(--muted);line-height:1.6">Reading traffic, hazard perception, and defensive driving</p>
+            </div>
+            <div>
+              <h3 style="color:var(--brand);margin-bottom:10px">Parking Skills</h3>
+              <p style="color:var(--muted);line-height:1.6">Parallel parking, reverse parking, and three-point turns</p>
+            </div>
+            <div>
+              <h3 style="color:var(--brand);margin-bottom:10px">Test Preparation</h3>
+              <p style="color:var(--muted);line-height:1.6">Practice test routes and build confidence for your driving test</p>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Pricing & Booking -->
-    <div class="card" style="text-align:center">
-      <h2 style="margin-top:0;font-size:28px;margin-bottom:20px">Ready to Get Started?</h2>
-      <p style="font-size:18px;margin-bottom:30px;color:var(--muted)">
-        Book your first lesson today and start your journey to becoming a confident driver
-      </p>
-      <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
-        <a href="simplybook.html" class="btn" style="font-size:18px">Book a Lesson</a>
-        <a href="simplybook-packages.html" class="btn" style="background:#334155;font-size:18px">View Packages</a>
+      <!-- Right Column - Booking Sidebar -->
+      <div class="sidebar-booking">
+        <div class="card">
+          <h3 style="margin:0 0 16px 0;font-size:24px;font-weight:700">Book Your Lesson</h3>
+          <div id="lesson-pricing-grid" style="display:grid;grid-template-columns:1fr;gap:12px;margin-top:20px">
+            <!-- Pricing will be loaded from config -->
+          </div>
+          <div style="margin-top:24px">
+            <a href="tel:{{PHONE_LINK}}" class="btn" style="font-size:16px;width:100%;justify-content:center">📞 Call {{OWNER}} {{PHONE}}</a>
+          </div>
+          <div style="margin-top:16px">
+            <a href="simplybook-packages.html" class="btn" style="background:#10b981;font-size:16px;width:100%;justify-content:center">View Packages</a>
+          </div>
+        </div>
       </div>
-      <p style="margin-top:24px;font-size:14px;color:var(--muted)">
-        <strong>Area covered:</strong> Geelong and surrounding suburbs<br>
-        <strong>Hours:</strong> Weekdays and weekends available
-      </p>
     </div>
 
     <!-- What to Expect -->
@@ -103,5 +111,31 @@
 
   <!-- Shared Footer -->
   <div data-include="partials/footer.html"></div>
+
+  <script>
+    // Load lesson pricing from config
+    (function() {
+      function renderLessonPricing() {
+        const container = document.getElementById('lesson-pricing-grid');
+        if (!container || !SITE_CONFIG.LESSON_PRICING) return;
+
+        container.innerHTML = SITE_CONFIG.LESSON_PRICING.map(lesson => `
+          <div style="padding:12px;background:#1e3a8a22;border:1px solid #3b82f655;border-radius:8px">
+            <p style="margin:0;font-size:14px;color:var(--muted)">${lesson.duration} lesson</p>
+            <p style="margin:4px 0 0 0;font-size:24px;font-weight:700;color:#e5e7eb">$${lesson.price}</p>
+          </div>
+        `).join('');
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', renderLessonPricing);
+      } else {
+        renderLessonPricing();
+      }
+
+      // Re-render if config is loaded from API
+      window.addEventListener('configUpdated', renderLessonPricing);
+    })();
+  </script>
 </body>
 </html>

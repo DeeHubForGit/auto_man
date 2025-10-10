@@ -14,6 +14,19 @@ function renderServices(containerId = 'services-container') {
     const linkTag = service.page ? 'a' : 'div';
     const href = service.page ? `href="${service.page}"` : '';
     
+    // Format pricing display
+    let priceDisplay = '';
+    if (service.cost) {
+      // Add alternative pricing if available
+      const altText = service.priceAlt 
+        ? `<br><span class="text-sm text-blue-600">${service.priceAlt}</span>` 
+        : '';
+      
+      priceDisplay = `<p class="text-base font-semibold text-blue-600 mt-2">${service.cost}${altText}</p>`;
+    } else if (service.costNote) {
+      priceDisplay = `<p class="text-sm font-semibold text-gray-500 mt-2">${service.costNote}</p>`;
+    }
+    
     return `
       <${linkTag} ${href} class="bg-white rounded-2xl shadow-lg overflow-hidden group hover:shadow-xl transition-shadow duration-300 block">
         <div class="aspect-w-16 aspect-h-10 bg-gray-200">
@@ -27,6 +40,7 @@ function renderServices(containerId = 'services-container') {
             <span class="text-blue-600">→</span>
           </h3>
           <p class="text-sm text-gray-600">${service.description}</p>
+          ${priceDisplay}
         </div>
       </${linkTag}>
     `;

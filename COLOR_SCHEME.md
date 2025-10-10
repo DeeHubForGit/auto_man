@@ -1,17 +1,24 @@
 # Auto-Man Driving School - Color Scheme
 
-## Brand Colors
+## Primary Colors
+- **Brand Blue**: `#3b82f6` (Tailwind: `blue-500`)
+- **Hover Blue**: `#2563eb` (Tailwind: `blue-600`)
 
-### Primary Blue
-- **Main Brand Blue**: `#3b82f6` (blue-500) - Used for primary buttons, links, accents
-- **Light Blue**: `#60a5fa` (blue-400) - Used for headings on dark backgrounds, hover states
-- **Dark Blue**: `#1e40af` (blue-800) - Used for text on light backgrounds
+## Button Colors
+**All buttons use the same lighter blue for consistency:**
+- **Standard Button**: `bg-blue-500` with `hover:bg-blue-600`
+- **Primary/Featured Button**: `bg-gradient-to-r from-sky-400 to-blue-500` with border (for hero/featured CTAs)
+
+## Usage Guidelines
+- Use `bg-blue-500` for ALL standard buttons across the site
+- Use gradient + border only for primary hero buttons
+- This lighter blue works on both dark and light backgrounds
+- Maintains consistency across all pages
 
 ### Background Colors
 - **Light Background**: `#f9fafb` (gray-50) - Page backgrounds
 - **White**: `#ffffff` - Card backgrounds, primary button backgrounds
 - **Dark Background**: `#0b1220` - Dark sections (from theme.css)
-- **Card Dark**: `#101828` - Dark card backgrounds
 
 ### Accent Colors
 - **Success/Green**: `#10b981` (emerald-500) - Success messages, positive actions

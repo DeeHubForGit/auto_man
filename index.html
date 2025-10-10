@@ -46,7 +46,7 @@
         <!-- Service overviews will be dynamically loaded from config -->
       </div>
       <div class="mt-12 text-center">
-        <a href="simplybook.html" class="bg-blue-700 text-white px-8 py-3 rounded-lg shadow-lg hover:bg-blue-800 transition-colors duration-200">Book Now</a>
+        <a href="simplybook.html" class="bg-blue-500 text-white px-8 py-3 rounded-lg shadow-lg hover:bg-blue-600 transition-colors duration-200">Book Now</a>
       </div>
     </div>
   </section>
@@ -109,7 +109,7 @@
       <div class="mt-8 bg-white rounded-xl border p-6">
         <h3 class="font-semibold text-lg" data-service-name="driving-test-package">Driving Test Package</h3>
         <p class="text-sm text-gray-700 mt-3 mb-4" data-service-description="driving-test-package">Includes 45–60 min warm-up lesson before your test, and use of instructor car for the test.</p>
-        <a href="driving-test-package.html" class="inline-block bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800">Book Now</a>
+        <a href="driving-test-package.html" class="inline-block bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">Book Now</a>
       </div>
     </div>
   </section>
@@ -119,26 +119,16 @@
   <section id="contact" class="py-16">
     <div class="container mx-auto px-4">
       <h2 class="text-2xl font-bold">Contact Us</h2>
-      <div class="mt-6 grid md:grid-cols-3 gap-6">
-        <div class="bg-white rounded-xl shadow p-6 text-center">
-          <div class="text-3xl mb-3">📞</div>
-          <h3 class="font-semibold mb-2">Call</h3>
-          <p class="text-lg"><a class="text-blue-500 hover:text-blue-600 font-bold" href="tel:{{PHONE_LINK}}">{{PHONE}}</a></p>
-        </div>
-        <div class="bg-white rounded-xl shadow p-6 text-center">
-          <div class="text-3xl mb-3">📧</div>
-          <h3 class="font-semibold mb-2">Email</h3>
-          <p class="text-lg"><a class="text-blue-500 hover:text-blue-600 font-bold" href="mailto:info@auto-man.com.au">info@auto-man.com.au</a></p>
-        </div>
-        <div class="bg-white rounded-xl shadow p-6 text-center">
-          <div class="text-3xl mb-3">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#1877f2" class="w-12 h-12 mx-auto">
-              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-            </svg>
-          </div>
-          <h3 class="font-semibold mb-2">Facebook</h3>
-          <p class="text-lg"><a class="text-blue-500 hover:text-blue-600 font-bold" href="#" target="_blank" rel="noopener">@auto.man.driving</a></p>
-        </div>
+      <div class="mt-6">
+        <div data-include="partials/contact-details.html"></div>
+      </div>
+
+      <!-- CTA to Contact Page -->
+      <div class="mt-12 text-center">
+        <p class="text-lg mb-4">Have a question or ready to book?</p>
+        <a href="contact.html" class="inline-block bg-blue-500 text-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-blue-600 transition-colors shadow-lg">
+          Send Us a Message
+        </a>
       </div>
     </div>
   </section>

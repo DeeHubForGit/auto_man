@@ -72,7 +72,7 @@ function renderPackages(containerId = 'packages-container') {
     
     const buttonClasses = isPopular
       ? 'mt-5 w-full bg-gradient-to-r from-sky-400 to-blue-500 text-white px-4 py-3 rounded-lg hover:from-sky-500 hover:to-blue-600 text-center block font-bold shadow-lg'
-      : 'mt-5 w-full bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 text-center block';
+      : 'mt-5 w-full bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 text-center block font-semibold';
     
     const features = pkg.features.map(f => `<li>${f}</li>`).join('');
     const perLessonPrice = pkg.lessons ? (pkg.price / pkg.lessons).toFixed(0) : null;

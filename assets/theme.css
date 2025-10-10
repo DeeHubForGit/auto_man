@@ -68,6 +68,20 @@ section {
   border: 1px solid var(--border);
 }
 
+/* Ensure buttons keep their blue color */
+a.bg-blue-500,
+button.bg-blue-500 {
+  background-color: #3b82f6 !important;
+  color: white !important;
+  border: none !important;
+}
+
+a.bg-blue-500:hover,
+button.bg-blue-500:hover {
+  background-color: #2563eb !important;
+  color: white !important;
+}
+
 /* Text colors */
 .text-gray-900 {
   color: var(--text-light) !important;
@@ -133,12 +147,12 @@ a.hover\:bg-purple-50:hover {
   box-shadow: 0 4px 12px rgba(96, 165, 250, 0.6);
 }
 
-/* Contact section links */
-#contact a {
+/* Contact section links - only for contact info, not buttons */
+#contact a:not(.bg-blue-500) {
   color: #60a5fa !important;
 }
 
-#contact a:hover {
+#contact a:not(.bg-blue-500):hover {
   color: #93c5fd !important;
 }
 

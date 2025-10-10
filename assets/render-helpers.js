@@ -36,7 +36,10 @@ function renderServices(containerId = 'services-container') {
         </div>
         <div class="p-6">
           <h3 class="font-semibold text-lg mb-2 flex items-center justify-between">
-            ${service.name}
+            <span class="flex items-center gap-2">
+              ${service.icon ? (service.icon.endsWith('.svg') ? `<img src="${service.icon}" alt="" width="28" height="28" class="inline-block">` : `<span class="text-2xl">${service.icon}</span>`) : ''}
+              ${service.name}
+            </span>
             <span class="text-blue-600">→</span>
           </h3>
           <p class="text-sm text-gray-600">${service.description}</p>

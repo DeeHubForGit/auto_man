@@ -13,6 +13,7 @@ const SITE_CONFIG = {
       slug: 'beginner-drivers',
       description: 'Learn with patient, experienced instructors at your own pace in a safe and supportive environment.',
       image: 'images/beginner-driver.jpg',
+      icon: 'images/icons/l-plate.svg', // L-plate for learner drivers
       page: 'beginner-drivers.html',
       duration: '1 hour', // Default lesson duration
       cost: '$85 per hour',
@@ -25,6 +26,7 @@ const SITE_CONFIG = {
       slug: 'driving-test-package',
       description: 'Get a warm-up lesson and use of our instructor\'s car for your driving test. Maximise your chances of success with confidence.',
       image: 'images/driving-test.jpg',
+      icon: 'images/icons/traffic-cone.svg', // Traffic cone for driving test
       page: 'driving-test-package.html',
       duration: '1 hour pre-test + test',
       cost: '$300',
@@ -40,6 +42,7 @@ const SITE_CONFIG = {
       slug: 'overseas-licence',
       description: 'Convert your overseas licence to Australian standards and gain confidence with local road rules.',
       image: 'images/overseas-driver.jpg',
+      icon: '🌏', // Globe for international
       page: 'overseas-licence.html',
       duration: '1 hour',
       cost: '$85 per hour',
@@ -52,6 +55,7 @@ const SITE_CONFIG = {
       slug: 'nervous-drivers',
       description: 'Specialised support for nervous or anxious drivers. Build confidence with patient and understanding instruction.',
       image: 'images/nervous-driver.jpg',
+      icon: '💙', // Heart for care/support
       page: 'nervous-drivers.html',
       duration: '1 hour',
       cost: '$85 per hour',
@@ -64,6 +68,7 @@ const SITE_CONFIG = {
       slug: 'senior-drivers',
       description: 'Refresher lessons and test preparation tailored for senior drivers. Maintain your independence with confidence.',
       image: 'images/older-driver.jpg',
+      icon: 'images/icons/green-star.svg', // Green star for experienced drivers
       page: 'senior-drivers.html',
       duration: '1 hour',
       cost: '$75 per hour',
@@ -76,6 +81,7 @@ const SITE_CONFIG = {
       slug: 'special-needs',
       description: 'Have unique needs or circumstances? We offer customised lessons tailored to your specific requirements. Contact us to discuss how we can help.',
       image: 'images/medium-shot-smiley-woman-car.jpg',
+      icon: '🤝', // Handshake for personalized support
       page: null,
       duration: 'Custom',
       cost: null,

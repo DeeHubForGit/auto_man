@@ -8,6 +8,7 @@
       <a href="index.html#contact">Contact</a>
     </nav>
     <div class="flex items-center gap-3">
+      <a href="tel:{{PHONE_LINK}}" class="hidden md:inline-flex items-center gap-2 text-blue-500 font-semibold hover:text-blue-600">📞 {{PHONE}}</a>
       <a href="simplybook.html" class="hidden md:inline-block bg-blue-700 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-800 focus:ring">Book Now</a>
       <button class="md:hidden px-3 py-2 border rounded" onclick="toggleMenu()" aria-label="Toggle menu">☰</button>
     </div>
@@ -19,6 +20,7 @@
       <a href="index.html#ethos" onclick="toggleMenu()">Our Ethos</a>
       <a href="index.html#pricing" onclick="toggleMenu()">Lesson Packages</a>
       <a href="index.html#contact" onclick="toggleMenu()">Contact</a>
+      <a href="tel:{{PHONE_LINK}}" class="flex items-center gap-2 text-blue-700 font-semibold" onclick="toggleMenu()">📞 Call {{PHONE}}</a>
       <a href="simplybook.html" class="bg-blue-700 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-800" onclick="toggleMenu()">Book Now</a>
     </nav>
   </div>

@@ -16,7 +16,8 @@ const SITE_CONFIG = {
       icon: 'images/icons/l-plate.svg', // L-plate for learner drivers
       page: 'beginner-drivers.html',
       duration: '1 hour', // Default lesson duration
-      cost: '$85 per hour',
+      cost: '$85', // Base price
+      costDescription: '$85 per hour', // Full description for service cards
       priceAlt: 'or $76 per hour in a package', // Alternative pricing text
       costNote: null
     },
@@ -29,12 +30,10 @@ const SITE_CONFIG = {
       icon: 'images/icons/traffic-cone.svg', // Traffic cone for driving test
       page: 'driving-test-package.html',
       duration: '1 hour pre-test + test',
-      cost: '$300',
+      cost: '$300', // Base price
+      costDescription: '$300', // Full description for service cards
       priceAlt: null, // No alternative pricing
-      costNote: 'Our Driving Test Package fee does not include VicRoads testing fee.',
-      // Legacy support
-      price: 250,
-      priceNote: 'Our Driving Test Package fee does not include VicRoads testing fee.'
+      costNote: 'Our Driving Test Package fee does not include VicRoads testing fee.'
     },
     {
       id: 'overseas-licence',
@@ -45,7 +44,8 @@ const SITE_CONFIG = {
       icon: '🌏', // Globe for international
       page: 'overseas-licence.html',
       duration: '1 hour',
-      cost: '$85 per hour',
+      cost: '$85', // Base price
+      costDescription: '$85 per hour', // Full description for service cards
       priceAlt: 'or $76 per hour in a package',
       costNote: null
     },
@@ -58,7 +58,8 @@ const SITE_CONFIG = {
       icon: '💙', // Heart for care/support
       page: 'nervous-drivers.html',
       duration: '1 hour',
-      cost: '$85 per hour',
+      cost: '$85', // Base price
+      costDescription: '$85 per hour', // Full description for service cards
       priceAlt: 'or $76 per hour in a package',
       costNote: null
     },
@@ -71,7 +72,8 @@ const SITE_CONFIG = {
       icon: 'images/icons/green-star.svg', // Green star for experienced drivers
       page: 'senior-drivers.html',
       duration: '1 hour',
-      cost: '$75 per hour',
+      cost: '$75', // Base price (pensioner discount)
+      costDescription: '$75 per hour', // Full description for service cards
       priceAlt: null, // No package pricing for seniors
       costNote: 'Pensioner discount included'
     },
@@ -85,6 +87,7 @@ const SITE_CONFIG = {
       page: null,
       duration: 'Custom',
       cost: null,
+      costDescription: null,
       priceAlt: null,
       costNote: ''
     }

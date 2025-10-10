@@ -16,13 +16,13 @@ function renderServices(containerId = 'services-container') {
     
     // Format pricing display
     let priceDisplay = '';
-    if (service.cost) {
+    if (service.costDescription) {
       // Add alternative pricing if available
       const altText = service.priceAlt 
         ? `<br><span class="text-sm text-blue-600">${service.priceAlt}</span>` 
         : '';
       
-      priceDisplay = `<p class="text-base font-semibold text-blue-600 mt-2">${service.cost}${altText}</p>`;
+      priceDisplay = `<p class="text-base font-semibold text-blue-600 mt-2">${service.costDescription}${altText}</p>`;
     } else if (service.costNote) {
       priceDisplay = `<p class="text-sm font-semibold text-gray-500 mt-2">${service.costNote}</p>`;
     }
@@ -104,13 +104,43 @@ function renderPackages(containerId = 'packages-container') {
  * @param {string} serviceId - Service ID to update prices for
  */
 function updatePriceDisplay(serviceId) {
-  const service = window.SITE_CONFIG.getService(serviceId);
-  if (!service || !service.price) return;
+  const service = window.SITE_CONFIG.getServiceOverview(serviceId);
+  if (!service || !service.cost) return;
 
   // Update all elements with data-price attribute matching the service
   document.querySelectorAll(`[data-price="${serviceId}"]`).forEach(el => {
-    el.textContent = `$${service.price}`;
+    el.textContent = service.cost;
   });
+}
+
+/**
+ * Update FAQ pricing from config
+ */
+function updateFAQPricing() {
+  if (!window.SITE_CONFIG || !window.SITE_CONFIG.LESSON_PRICING) return;
+  
+  const pricing = window.SITE_CONFIG.LESSON_PRICING;
+  
+  // Update 1 hour price
+  const price1hr = pricing.find(p => p.duration === '1 hour');
+  if (price1hr) {
+    const el = document.getElementById('price-1hr');
+    if (el) el.textContent = '$' + price1hr.price;
+  }
+  
+  // Update 1.5 hour price
+  const price1_5hr = pricing.find(p => p.duration === '1.5 hour');
+  if (price1_5hr) {
+    const el = document.getElementById('price-1-5hr');
+    if (el) el.textContent = '$' + price1_5hr.price;
+  }
+  
+  // Update 2 hour price
+  const price2hr = pricing.find(p => p.duration === '2 hour');
+  if (price2hr) {
+    const el = document.getElementById('price-2hr');
+    if (el) el.textContent = '$' + price2hr.price;
+  }
 }
 
 /**
@@ -125,6 +155,9 @@ function initDynamicContent() {
   if (document.getElementById('packages-container')) {
     renderPackages();
   }
+  
+  // Update FAQ pricing if on FAQ page
+  updateFAQPricing();
 }
 
 // Listen for config updates from API

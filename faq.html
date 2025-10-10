@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FAQs | Auto-Man Driving School Geelong</title>
+  <meta name="description" content="Frequently asked questions about driving lessons in Geelong. Get answers about pricing, booking, test preparation, and more." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="assets/theme.css" rel="stylesheet">
+  <script src="assets/config.js"></script>
+  <script src="assets/include.js" defer></script>
+  <!-- Google Analytics -->
+  <div data-include="partials/analytics.html"></div>
+  <style>
+    .faq-item {
+      border-bottom: 1px solid #374151;
+      padding: 1.5rem 0;
+    }
+    .faq-item:last-child {
+      border-bottom: none;
+    }
+    .faq-question {
+      font-weight: 600;
+      font-size: 1.125rem;
+      color: #f3f4f6;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: start;
+      gap: 0.75rem;
+    }
+    .faq-answer {
+      color: #d1d5db;
+      line-height: 1.7;
+      padding-left: 2rem;
+    }
+    .faq-answer a {
+      color: #60a5fa;
+      text-decoration: underline;
+    }
+    .faq-answer a:hover {
+      color: #93c5fd;
+    }
+    .faq-icon {
+      color: #60a5fa;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <!-- Shared Header -->
+  <div data-include="partials/header.html"></div>
+
+  <!-- Hero Section -->
+  <section class="bg-gradient-to-br from-blue-600 to-blue-800 text-white py-20">
+    <div class="container mx-auto px-4 text-center">
+      <h1 class="text-4xl md:text-5xl font-bold mb-4">Frequently Asked Questions</h1>
+      <p class="text-xl opacity-90">Everything you need to know about learning to drive with Auto-Man</p>
+    </div>
+  </section>
+
+  <!-- FAQ Content -->
+  <section class="py-16">
+    <div class="container mx-auto px-4 max-w-4xl">
+      
+      <!-- Getting Started -->
+      <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
+        <h2 class="text-3xl font-bold mb-6" style="color: #60a5fa;">🚀 Getting Started</h2>
+        
+        <div class="faq-item">
+          <div class="faq-question">
+            <span class="faq-icon">Q:</span>
+            <span>How do I book my first lesson?</span>
+          </div>
+          <div class="faq-answer">
+            You can book online through our booking system or call us directly at <a href="tel:{{PHONE_LINK}}" class="text-blue-700 font-semibold hover:underline">{{PHONE}}</a>. We'll discuss your experience level, availability, and arrange a convenient pick-up location.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">
+            <span class="faq-icon">Q:</span>
+            <span>What do I need to bring to my first lesson?</span>
+          </div>
+          <div class="faq-answer">
+            You'll need your learner permit and a positive attitude! We recommend wearing comfortable clothes and closed-toe shoes. If you wear glasses or contacts, make sure to bring them.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">
+            <span class="faq-icon">Q:</span>
+            <span>I'm a complete beginner. Is that okay?</span>
+          </div>
+          <div class="faq-answer">
+            Absolutely! We specialise in teaching complete beginners. We'll start with the basics in a quiet area and progress at your pace. Everyone starts somewhere, and we're here to guide you every step of the way.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">
+            <span class="faq-icon">Q:</span>
+            <span>Where do lessons take place?</span>
+          </div>
+          <div class="faq-answer">
+            We service Geelong and surrounding suburbs. We'll pick you up from your preferred location (home, school, work) and conduct lessons on a variety of roads to build your confidence in different driving conditions.
+          </div>
+        </div>
+      </div>
+
+      <!-- Lessons & Pricing -->
+      <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
+        <h2 class="text-3xl font-bold mb-6" style="color: #60a5fa;">💰 Lessons & Pricing</h2>
+        
+        <div class="faq-item">
+          <div class="faq-question">
+            <span class="faq-icon">Q:</span>
+            <span>How much do lessons cost?</span>
+          </div>
+          <div class="faq-answer">
+            Individual lessons start at <span id="price-1hr">$85</span> for 1 hour, <span id="price-1-5hr">$125</span> for 1.5 hours, and <span id="price-2hr">$165</span> for 2 hours. We also offer package deals that provide better value. Check our <a href="index.html#pricing" class="text-blue-700 font-semibold hover:underline">Lesson Packages</a> page for current pricing.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">
+            <span class="faq-icon">Q:</span>
+            <span>How long should my lessons be?</span>
+          </div>
+          <div class="faq-answer">
+            We recommend 1.5 to 2-hour lessons for best results. This gives you enough time to warm up, practice skills, and consolidate learning without getting too tired. However, 1-hour lessons are also available if that suits your schedule better.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">
+            <span class="faq-icon">Q:</span>
+            <span>Do you offer package deals?</span>
+          </div>
+          <div class="faq-answer">
+            Yes! We offer multi-lesson packages that provide better value. Popular options include 3-lesson, 5-lesson, and 10-lesson packages. These are valid for 12 months and can save you money compared to individual lessons.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">
+            <span class="faq-icon">Q:</span>
+            <span>What's your cancellation policy?</span>
+          </div>
+          <div class="faq-answer">
+            We require at least 24 hours notice for cancellations or rescheduling. Late cancellations or no-shows may incur a fee. We understand emergencies happen, so please contact us as soon as possible if you need to change your lesson.
+          </div>
+        </div>
+      </div>
+
+      <!-- Driving Test -->
+      <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
+        <h2 class="text-3xl font-bold mb-6" style="color: #60a5fa;">📝 Driving Test</h2>
+        
+        <div class="faq-item">
+          <div class="faq-question">
+            <span class="faq-icon">Q:</span>
+            <span>How many lessons do I need before taking my test?</span>
+          </div>
+          <div class="faq-answer">
+            This varies for each student depending on your starting level, natural ability, and practice between lessons. On average, students need 10-20 professional lessons plus regular practice with a supervising driver. We'll let you know when we think you're ready.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">
+            <span class="faq-icon">Q:</span>
+            <span>Do you offer a driving test package?</span>
+          </div>
+          <div class="faq-answer">
+            Yes! Our Driving Test Package ($300) includes a pre-test warm-up lesson, use of our vehicle for the test, and we'll accompany you to VicRoads. This helps you feel comfortable and confident on test day. Learn more on our <a href="driving-test-package.html" class="text-blue-700 font-semibold hover:underline">Driving Test Package</a> page.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">
+            <span class="faq-icon">Q:</span>
+            <span>Can I use your car for my driving test?</span>
+          </div>
+          <div class="faq-answer">
+            Yes, when you book our Driving Test Package, you'll use our vehicle for your test. This is beneficial because you'll be familiar with the car from your lessons, and our vehicles meet all VicRoads requirements.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">
+            <span class="faq-icon">Q:</span>
+            <span>What if I fail my test?</span>
+          </div>
+          <div class="faq-answer">
+            Don't worry - many people don't pass on their first attempt! We'll review what went wrong, work on those areas, and help you prepare for your next test. The experience of taking the test is valuable learning in itself.
+          </div>
+        </div>
+      </div>
+
+      <!-- Vehicles & Safety -->
+      <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
+        <h2 class="text-3xl font-bold mb-6" style="color: #60a5fa;">🚗 Vehicles & Safety</h2>
+        
+        <div class="faq-item">
+          <div class="faq-question">
+            <span class="faq-icon">Q:</span>
+            <span>What type of cars do you use?</span>
+          </div>
+          <div class="faq-answer">
+            We use modern, well-maintained automatic transmission vehicles equipped with dual controls for your safety. Our cars are regularly serviced and meet all safety standards.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">
+            <span class="faq-icon">Q:</span>
+            <span>Do you teach manual transmission?</span>
+          </div>
+          <div class="faq-answer">
+            Currently, we specialise in automatic transmission vehicles. We will be offering manual transmission lessons in the future. Most learners today prefer automatic as it's easier to learn and suitable for most driving situations.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">
+            <span class="faq-icon">Q:</span>
+            <span>Are your vehicles insured?</span>
+          </div>
+          <div class="faq-answer">
+            Yes, all our vehicles are fully insured for driving instruction. You're covered during your lessons with us.
+          </div>
+        </div>
+      </div>
+
+      <!-- Special Circumstances -->
+      <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
+        <h2 class="text-3xl font-bold mb-6" style="color: #60a5fa;">❓ Special Circumstances</h2>
+        
+        <div class="faq-item">
+          <div class="faq-question">
+            <span class="faq-icon">Q:</span>
+            <span>I'm very nervous about driving. Can you help?</span>
+          </div>
+          <div class="faq-answer">
+            Absolutely! We have extensive experience working with nervous and anxious drivers. We'll take things at your pace, use proven techniques to build confidence, and create a supportive, pressure-free environment. Check our <a href="nervous-drivers.html" class="text-blue-700 font-semibold hover:underline">Nervous Drivers</a> page for more information.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">
+            <span class="faq-icon">Q:</span>
+            <span>I have an overseas licence. Do you offer conversion lessons?</span>
+          </div>
+          <div class="faq-answer">
+            Yes! We help international licence holders adapt to Australian road rules and driving conditions. We'll tailor lessons to your experience level and focus on local requirements. Visit our <a href="overseas-licence.html" class="text-blue-700 font-semibold hover:underline">Overseas Licence Conversion</a> page.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">
+            <span class="faq-icon">Q:</span>
+            <span>Do you offer lessons for senior drivers?</span>
+          </div>
+          <div class="faq-answer">
+            Yes, we provide refresher lessons and re-test preparation for senior drivers. We understand the unique needs of mature drivers and provide patient, respectful instruction. See our <a href="senior-drivers.html" class="text-blue-700 font-semibold hover:underline">Senior Driver Retests</a> page.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">
+            <span class="faq-icon">Q:</span>
+            <span>Can parents/guardians come along to lessons?</span>
+          </div>
+          <div class="faq-answer">
+            Yes, parents and guardians are welcome to observe lessons, especially for younger learners. This can help you understand what your learner is working on and support their practice between lessons.
+          </div>
+        </div>
+      </div>
+
+      <!-- Still Have Questions? -->
+      <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl p-8 text-center">
+        <h2 class="text-3xl font-bold mb-4">Still Have Questions?</h2>
+        <p class="text-xl mb-6 opacity-90">We're here to help! Get in touch and we'll answer any questions you have.</p>
+        <div class="flex gap-4 justify-center flex-wrap">
+          <a href="tel:{{PHONE_LINK}}" class="bg-blue-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-600 transition-colors">📞 Call {{PHONE}}</a>
+          <a href="mailto:info@auto-man.com.au" class="bg-blue-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-600 transition-colors">📧 Email Us</a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Shared Footer -->
+  <div data-include="partials/footer.html"></div>
+  <script src="assets/render-helpers.js"></script>
+</body>
+</html>

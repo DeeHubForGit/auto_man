@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>About Us | Auto-Man Driving School Geelong</title>
+  <meta name="description" content="Learn about Auto-Man Driving School. Professional driving instruction in Geelong with experienced, patient instructors dedicated to your success." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="assets/theme.css" rel="stylesheet">
+  <style>
+    :root{--brand:#3b82f6;--bg:#0b1220;--card:#101828;--muted:#9aa4b2}
+    .card{background:var(--card);border:1px solid #1f2937;border-radius:16px;padding:30px;box-shadow:0 10px 30px rgba(0,0,0,.25);margin-bottom:30px}
+    .feature-list{list-style:none;padding:0;margin:20px 0}
+    .feature-list li{padding:12px 0;padding-left:30px;position:relative;line-height:1.6}
+    .feature-list li:before{content:"✓";position:absolute;left:0;color:var(--brand);font-weight:bold;font-size:20px}
+  </style>
+  <script src="assets/config.js"></script>
+  <script src="assets/include.js" defer></script>
+  <!-- Google Analytics -->
+  <div data-include="partials/analytics.html"></div>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <!-- Shared Header -->
+  <div data-include="partials/header.html"></div>
+
+  <!-- Hero Section -->
+  <section class="bg-gradient-to-br from-blue-600 to-blue-800 text-white py-20">
+    <div class="container mx-auto px-4 text-center">
+      <h1 class="text-4xl md:text-5xl font-bold mb-4">About Auto-Man Driving School</h1>
+      <p class="text-xl opacity-90">Professional driving instruction in Geelong and surrounding suburbs</p>
+    </div>
+  </section>
+
+  <!-- Main Content -->
+  <section class="py-16">
+    <div class="container mx-auto px-4 max-w-4xl">
+      
+      <!-- Our Story -->
+      <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
+        <h2 class="text-3xl font-bold mb-4">Our Story</h2>
+        <p class="text-lg text-gray-700 leading-relaxed mb-4">
+          Auto-Man Driving School has been helping learners in Geelong and surrounding suburbs gain their driving 
+          independence with confidence. Our mission is to provide high-quality, patient, and personalised driving 
+          instruction that prepares students not just to pass their test, but to become safe, confident drivers for life.
+        </p>
+        <p class="text-lg text-gray-700 leading-relaxed">
+          We understand that learning to drive can be both exciting and nerve-wracking. That's why we focus on creating 
+          a supportive, pressure-free environment where students can learn at their own pace.
+        </p>
+      </div>
+
+      <!-- Meet Your Instructor -->
+      <div data-include="partials/meet-instructor.html"></div>
+      <!-- Why Choose Auto-Man? -->
+      <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
+        <h2 class="text-3xl font-bold mb-6">Why Choose Auto-Man Driving School?</h2>
+        <ul class="space-y-6">
+          <li>
+            <h3 class="text-xl font-semibold text-gray-900 mb-2">🏅 Experienced and Qualified Instructor</h3>
+            <p class="text-gray-700 leading-relaxed">
+              Fully licensed and trained to provide the highest standard of instruction. Patient, calm, and dedicated to helping you become a safe, confident driver.
+            </p>
+          </li>
+          <li>
+            <h3 class="text-xl font-semibold text-gray-900 mb-2">🛡️ Focus on Safety</h3>
+            <p class="text-gray-700 leading-relaxed">
+              Our core mission is to equip students with the knowledge and skills to be safe drivers, not just pass a test. Safety is paramount, and respect for the road is emphasised in every lesson.
+            </p>
+          </li>
+          <li>
+            <h3 class="text-xl font-semibold text-gray-900 mb-2">🎯 Personalised Learning</h3>
+            <p class="text-gray-700 leading-relaxed">
+              We recognise that everyone learns differently. Lessons are tailored to each student's individual needs and learning style, ensuring a more effective and engaging learning experience.
+            </p>
+          </li>
+          <li>
+            <h3 class="text-xl font-semibold text-gray-900 mb-2">🫶 Calm and Patient Approach</h3>
+            <p class="text-gray-700 leading-relaxed">
+              Learning to drive can be nerve-wracking for some. Our calm and patient demeanour provides a supportive learning environment, even for nervous beginners.
+            </p>
+          </li>
+          <li>
+            <h3 class="text-xl font-semibold text-gray-900 mb-2">👨‍👩‍👧 Parental Involvement Encouraged</h3>
+            <p class="text-gray-700 leading-relaxed">
+              We welcome parents to participate in lessons, fostering open communication and collaboration between student, instructor, and parent.
+            </p>
+          </li>
+        </ul>
+        <p class="text-gray-700 leading-relaxed mt-6">
+          Overall, Auto-Man Driving School offers a unique and comprehensive approach to driver education in Geelong. If you're looking to become a safe, confident, and responsible driver, we look forward to working with you.
+        </p>
+      </div>
+
+      <!-- Call to Action -->
+      <div class="text-center bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl p-8">
+        <h2 class="text-3xl font-bold mb-4">Ready to Start Your Driving Journey?</h2>
+        <p class="text-xl mb-6 opacity-90">Book your first lesson today and take the first step towards driving independence</p>
+        <div class="flex gap-4 justify-center flex-wrap">
+          <a href="tel:{{PHONE_LINK}}" class="bg-blue-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-600 transition-colors">📞 Call {{PHONE}}</a>
+          <a href="simplybook.html" class="bg-blue-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-600 transition-colors">Book Now</a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Shared Footer -->
+  <div data-include="partials/footer.html"></div>
+</body>
+</html>

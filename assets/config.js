@@ -15,7 +15,8 @@ const SITE_CONFIG = {
       image: 'images/beginner-driver.jpg',
       page: 'beginner-drivers.html',
       duration: '1 hour', // Default lesson duration
-      cost: 80, // Per hour cost
+      cost: '$85 per hour',
+      priceAlt: 'or $76 per hour in a package', // Alternative pricing text
       costNote: null
     },
     {
@@ -26,7 +27,8 @@ const SITE_CONFIG = {
       image: 'images/driving-test.jpg',
       page: 'driving-test-package.html',
       duration: '1 hour pre-test + test',
-      cost: 300,
+      cost: '$300',
+      priceAlt: null, // No alternative pricing
       costNote: 'Our Driving Test Package fee does not include VicRoads testing fee.',
       // Legacy support
       price: 250,
@@ -40,7 +42,8 @@ const SITE_CONFIG = {
       image: 'images/overseas-driver.jpg',
       page: 'overseas-licence.html',
       duration: '1 hour',
-      cost: 80,
+      cost: '$85 per hour',
+      priceAlt: 'or $76 per hour in a package',
       costNote: null
     },
     {
@@ -51,7 +54,8 @@ const SITE_CONFIG = {
       image: 'images/nervous-driver.jpg',
       page: 'nervous-drivers.html',
       duration: '1 hour',
-      cost: 80,
+      cost: '$85 per hour',
+      priceAlt: 'or $76 per hour in a package',
       costNote: null
     },
     {
@@ -62,8 +66,9 @@ const SITE_CONFIG = {
       image: 'images/older-driver.jpg',
       page: 'senior-drivers.html',
       duration: '1 hour',
-      cost: 80,
-      costNote: null
+      cost: '$75 per hour',
+      priceAlt: null, // No package pricing for seniors
+      costNote: 'Pensioner discount included'
     },
     {
       id: 'special-needs',
@@ -74,7 +79,8 @@ const SITE_CONFIG = {
       page: null,
       duration: 'Custom',
       cost: null,
-      costNote: 'Contact us for pricing'
+      priceAlt: null,
+      costNote: ''
     }
   ],
   

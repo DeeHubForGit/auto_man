@@ -20,8 +20,8 @@ body {
 
 /* Header */
 header {
-  background-color: var(--header) !important;
-  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, #1e3a5f 0%, #1a2332 50%, #0f1a28 100%) !important;
+  border-bottom: 1px solid rgba(59, 130, 246, 0.2);
 }
 
 header a.logo {
@@ -43,8 +43,8 @@ header button {
 
 /* Footer */
 footer {
-  background-color: var(--card) !important;
-  border-top: 1px solid var(--border);
+  background: linear-gradient(135deg, #0f1a28 0%, #1a2332 50%, #1e3a5f 100%) !important;
+  border-top: 1px solid rgba(59, 130, 246, 0.2);
   color: var(--muted);
 }
 

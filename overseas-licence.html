@@ -25,6 +25,7 @@
     .sidebar-booking{position:sticky;top:80px;align-self:start}
   </style>
   <script src="assets/config.js"></script>
+  <script src="assets/render-helpers.js"></script>
   <script src="assets/include.js" defer></script>
   <!-- Google Analytics -->
   <div data-include="partials/analytics.html"></div>
@@ -136,30 +137,5 @@
   <!-- Shared Footer -->
   <div data-include="partials/footer.html"></div>
 
-  <script>
-    // Load lesson pricing from config
-    (function() {
-      function renderLessonPricing() {
-        const container = document.getElementById('lesson-pricing-grid');
-        if (!container || !SITE_CONFIG.LESSON_PRICING) return;
-
-        container.innerHTML = SITE_CONFIG.LESSON_PRICING.map(lesson => `
-          <div style="padding:12px;background:#1e3a8a22;border:1px solid #3b82f655;border-radius:8px">
-            <p style="margin:0;font-size:14px;color:var(--muted)">${lesson.duration} lesson</p>
-            <p style="margin:4px 0 0 0;font-size:24px;font-weight:700;color:#e5e7eb">$${lesson.price}</p>
-          </div>
-        `).join('');
-      }
-
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', renderLessonPricing);
-      } else {
-        renderLessonPricing();
-      }
-
-      // Re-render if config is loaded from API
-      window.addEventListener('configUpdated', renderLessonPricing);
-    })();
-  </script>
 </body>
 </html>

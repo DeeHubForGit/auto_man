@@ -149,25 +149,40 @@ function updateFAQPricing() {
  */
 function renderLessonPricing(containerId = 'lesson-pricing-grid') {
   const container = document.getElementById(containerId);
-  if (!container || !Array.isArray(SITE_CONFIG.LESSON_PRICING)) return;
+  if (!container || !window.SITE_CONFIG) return;
+
+  const currentPage = window.location.pathname.toLowerCase();
+  const useDiscounted = currentPage.includes('senior');
+
+  const lessons = useDiscounted
+    ? SITE_CONFIG.LESSON_PRICING_DISCOUNTED
+    : SITE_CONFIG.LESSON_PRICING;
+
+  if (!Array.isArray(lessons) || !lessons.length) return;
 
   const bookingUrl = (lesson) =>
     lesson?.simplybookId
       ? `simplybook.html?service=${encodeURIComponent(lesson.simplybookId)}`
       : 'simplybook.html';
 
-  container.innerHTML = SITE_CONFIG.LESSON_PRICING.map(
-    (lesson) => `
-      <a href="${bookingUrl(lesson)}"
-        style="display:block;padding:12px;background:#1e3a8a22;border:1px solid #3b82f655;
-               border-radius:8px;text-decoration:none;transition:all .2s;cursor:pointer"
-        onmouseover="this.style.background='#1e3a8a44';this.style.borderColor='#3b82f6'"
-        onmouseout="this.style.background='#1e3a8a22';this.style.borderColor='#3b82f655'">
-        <p style="margin:0;font-size:14px;color:var(--muted)">${lesson.duration} lesson</p>
-        <p style="margin:4px 0 0 0;font-size:24px;font-weight:700;color:#e5e7eb">$${lesson.price}</p>
-      </a>
-    `
-  ).join('');
+  container.innerHTML = lessons
+    .map(
+      (lesson) => `
+        <a href="${bookingUrl(lesson)}"
+           style="display:block;padding:12px;background:#1e3a8a22;border:1px solid #3b82f655;
+                  border-radius:8px;text-decoration:none;transition:all .2s;cursor:pointer"
+           onmouseover="this.style.background='#1e3a8a44';this.style.borderColor='#3b82f6'"
+           onmouseout="this.style.background='#1e3a8a22';this.style.borderColor='#3b82f655'">
+          <p style="margin:0;font-size:14px;color:var(--muted)">${lesson.duration} lesson</p>
+          <p style="margin:4px 0 0 0;font-size:24px;font-weight:700;color:#e5e7eb">$${lesson.price}</p>
+          ${
+            lesson.note
+              ? `<p style="margin:8px 0 0 0;font-size:12px;color:var(--muted);font-style:italic">${lesson.note}</p>`
+              : ''
+          }
+        </a>`
+    )
+    .join('');
 }
 
 // Make globally accessible

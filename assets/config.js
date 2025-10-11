@@ -105,6 +105,11 @@ const SITE_CONFIG = {
     { duration: '2 hour',   durationShort: '2hr',   price: 165, simplybookId: 7 }
   ],
   
+  // Discounted pricing (e.g. senior)
+  LESSON_PRICING_DISCOUNTED: [
+    { duration: '1 hour', durationShort: '1hr', price: 75, simplybookId: 8, note: 'Incl pensioner discount' }
+  ],
+
   // Lesson packages
   PACKAGES: [
     {

@@ -100,9 +100,9 @@ const SITE_CONFIG = {
   
   // Individual lesson pricing (by duration)
   LESSON_PRICING: [
-    { duration: '1 hour', durationShort: '1hr', price: 85, simplybookId: 5, simplybookUrl: 'simplybook.html?service=5' },
-    { duration: '1.5 hour', durationShort: '1.5hr', price: 125, simplybookId: 6, simplybookUrl: 'simplybook.html?service=6' },
-    { duration: '2 hour', durationShort: '2hr', price: 165, simplybookId: 7, simplybookUrl: 'simplybook.html?service=7' }
+    { duration: '1 hour',   durationShort: '1hr',   price: 85,  simplybookId: 5 },
+    { duration: '1.5 hour', durationShort: '1.5hr', price: 125, simplybookId: 6 },
+    { duration: '2 hour',   durationShort: '2hr',   price: 165, simplybookId: 7 }
   ],
   
   // Lesson packages

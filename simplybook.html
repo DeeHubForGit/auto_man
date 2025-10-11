@@ -90,46 +90,45 @@
 
   <!-- SimplyBook Widget Initialization Script -->
   <script type="text/javascript">
-    // Get service ID from URL parameter
     const urlParams = new URLSearchParams(window.location.search);
-    const serviceId = urlParams.get('service');
-    
-    // Build the widget URL - if service ID is provided, link directly to that service
-    let widgetUrl = "https://automands.simplybook.net";
-    if (serviceId) {
-      // Use the direct booking link format
-      widgetUrl = `https://automands.simplybook.net/v2/#book/service/${serviceId}`;
-    }
-    
-    // Initialize SimplyBook widget with custom styling
-    var widget = new SimplybookWidget({
-      "widget_type": "iframe",
-      "url": widgetUrl,
-      "theme": "dainty",
-      "theme_settings": {
-        "sb_base_color": "#3b82f6",
-        "btn_color_1": "#3b82f6",
-        "booking_nav_bg_color": "#3b82f6",
-        "link_color": "#3b82f6",
-        "sb_button_size": "small",
-        "hide_img_mode": "0",
-        "display_item_mode": "list"
+    const serviceId = urlParams.get('service');   // e.g. 5, 6, 7
+
+    const widgetOptions = {
+      widget_type: "iframe",
+      url: "https://automands.simplybook.net",
+      theme: "dainty",
+      theme_settings: {
+        sb_base_color: "#3b82f6",
+        btn_color_1: "#3b82f6",
+        booking_nav_bg_color: "#3b82f6",
+        link_color: "#3b82f6",
+        sb_button_size: "small",
+        hide_img_mode: "0",
+        display_item_mode: "list"
       },
-      "timeline": "modern",
-      "datepicker": "top_calendar",
-      "is_rtl": false,
-      "container_id": "simplybook-widget"
-    });
-    
-    // Hide skeleton when widget loads
-    setTimeout(function() {
-      var widgetEl = document.getElementById('simplybook-widget');
-      if (widgetEl && widgetEl.querySelector('iframe')) {
-        document.getElementById('sbShell').classList.add('loaded');
-      }
+      timeline: "modern",
+      datepicker: "top_calendar",
+      is_rtl: false,
+      container_id: "simplybook-widget",
+      app_config: { predefined: {} }  // <-- key piece
+    };
+
+    // Preselect the service so the widget skips straight to date/time.
+    if (serviceId) {
+      widgetOptions.app_config.predefined.service = String(serviceId);
+      // provider is optional; omit so SimplyBook can auto-assign if needed:
+      // widgetOptions.app_config.predefined.provider = "2";
+    }
+
+    const widget = new SimplybookWidget(widgetOptions);
+
+    // Hide skeleton after load
+    setTimeout(() => {
+      const iframe = document.querySelector('#simplybook-widget iframe');
+      if (iframe) document.getElementById('sbShell').classList.add('loaded');
     }, 1000);
   </script>
-  
+
   <!-- Additional CSS to override widget styles -->
   <style>
     /* Target the widget iframe content after it loads */

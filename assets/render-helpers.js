@@ -144,6 +144,36 @@ function updateFAQPricing() {
 }
 
 /**
+ * Render lesson pricing cards (for sidebar on service pages)
+ * Populates #lesson-pricing-grid using SITE_CONFIG.LESSON_PRICING
+ */
+function renderLessonPricing(containerId = 'lesson-pricing-grid') {
+  const container = document.getElementById(containerId);
+  if (!container || !Array.isArray(SITE_CONFIG.LESSON_PRICING)) return;
+
+  const bookingUrl = (lesson) =>
+    lesson?.simplybookId
+      ? `simplybook.html?service=${encodeURIComponent(lesson.simplybookId)}`
+      : 'simplybook.html';
+
+  container.innerHTML = SITE_CONFIG.LESSON_PRICING.map(
+    (lesson) => `
+      <a href="${bookingUrl(lesson)}"
+        style="display:block;padding:12px;background:#1e3a8a22;border:1px solid #3b82f655;
+               border-radius:8px;text-decoration:none;transition:all .2s;cursor:pointer"
+        onmouseover="this.style.background='#1e3a8a44';this.style.borderColor='#3b82f6'"
+        onmouseout="this.style.background='#1e3a8a22';this.style.borderColor='#3b82f655'">
+        <p style="margin:0;font-size:14px;color:var(--muted)">${lesson.duration} lesson</p>
+        <p style="margin:4px 0 0 0;font-size:24px;font-weight:700;color:#e5e7eb">$${lesson.price}</p>
+      </a>
+    `
+  ).join('');
+}
+
+// Make globally accessible
+window.renderLessonPricing = renderLessonPricing;
+
+/**
  * Initialize dynamic rendering on page load
  */
 function initDynamicContent() {
@@ -156,6 +186,10 @@ function initDynamicContent() {
     renderPackages();
   }
   
+  if (document.getElementById('lesson-pricing-grid')) {
+    renderLessonPricing();
+  }
+
   // Update FAQ pricing if on FAQ page
   updateFAQPricing();
 }

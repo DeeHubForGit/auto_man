@@ -24,6 +24,7 @@
     .sidebar-booking{position:sticky;top:80px;align-self:start}
   </style>
   <script src="assets/config.js"></script>
+  <script src="assets/render-helpers.js"></script>
   <script src="assets/include.js" defer></script>
   <!-- Google Analytics -->
   <div data-include="partials/analytics.html"></div>
@@ -116,38 +117,6 @@
 
   <!-- Shared Footer -->
   <div data-include="partials/footer.html"></div>
-
-  <script>
-    (function () {
-      function bookingUrl(lesson) {
-        const id = lesson?.simplybookId;
-        return id ? `simplybook.html?service=${encodeURIComponent(id)}` : 'simplybook.html';
-      }
-
-      function renderLessonPricing() {
-        const container = document.getElementById('lesson-pricing-grid');
-        if (!container || !Array.isArray(SITE_CONFIG.LESSON_PRICING)) return;
-
-        container.innerHTML = SITE_CONFIG.LESSON_PRICING.map(lesson => `
-          <a href="${bookingUrl(lesson)}"
-            style="display:block;padding:12px;background:#1e3a8a22;border:1px solid #3b82f655;border-radius:8px;text-decoration:none;transition:all .2s;cursor:pointer"
-            onmouseover="this.style.background='#1e3a8a44';this.style.borderColor='#3b82f6'"
-            onmouseout="this.style.background='#1e3a8a22';this.style.borderColor='#3b82f655'">
-            <p style="margin:0;font-size:14px;color:var(--muted)">${lesson.duration} lesson</p>
-            <p style="margin:4px 0 0 0;font-size:24px;font-weight:700;color:#e5e7eb">$${lesson.price}</p>
-          </a>
-        `).join('');
-      }
-
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', renderLessonPricing);
-      } else {
-        renderLessonPricing();
-      }
-
-      window.addEventListener('configUpdated', renderLessonPricing);
-    })();
-  </script>
 
 </body>
 </html>

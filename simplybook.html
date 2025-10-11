@@ -76,8 +76,8 @@
           <li><strong>Area covered:</strong> Geelong and surrounding suburbs.</li>
         </ul>
         <div style="display:flex; gap:10px; flex-wrap:wrap; margin:12px 0 16px 0">
-          <a href="tel:04XXXXXXXX" class="btn" style="text-decoration:none">Call us</a>
-          <a href="mailto:info@auto-man.com.au" class="btn" style="background:#334155;text-decoration:none">Email</a>
+          <a href="tel:{{PHONE_LINK}}" class="btn" style="text-decoration:none">📞 Call {{PHONE}}</a>
+          <a href="mailto:{{EMAIL}}" class="btn" style="background:#334155;text-decoration:none">Email</a>
         </div>
         <div class="muted" style="font-size:14px">
           <p style="margin:0 0 8px 0"><strong>Hours:</strong> Weekdays and weekends available. If you can't find a suitable time, contact us and we'll try to help.</p>
@@ -90,10 +90,21 @@
 
   <!-- SimplyBook Widget Initialization Script -->
   <script type="text/javascript">
+    // Get service ID from URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const serviceId = urlParams.get('service');
+    
+    // Build the widget URL - if service ID is provided, link directly to that service
+    let widgetUrl = "https://automands.simplybook.net";
+    if (serviceId) {
+      // Use the direct booking link format
+      widgetUrl = `https://automands.simplybook.net/v2/#book/service/${serviceId}`;
+    }
+    
     // Initialize SimplyBook widget with custom styling
     var widget = new SimplybookWidget({
       "widget_type": "iframe",
-      "url": "https://automands.simplybook.net",
+      "url": widgetUrl,
       "theme": "dainty",
       "theme_settings": {
         "sb_base_color": "#3b82f6",

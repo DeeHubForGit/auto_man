@@ -4,6 +4,7 @@ const SITE_CONFIG = {
   PHONE_NUMBER: '0403 632 313',
   PHONE_NUMBER_LINK: '0403632313', // For tel: links (no spaces)
   PHONE_NUMBER_DISPLAY: '0403 632 313', // For display (with spaces)
+  EMAIL: 'automangeelong@gmail.com',
   
   // Service overviews for marketing/homepage (high-level categories)
   SERVICE_OVERVIEWS: [
@@ -99,9 +100,9 @@ const SITE_CONFIG = {
   
   // Individual lesson pricing (by duration)
   LESSON_PRICING: [
-    { duration: '1 hour', durationShort: '1hr', price: 85 },
-    { duration: '1.5 hour', durationShort: '1.5hr', price: 125 },
-    { duration: '2 hour', durationShort: '2hr', price: 165 }
+    { duration: '1 hour', durationShort: '1hr', price: 85, simplybookId: 5, simplybookUrl: 'simplybook.html?service=5' },
+    { duration: '1.5 hour', durationShort: '1.5hr', price: 125, simplybookId: 6, simplybookUrl: 'simplybook.html?service=6' },
+    { duration: '2 hour', durationShort: '2hr', price: 165, simplybookId: 7, simplybookUrl: 'simplybook.html?service=7' }
   ],
   
   // Lesson packages
@@ -225,7 +226,7 @@ window.SITE_CONFIG.loadFromAPI = async function(apiUrl) {
     const nodesToReplace = [];
     let node;
     while (node = walker.nextNode()) {
-      if (node.textContent.includes('{{PHONE}}') || node.textContent.includes('{{OWNER}}')) {
+      if (node.textContent.includes('{{PHONE}}') || node.textContent.includes('{{OWNER}}') || node.textContent.includes('{{EMAIL}}')) {
         nodesToReplace.push(node);
       }
     }
@@ -233,12 +234,18 @@ window.SITE_CONFIG.loadFromAPI = async function(apiUrl) {
     nodesToReplace.forEach(node => {
       node.textContent = node.textContent
         .replace(/\{\{PHONE\}\}/g, SITE_CONFIG.PHONE_NUMBER_DISPLAY)
-        .replace(/\{\{OWNER\}\}/g, SITE_CONFIG.OWNER_NAME);
+        .replace(/\{\{OWNER\}\}/g, SITE_CONFIG.OWNER_NAME)
+        .replace(/\{\{EMAIL\}\}/g, SITE_CONFIG.EMAIL);
     });
 
     // Replace {{PHONE_LINK}} in href attributes
     document.querySelectorAll('a[href*="{{PHONE_LINK}}"]').forEach(link => {
       link.href = link.href.replace(/\{\{PHONE_LINK\}\}/g, SITE_CONFIG.PHONE_NUMBER_LINK);
+    });
+
+    // Replace {{EMAIL}} in href attributes
+    document.querySelectorAll('a[href*="{{EMAIL}}"]').forEach(link => {
+      link.href = link.href.replace(/\{\{EMAIL\}\}/g, SITE_CONFIG.EMAIL);
     });
   }
 

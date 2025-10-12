@@ -123,7 +123,8 @@ const SITE_CONFIG = {
       features: [
         '3 × 1-hour lessons',
         'Valid 12 months'
-      ]
+      ],
+      simplybookPackageId: 1
     },
     {
       id: '5-lesson-pack',
@@ -136,7 +137,8 @@ const SITE_CONFIG = {
       features: [
         '5 × 1-hour lessons',
         'Valid 12 months'
-      ]
+      ],
+      simplybookPackageId: 2
     },
     {
       id: '10-lesson-pack',
@@ -149,7 +151,8 @@ const SITE_CONFIG = {
       features: [
         '10 × 1-hour lessons',
         'Valid 12 months'
-      ]
+      ],
+      simplybookPackageId: 3
     }
   ]
 };

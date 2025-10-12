@@ -58,31 +58,44 @@ function renderPackages(containerId = 'packages-container') {
   const container = document.getElementById(containerId);
   if (!container || !window.SITE_CONFIG) return;
 
-  const packages = window.SITE_CONFIG.PACKAGES;
-  
+  const packages = Array.isArray(SITE_CONFIG.PACKAGES) ? SITE_CONFIG.PACKAGES : [];
+
+  const bookingUrl = (pkg) =>
+    (pkg && pkg.simplybookPackageId != null && pkg.simplybookPackageId !== '')
+      ? `simplybook-packages.html?package=${encodeURIComponent(pkg.simplybookPackageId)}`
+      : `simplybook-packages.html`;
+
   container.innerHTML = packages.map(pkg => {
-    const isPopular = pkg.popular;
-    const popularBadge = isPopular 
+    const isPopular = !!pkg.popular;
+
+    const popularBadge = isPopular
       ? '<span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-sky-400 to-blue-400 text-white text-base font-bold px-4 py-2 rounded-full shadow-lg flex items-center gap-1"><span class="text-xl">⭐</span> Most Popular</span>'
       : '';
-    
+
     const cardClasses = isPopular
       ? 'bg-white rounded-2xl shadow-xl p-6 border-2 border-sky-400 relative transform scale-105 ring-4 ring-sky-400/30'
       : 'bg-white rounded-2xl shadow p-6 border relative';
-    
+
     const buttonClasses = isPopular
       ? 'mt-5 w-full bg-gradient-to-r from-sky-400 to-blue-500 text-white px-4 py-3 rounded-lg hover:from-sky-500 hover:to-blue-600 text-center block font-bold shadow-lg'
       : 'mt-5 w-full bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 text-center block font-semibold';
-    
-    const features = pkg.features.map(f => `<li>${f}</li>`).join('');
-    const perLessonPrice = pkg.lessons ? (pkg.price / pkg.lessons).toFixed(0) : null;
-    const perLessonText = perLessonPrice ? `<p class="text-lg font-bold mt-1" style="color:#3b82f6">$${perLessonPrice}/lesson</p>` : '';
-    
-    // Calculate savings compared to individual lesson price ($85/lesson)
-    const individualPrice = 85;
-    const savings = pkg.lessons ? (individualPrice * pkg.lessons - pkg.price) : 0;
-    const savingsText = savings > 0 ? `<p class="text-base font-bold mt-1" style="color:#10b981">Save $${savings}</p>` : '';
-    
+
+    const features = (pkg.features || []).map(f => `<li>${f}</li>`).join('');
+
+    // Per-lesson and savings
+    const lessonsCount = Number(pkg.lessons) || 0;
+    const perLessonPrice = lessonsCount ? (Number(pkg.price) / lessonsCount) : null;
+    const perLessonText = perLessonPrice != null
+      ? `<p class="text-lg font-bold mt-1" style="color:#3b82f6">$${perLessonPrice.toFixed(0)} per lesson</p>`
+      : '';
+
+    // Savings vs. $85 individual lesson
+    const INDIVIDUAL = 85;
+    const savings = lessonsCount ? (INDIVIDUAL * lessonsCount - Number(pkg.price)) : 0;
+    const savingsText = savings > 0
+      ? `<p class="text-base font-bold mt-1" style="color:#10b981">Save $${savings}</p>`
+      : '';
+
     return `
       <div class="${cardClasses}">
         ${popularBadge}
@@ -93,7 +106,7 @@ function renderPackages(containerId = 'packages-container') {
         <ul class="mt-3 text-sm text-gray-700 list-disc list-inside">
           ${features}
         </ul>
-        <a href="simplybook.html" class="${buttonClasses}">Book Now</a>
+        <a href="${bookingUrl(pkg)}" class="${buttonClasses}">Book Now</a>
       </div>
     `;
   }).join('');

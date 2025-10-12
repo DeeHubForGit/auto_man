@@ -85,7 +85,7 @@ const SITE_CONFIG = {
       description: 'Have unique needs or circumstances? We offer customised lessons tailored to your specific requirements. Contact us to discuss how we can help.',
       image: 'images/medium-shot-smiley-woman-car.jpg',
       icon: '🤝', // Handshake for personalized support
-      page: null,
+      page: 'special-requirements.html',
       duration: 'Custom',
       cost: null,
       costDescription: null,

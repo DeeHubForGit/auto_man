@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Book a Lesson - Auto-Man Driving School</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css">
+  <link href="assets/theme.css" rel="stylesheet">
+</head>
+<body class="bg-slate-900 text-white">
+  <!-- Header -->
+  <div id="header-placeholder"></div>
+  
+  <!-- Main Content -->
+  <main class="min-h-screen pt-20 pb-16">
+    <section class="mx-auto max-w-3xl p-6">
+      <h1 class="text-3xl font-bold mb-4">Book a Driving Lesson</h1>
+      <p class="text-slate-400 mb-8">Choose a lesson type below. You'll be taken to our secure Google booking page to select your preferred date and time.</p>
+
+      <div class="grid gap-6 sm:grid-cols-2">
+        <!-- 1 Hour Auto -->
+        <a href="https://calendar.app.google/JYThbjZ2hABn75co8"
+          target="_blank" rel="noopener noreferrer"
+          class="block rounded-2xl border border-slate-700 p-6 hover:bg-slate-800 transition hover:border-blue-500">
+          <div class="text-xl font-semibold">Automatic Lesson</div>
+          <div class="text-blue-400 font-medium mt-1">1 hour session</div>
+          <div class="text-slate-300 mt-3">Perfect for beginners and those wanting to improve specific skills.</div>
+          <div class="mt-5 flex justify-between items-center">
+            <span class="text-lg font-medium">AU$85</span>
+            <span class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 transition">
+              Book now
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+            </span>
+          </div>
+        </a>
+
+        <!-- Test Prep -->
+        <a href="https://calendar.app.google/SJ3W2CWRqjMRdqEH8"
+          target="_blank" rel="noopener noreferrer"
+          class="block rounded-2xl border border-slate-700 p-6 hover:bg-slate-800 transition hover:border-blue-500">
+          <div class="text-xl font-semibold">Automatic Lesson</div>
+          <div class="text-blue-400 font-medium mt-1">90 minute session</div>
+          <div class="text-slate-300 mt-3">Perfect for beginners and those wanting to improve specific skills.</div>
+          <div class="mt-5 flex justify-between items-center">
+            <span class="text-lg font-medium">AU$125</span>
+            <span class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 transition">
+              Book now
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+            </span>
+          </div>
+        </a>
+      </div>
+
+      <div class="mt-10 p-6 bg-slate-800/50 rounded-xl">
+        <h3 class="text-lg font-semibold mb-3">Booking Information</h3>
+        <ul class="space-y-2 text-slate-300">
+          <li class="flex items-start">
+            <svg class="h-5 w-5 text-green-400 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span>Select your preferred time slot from the available options</span>
+          </li>
+          <li class="flex items-start">
+            <svg class="h-5 w-5 text-green-400 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span>You'll receive a confirmation email with all the details</span>
+          </li>
+          <li class="flex items-start">
+            <svg class="h-5 w-5 text-green-400 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span>24-hour cancellation policy applies</span>
+          </li>
+        </ul>
+      </div>
+
+      <p class="text-sm text-slate-500 mt-6 text-center">
+        Booking opens in a new tab on calendar.google.com. Please ensure pop-ups are enabled for this site.
+      </p>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <div id="footer-placeholder"></div>
+
+  <script>
+    // Load header and footer
+    document.addEventListener('DOMContentLoaded', function() {
+      // Load header
+      fetch('partials/header.html')
+        .then(response => response.text())
+        .then(data => {
+          document.getElementById('header-placeholder').innerHTML = data;
+        });
+      
+      // Load footer
+      fetch('partials/footer.html')
+        .then(response => response.text())
+        .then(data => {
+          document.getElementById('footer-placeholder').innerHTML = data;
+        });
+    });
+  </script>
+</body>
+</html>

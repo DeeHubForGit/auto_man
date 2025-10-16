@@ -61,9 +61,9 @@ function renderPackages(containerId = 'packages-container') {
   const packages = Array.isArray(SITE_CONFIG.PACKAGES) ? SITE_CONFIG.PACKAGES : [];
 
   const bookingUrl = (pkg) =>
-    (pkg && pkg.simplybookPackageId != null && pkg.simplybookPackageId !== '')
-      ? `simplybook-packages.html?package=${encodeURIComponent(pkg.simplybookPackageId)}`
-      : `simplybook-packages.html`;
+    (pkg && pkg.bookingPackageId != null && pkg.bookingPackageId !== '')
+      ? `booking-packages.html?package=${encodeURIComponent(pkg.bookingPackageId)}`
+      : `booking-packages.html`;
 
   container.innerHTML = packages.map(pkg => {
     const isPopular = !!pkg.popular;
@@ -174,9 +174,9 @@ function renderLessonPricing(containerId = 'lesson-pricing-grid') {
   if (!Array.isArray(lessons) || !lessons.length) return;
 
   const bookingUrl = (lesson) =>
-    lesson?.simplybookId
-      ? `simplybook.html?service=${encodeURIComponent(lesson.simplybookId)}`
-      : 'simplybook.html';
+    lesson?.bookingId
+      ? `booking.html?service=${encodeURIComponent(lesson.bookingId)}`
+      : 'booking.html';
 
   container.innerHTML = lessons
     .map(

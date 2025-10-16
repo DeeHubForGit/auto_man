@@ -100,14 +100,14 @@ const SITE_CONFIG = {
   
   // Individual lesson pricing (by duration)
   LESSON_PRICING: [
-    { duration: '1 hour',   durationShort: '1hr',   price: 85,  simplybookId: 5 },
-    { duration: '1.5 hour', durationShort: '1.5hr', price: 125, simplybookId: 6 },
-    { duration: '2 hour',   durationShort: '2hr',   price: 165, simplybookId: 7 }
+    { duration: '1 hour',   durationShort: '1hr',   price: 85,  bookingId: 5 },
+    { duration: '1.5 hour', durationShort: '1.5hr', price: 125, bookingId: 6 },
+    { duration: '2 hour',   durationShort: '2hr',   price: 165, bookingId: 7 }
   ],
   
   // Discounted pricing (e.g. senior)
   LESSON_PRICING_DISCOUNTED: [
-    { duration: '1 hour', durationShort: '1hr', price: 75, simplybookId: 8, note: 'Incl pensioner discount' }
+    { duration: '1 hour', durationShort: '1hr', price: 75, bookingId: 8, note: 'Incl pensioner discount' }
   ],
 
   // Lesson packages
@@ -124,7 +124,7 @@ const SITE_CONFIG = {
         '3 × 1-hour lessons',
         'Valid 12 months'
       ],
-      simplybookPackageId: 1
+      bookingPackageId: 1
     },
     {
       id: '5-lesson-pack',
@@ -138,7 +138,7 @@ const SITE_CONFIG = {
         '5 × 1-hour lessons',
         'Valid 12 months'
       ],
-      simplybookPackageId: 2
+      bookingPackageId: 2
     },
     {
       id: '10-lesson-pack',
@@ -152,7 +152,7 @@ const SITE_CONFIG = {
         '10 × 1-hour lessons',
         'Valid 12 months'
       ],
-      simplybookPackageId: 3
+      bookingPackageId: 3
     }
   ]
 };

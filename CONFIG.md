@@ -150,8 +150,7 @@ All HTML pages now include the config file:
 - index.html
 - driving-test-package.html
 - beginner-drivers.html
-- simplybook.html
-- simplybook-packages.html
+- booking.html
 - signup.html
 - setmore.html
 - picktime.html

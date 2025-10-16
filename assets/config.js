@@ -135,7 +135,9 @@ const SITE_CONFIG = {
       id: 'manual',
       name: 'Manual Lessons',
       icon: 'images/manual-gearbox.png',
+      comingSoon: true,
       services: [
+        /* Manual services coming soon - no manual vehicle available yet
         {
           id: 'manual-1hr',
           name: 'Manual Driving Lesson',
@@ -160,6 +162,7 @@ const SITE_CONFIG = {
           description: 'Extended manual transmission practice',
           bookingUrl: 'https://calendar.app.google/REPLACE_WITH_MANUAL_2H_LINK'
         }
+        */
       ]
     },
     {
@@ -174,7 +177,8 @@ const SITE_CONFIG = {
           price: 75,
           description: 'Includes pensioner discount',
           bookingUrl: 'https://calendar.app.google/REPLACE_WITH_SENIOR_AUTO_1H_LINK'
-        },
+        }
+        /* Manual services coming soon - no manual vehicle available yet
         {
           id: 'senior-manual-1hr',
           name: 'Senior Manual Driving Lesson',
@@ -183,6 +187,7 @@ const SITE_CONFIG = {
           description: 'Includes pensioner discount',
           bookingUrl: 'https://calendar.app.google/REPLACE_WITH_SENIOR_MANUAL_1H_LINK'
         }
+        */
       ]
     }
   ],
@@ -352,6 +357,9 @@ window.SITE_CONFIG.loadFromAPI = async function(apiUrl) {
     replacePhoneNumbers();
   }
 
-  // Re-run after partials are loaded
+  // Also run after config is updated from API
+  window.addEventListener('configUpdated', replacePhoneNumbers);
+  
+  // Run after partials (header/footer) are loaded
   window.addEventListener('partialsLoaded', replacePhoneNumbers);
 })();

@@ -6,17 +6,38 @@
   <title>Book a Lesson - Auto-Man Driving School</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="assets/config.js"></script>
+  <script src="assets/render-helpers.js"></script>
   <script src="assets/include.js" defer></script>
   <link rel="stylesheet" href="css/styles.css">
   <link href="assets/theme.css" rel="stylesheet">
+  <style>
+    /* Smooth expand/collapse animation */
+    .category-services {
+      overflow: hidden;
+      transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+      max-height: 2000px;
+      opacity: 1;
+    }
+    .category-services.collapsed {
+      max-height: 0;
+      opacity: 0;
+    }
+    /* Chevron rotation animation */
+    .chevron-icon {
+      transition: transform 0.3s ease;
+    }
+    .chevron-icon.rotated {
+      transform: rotate(-180deg);
+    }
+  </style>
 </head>
 <body class="bg-slate-900 text-white">
   <!-- Header -->
-  <div id="header-placeholder"></div>
+  <div data-include="partials/header.html"></div>
   
   <!-- Main Content -->
-  <main class="min-h-screen pt-20 pb-16">
-    <section class="mx-auto max-w-3xl p-6">
+  <main class="min-h-screen pt-8 pb-16">
+    <section class="mx-auto max-w-3xl px-4 sm:px-6">
       <h1 class="text-3xl font-bold mb-4">Book a Driving Lesson</h1>
       <p class="text-slate-400 mb-8">Choose a lesson type below. You'll be taken to our secure Google booking page to select your preferred date and time.</p>
 
@@ -56,26 +77,11 @@
   </main>
 
   <!-- Footer -->
-  <div id="footer-placeholder"></div>
+  <div data-include="partials/footer.html"></div>
 
   <script>
-    // Load header and footer
+    // Render booking services on DOM ready
     document.addEventListener('DOMContentLoaded', function() {
-      // Load header
-      fetch('partials/header.html')
-        .then(response => response.text())
-        .then(data => {
-          document.getElementById('header-placeholder').innerHTML = data;
-        });
-      
-      // Load footer
-      fetch('partials/footer.html')
-        .then(response => response.text())
-        .then(data => {
-          document.getElementById('footer-placeholder').innerHTML = data;
-        });
-
-      // Render booking services
       renderBookingServices();
     });
 
@@ -99,7 +105,7 @@
         headerButton.innerHTML = `
           <img src="${category.icon}" alt="${category.name}" class="w-8 h-8 object-contain">
           <h2 class="text-xl font-semibold tracking-tight flex-1">${category.name}</h2>
-          <svg id="chevron-${category.id}" class="w-5 h-5 text-slate-400 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg id="chevron-${category.id}" class="w-5 h-5 text-slate-400 chevron-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
           </svg>
         `;
@@ -107,31 +113,44 @@
         // Services container (auto-expanded by default)
         const servicesDiv = document.createElement('div');
         servicesDiv.id = `services-${category.id}`;
-        servicesDiv.className = 'space-y-3';
+        servicesDiv.className = 'space-y-3 category-services p-1';
         
-        // Render each service
-        category.services.forEach(service => {
-          const serviceDiv = document.createElement('div');
-          serviceDiv.className = 'group flex flex-wrap items-center gap-3 justify-between bg-[#101828] rounded-2xl p-4 shadow-sm ring-1 ring-white/10 hover:ring-blue-400/60 transition';
-          
-          serviceDiv.innerHTML = `
-            <div class="min-w-0 flex-1">
-              <p class="font-medium">${service.name} — ${service.duration}</p>
-              <p class="text-xs text-gray-400">${service.description}</p>
-            </div>
-            <div class="flex items-center gap-4">
-              <span class="text-gray-300 font-medium">$${service.price}</span>
-              <a href="${service.bookingUrl}"
-                 target="_blank"
-                 rel="noopener noreferrer"
-                 class="px-3 py-1.5 rounded-lg border border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-white transition whitespace-nowrap">
-                Book Now
-              </a>
-            </div>
+        // Check if coming soon
+        if (category.comingSoon) {
+          const comingSoonDiv = document.createElement('div');
+          comingSoonDiv.className = 'bg-[#101828] rounded-2xl p-4 shadow-sm ring-1 ring-white/10 flex items-center justify-center gap-3';
+          comingSoonDiv.innerHTML = `
+            <svg class="w-5 h-5 text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span class="text-gray-300 font-medium">Coming Soon</span>
           `;
-          
-          servicesDiv.appendChild(serviceDiv);
-        });
+          servicesDiv.appendChild(comingSoonDiv);
+        } else {
+          // Render each service
+          category.services.forEach(service => {
+            const serviceDiv = document.createElement('div');
+            serviceDiv.className = 'group flex flex-wrap items-center gap-3 justify-between bg-[#101828] rounded-2xl p-4 shadow-sm ring-1 ring-white/10 hover:ring-blue-400/60 transition';
+            
+            serviceDiv.innerHTML = `
+              <div class="min-w-0 flex-1">
+                <p class="font-medium">${service.name} — ${service.duration}</p>
+                <p class="text-xs text-gray-400">${service.description}</p>
+              </div>
+              <div class="flex items-center gap-4">
+                <span class="text-gray-300 font-medium">$${service.price}</span>
+                <a href="${service.bookingUrl}"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="px-3 py-1.5 rounded-lg border border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-white transition whitespace-nowrap">
+                  Book Now
+                </a>
+              </div>
+            `;
+            
+            servicesDiv.appendChild(serviceDiv);
+          });
+        }
         
         categoryDiv.appendChild(headerButton);
         categoryDiv.appendChild(servicesDiv);
@@ -145,13 +164,9 @@
       
       if (!servicesDiv || !chevron) return;
       
-      if (servicesDiv.style.display === 'none') {
-        servicesDiv.style.display = 'block';
-        chevron.style.transform = 'rotate(0deg)';
-      } else {
-        servicesDiv.style.display = 'none';
-        chevron.style.transform = 'rotate(-90deg)';
-      }
+      // Toggle collapsed class for smooth animation
+      servicesDiv.classList.toggle('collapsed');
+      chevron.classList.toggle('rotated');
     }
   </script>
 </body>

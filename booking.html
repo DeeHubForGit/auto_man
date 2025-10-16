@@ -20,42 +20,9 @@
       <h1 class="text-3xl font-bold mb-4">Book a Driving Lesson</h1>
       <p class="text-slate-400 mb-8">Choose a lesson type below. You'll be taken to our secure Google booking page to select your preferred date and time.</p>
 
-      <div class="grid gap-6 sm:grid-cols-2">
-        <!-- 1 Hour Auto -->
-        <a href="https://calendar.app.google/JYThbjZ2hABn75co8"
-          target="_blank" rel="noopener noreferrer"
-          class="block rounded-2xl border border-slate-700 p-6 hover:bg-slate-800 transition hover:border-blue-500">
-          <div class="text-xl font-semibold">Automatic Lesson</div>
-          <div class="text-blue-400 font-medium mt-1">1 hour session</div>
-          <div class="text-slate-300 mt-3">Perfect for beginners and those wanting to improve specific skills.</div>
-          <div class="mt-5 flex justify-between items-center">
-            <span class="text-lg font-medium">AU$85</span>
-            <span class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 transition">
-              Book now
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-              </svg>
-            </span>
-          </div>
-        </a>
-
-        <!-- Test Prep -->
-        <a href="https://calendar.app.google/SJ3W2CWRqjMRdqEH8"
-          target="_blank" rel="noopener noreferrer"
-          class="block rounded-2xl border border-slate-700 p-6 hover:bg-slate-800 transition hover:border-blue-500">
-          <div class="text-xl font-semibold">Automatic Lesson</div>
-          <div class="text-blue-400 font-medium mt-1">90 minute session</div>
-          <div class="text-slate-300 mt-3">Perfect for beginners and those wanting to improve specific skills.</div>
-          <div class="mt-5 flex justify-between items-center">
-            <span class="text-lg font-medium">AU$125</span>
-            <span class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 transition">
-              Book now
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-              </svg>
-            </span>
-          </div>
-        </a>
+      <!-- Services (Auto-expanded categories) -->
+      <div id="booking-services-container" class="space-y-8">
+        <!-- Categories and services will be dynamically loaded from config -->
       </div>
 
       <div class="mt-10 p-6 bg-slate-800/50 rounded-xl">
@@ -107,7 +74,85 @@
         .then(data => {
           document.getElementById('footer-placeholder').innerHTML = data;
         });
+
+      // Render booking services
+      renderBookingServices();
     });
+
+    function renderBookingServices() {
+      const container = document.getElementById('booking-services-container');
+      if (!container || !window.SITE_CONFIG || !window.SITE_CONFIG.BOOKING_CATEGORIES) {
+        return;
+      }
+
+      const categories = window.SITE_CONFIG.BOOKING_CATEGORIES;
+      
+      categories.forEach((category, index) => {
+        // Create category section
+        const categoryDiv = document.createElement('div');
+        categoryDiv.className = 'booking-category';
+        
+        // Category header (clickable to collapse/expand)
+        const headerButton = document.createElement('button');
+        headerButton.className = 'w-full text-left mb-4 flex items-center gap-3 group';
+        headerButton.onclick = () => toggleCategory(category.id);
+        headerButton.innerHTML = `
+          <img src="${category.icon}" alt="${category.name}" class="w-8 h-8 object-contain">
+          <h2 class="text-xl font-semibold tracking-tight flex-1">${category.name}</h2>
+          <svg id="chevron-${category.id}" class="w-5 h-5 text-slate-400 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        `;
+        
+        // Services container (auto-expanded by default)
+        const servicesDiv = document.createElement('div');
+        servicesDiv.id = `services-${category.id}`;
+        servicesDiv.className = 'space-y-3';
+        
+        // Render each service
+        category.services.forEach(service => {
+          const serviceDiv = document.createElement('div');
+          serviceDiv.className = 'group flex flex-wrap items-center gap-3 justify-between bg-[#101828] rounded-2xl p-4 shadow-sm ring-1 ring-white/10 hover:ring-blue-400/60 transition';
+          
+          serviceDiv.innerHTML = `
+            <div class="min-w-0 flex-1">
+              <p class="font-medium">${service.name} — ${service.duration}</p>
+              <p class="text-xs text-gray-400">${service.description}</p>
+            </div>
+            <div class="flex items-center gap-4">
+              <span class="text-gray-300 font-medium">$${service.price}</span>
+              <a href="${service.bookingUrl}"
+                 target="_blank"
+                 rel="noopener noreferrer"
+                 class="px-3 py-1.5 rounded-lg border border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-white transition whitespace-nowrap">
+                Book Now
+              </a>
+            </div>
+          `;
+          
+          servicesDiv.appendChild(serviceDiv);
+        });
+        
+        categoryDiv.appendChild(headerButton);
+        categoryDiv.appendChild(servicesDiv);
+        container.appendChild(categoryDiv);
+      });
+    }
+
+    function toggleCategory(categoryId) {
+      const servicesDiv = document.getElementById(`services-${categoryId}`);
+      const chevron = document.getElementById(`chevron-${categoryId}`);
+      
+      if (!servicesDiv || !chevron) return;
+      
+      if (servicesDiv.style.display === 'none') {
+        servicesDiv.style.display = 'block';
+        chevron.style.transform = 'rotate(0deg)';
+      } else {
+        servicesDiv.style.display = 'none';
+        chevron.style.transform = 'rotate(-90deg)';
+      }
+    }
   </script>
 </body>
 </html>

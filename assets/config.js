@@ -97,6 +97,95 @@ const SITE_CONFIG = {
   // Bookable services (for booking system integration)
   // This will be populated from the booking system API
   SERVICES: [],
+
+  // Booking service categories with services
+  BOOKING_CATEGORIES: [
+    {
+      id: 'automatic',
+      name: 'Automatic Lessons',
+      icon: 'images/auto-gearbox.png',
+      services: [
+        {
+          id: 'auto-1hr',
+          name: 'Automatic Driving Lesson',
+          duration: '1 hour',
+          price: 85,
+          description: 'Perfect for beginners and skill improvement',
+          bookingUrl: 'https://calendar.app.google/aFUFekxQM1QkqDcr6'
+        },
+        {
+          id: 'auto-1-5hr',
+          name: 'Automatic Driving Lesson',
+          duration: '1.5 hours',
+          price: 125,
+          description: 'Extra time for complex skills',
+          bookingUrl: 'https://calendar.app.google/ESS16P28U72565wF7'
+        },
+        {
+          id: 'auto-2hr',
+          name: 'Automatic Driving Lesson',
+          duration: '2 hours',
+          price: 165,
+          description: 'Extended session for comprehensive practice',
+          bookingUrl: 'https://calendar.app.google/sRWs2apky6bjsKKN7'
+        }
+      ]
+    },
+    {
+      id: 'manual',
+      name: 'Manual Lessons',
+      icon: 'images/manual-gearbox.png',
+      services: [
+        {
+          id: 'manual-1hr',
+          name: 'Manual Driving Lesson',
+          duration: '1 hour',
+          price: 85,
+          description: 'Clutch control and gear work',
+          bookingUrl: 'https://calendar.app.google/REPLACE_WITH_MANUAL_1H_LINK'
+        },
+        {
+          id: 'manual-1-5hr',
+          name: 'Manual Driving Lesson',
+          duration: '1.5 hours',
+          price: 125,
+          description: 'More time for traffic and hills',
+          bookingUrl: 'https://calendar.app.google/REPLACE_WITH_MANUAL_1_5H_LINK'
+        },
+        {
+          id: 'manual-2hr',
+          name: 'Manual Driving Lesson',
+          duration: '2 hours',
+          price: 165,
+          description: 'Extended manual transmission practice',
+          bookingUrl: 'https://calendar.app.google/REPLACE_WITH_MANUAL_2H_LINK'
+        }
+      ]
+    },
+    {
+      id: 'senior',
+      name: 'Senior Lessons',
+      icon: 'images/elderly-couple.png',
+      services: [
+        {
+          id: 'senior-auto-1hr',
+          name: 'Senior Automatic Driving Lesson',
+          duration: '1 hour',
+          price: 75,
+          description: 'Includes pensioner discount',
+          bookingUrl: 'https://calendar.app.google/REPLACE_WITH_SENIOR_AUTO_1H_LINK'
+        },
+        {
+          id: 'senior-manual-1hr',
+          name: 'Senior Manual Driving Lesson',
+          duration: '1 hour',
+          price: 75,
+          description: 'Includes pensioner discount',
+          bookingUrl: 'https://calendar.app.google/REPLACE_WITH_SENIOR_MANUAL_1H_LINK'
+        }
+      ]
+    }
+  ],
   
   // Individual lesson pricing (by duration)
   LESSON_PRICING: [

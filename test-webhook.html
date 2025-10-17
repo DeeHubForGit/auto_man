@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Google Calendar Webhook - Auto-Man</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen p-8">
+  <div class="max-w-4xl mx-auto">
+    <h1 class="text-3xl font-bold mb-6">🧪 Test Google Calendar Webhook</h1>
+    
+    <div class="bg-slate-800 rounded-lg p-6 mb-6">
+      <h2 class="text-xl font-semibold mb-4">Configuration</h2>
+      
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-2">Supabase Project URL</label>
+          <input type="text" id="supabaseUrl" 
+                 placeholder="https://xxxxx.supabase.co"
+                 class="w-full px-4 py-2 bg-slate-700 rounded border border-slate-600 focus:border-blue-500 focus:outline-none">
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium mb-2">Supabase Anon Key</label>
+          <input type="text" id="supabaseKey" 
+                 placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                 class="w-full px-4 py-2 bg-slate-700 rounded border border-slate-600 focus:border-blue-500 focus:outline-none">
+          <p class="text-xs text-slate-400 mt-1">Find this in Supabase Dashboard → Project Settings → API</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-slate-800 rounded-lg p-6 mb-6">
+      <h2 class="text-xl font-semibold mb-4">Test Booking Data</h2>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium mb-2">Client Email</label>
+          <input type="email" id="clientEmail" value="test@example.com"
+                 class="w-full px-4 py-2 bg-slate-700 rounded border border-slate-600 focus:border-blue-500 focus:outline-none">
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium mb-2">Client Name</label>
+          <input type="text" id="clientName" value="John Smith"
+                 class="w-full px-4 py-2 bg-slate-700 rounded border border-slate-600 focus:border-blue-500 focus:outline-none">
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium mb-2">Service Type</label>
+          <select id="serviceType" class="w-full px-4 py-2 bg-slate-700 rounded border border-slate-600 focus:border-blue-500 focus:outline-none">
+            <option value="auto-1hr">Automatic - 1 hour ($85)</option>
+            <option value="auto-1-5hr">Automatic - 1.5 hours ($125)</option>
+            <option value="auto-2hr">Automatic - 2 hours ($165)</option>
+            <option value="senior-auto-1hr">Senior Automatic - 1 hour ($75)</option>
+          </select>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium mb-2">Lesson Date & Time</label>
+          <input type="datetime-local" id="lessonDateTime"
+                 class="w-full px-4 py-2 bg-slate-700 rounded border border-slate-600 focus:border-blue-500 focus:outline-none">
+        </div>
+      </div>
+    </div>
+
+    <button onclick="testWebhook()" 
+            class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition">
+      🚀 Send Test Webhook
+    </button>
+
+    <div id="result" class="mt-6 hidden">
+      <h3 class="text-lg font-semibold mb-2">Result:</h3>
+      <pre id="resultContent" class="bg-slate-800 p-4 rounded overflow-x-auto text-sm"></pre>
+    </div>
+  </div>
+
+  <script>
+    // Set default datetime to tomorrow at 10am
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(10, 0, 0, 0);
+    document.getElementById('lessonDateTime').value = tomorrow.toISOString().slice(0, 16);
+
+    async function testWebhook() {
+      const supabaseUrl = document.getElementById('supabaseUrl').value;
+      const supabaseKey = document.getElementById('supabaseKey').value;
+      const clientEmail = document.getElementById('clientEmail').value;
+      const clientName = document.getElementById('clientName').value;
+      const serviceType = document.getElementById('serviceType').value;
+      const lessonDateTime = document.getElementById('lessonDateTime').value;
+
+      if (!supabaseUrl || !supabaseKey) {
+        alert('Please enter your Supabase URL and Anon Key');
+        return;
+      }
+
+      // Parse service details
+      const serviceMap = {
+        'auto-1hr': { duration: '1 hour', price: 85 },
+        'auto-1-5hr': { duration: '1.5 hours', price: 125 },
+        'auto-2hr': { duration: '2 hours', price: 165 },
+        'senior-auto-1hr': { duration: '1 hour', price: 75 }
+      };
+
+      const service = serviceMap[serviceType];
+      const startTime = new Date(lessonDateTime);
+      const endTime = new Date(startTime);
+      endTime.setHours(endTime.getHours() + parseFloat(service.duration));
+
+      // Create webhook payload
+      const payload = {
+        event: {
+          id: 'test_' + Date.now(),
+          summary: `Driving Lesson - ${clientName}`,
+          start: {
+            dateTime: startTime.toISOString(),
+            timeZone: 'Australia/Melbourne'
+          },
+          end: {
+            dateTime: endTime.toISOString(),
+            timeZone: 'Australia/Melbourne'
+          },
+          attendees: [
+            {
+              email: clientEmail,
+              displayName: clientName,
+              responseStatus: 'accepted'
+            }
+          ],
+          extendedProperties: {
+            shared: {
+              serviceType: serviceType,
+              duration: service.duration,
+              price: service.price.toString()
+            }
+          }
+        },
+        calendarId: 'primary'
+      };
+
+      const resultDiv = document.getElementById('result');
+      const resultContent = document.getElementById('resultContent');
+      
+      resultDiv.classList.remove('hidden');
+      resultContent.textContent = 'Sending request...';
+
+      try {
+        const webhookUrl = `${supabaseUrl}/functions/v1/google-calendar-webhook`;
+        
+        const response = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseKey}`
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+        
+        if (response.ok) {
+          resultContent.textContent = JSON.stringify(result, null, 2);
+          resultContent.className = 'bg-green-900/30 p-4 rounded overflow-x-auto text-sm border border-green-500';
+        } else {
+          resultContent.textContent = JSON.stringify(result, null, 2);
+          resultContent.className = 'bg-red-900/30 p-4 rounded overflow-x-auto text-sm border border-red-500';
+        }
+      } catch (error) {
+        resultContent.textContent = `Error: ${error.message}`;
+        resultContent.className = 'bg-red-900/30 p-4 rounded overflow-x-auto text-sm border border-red-500';
+      }
+    }
+  </script>
+</body>
+</html>

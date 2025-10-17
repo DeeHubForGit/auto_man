@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>My Account - Auto-Man Driving School</title>
+  <meta name="description" content="Manage your driving lessons and account details" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="assets/theme.css" rel="stylesheet">
+  <script src="assets/config.js"></script>
+  <script src="assets/render-helpers.js" defer></script>
+  <script src="assets/include.js" defer></script>
+  <!-- Supabase JS Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/js/config.local.js"></script>
+  <script src="assets/js/supabaseClient.js"></script>
+  <script src="assets/js/modal.js"></script>
+  <script src="assets/js/auth.js" defer></script>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <div data-include="partials/header.html"></div>
+
+  <div class="container mx-auto px-4 py-8">
+    <div class="flex flex-col lg:flex-row gap-6">
+      
+      <!-- Sidebar Navigation -->
+      <aside class="lg:w-64 flex-shrink-0">
+        <div class="bg-white rounded-2xl border shadow-sm p-6 sticky top-24">
+          <!-- User Info -->
+          <div class="mb-6 pb-6 border-b">
+            <div class="flex items-center gap-3 mb-2">
+              <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-lg">
+                <span id="userInitials">?</span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm text-gray-500">Logged in as</p>
+                <p id="userEmail" class="text-sm font-medium text-gray-900 truncate">Loading...</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Navigation Menu -->
+          <nav class="space-y-1">
+            <a href="#details" onclick="showSection('details')" id="nav-details" 
+               class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span class="font-medium">My Details</span>
+            </a>
+
+            <a href="#bookings" onclick="showSection('bookings')" id="nav-bookings"
+               class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span class="font-medium">My Bookings</span>
+            </a>
+
+            <div class="pt-4 mt-4 border-t">
+              <button onclick="handleLogout()" 
+                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors w-full">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                <span class="font-medium">Log Out</span>
+              </button>
+            </div>
+          </nav>
+        </div>
+      </aside>
+
+      <!-- Main Content Area -->
+      <main class="flex-1 min-w-0">
+        
+        <!-- Client Details Section -->
+        <div id="section-details" class="section-content">
+          <div data-include="partials/portal-details.html"></div>
+        </div>
+
+        <!-- Bookings Section -->
+        <div id="section-bookings" class="section-content hidden">
+          <div data-include="partials/portal-bookings.html"></div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <div data-include="partials/footer.html"></div>
+
+  <script>
+    let currentUser = null;
+    let clientData = null;
+
+    // Check authentication on load
+    document.addEventListener('DOMContentLoaded', async function() {
+      if (!window.supabaseClient) {
+        Modal.error('Authentication is not configured. Please contact support.');
+        setTimeout(() => window.location.href = 'index.html', 2000);
+        return;
+      }
+
+      // Check if user is logged in
+      const { data: { session } } = await window.supabaseClient.auth.getSession();
+      
+      if (!session || !session.user) {
+        // Not logged in, redirect to login
+        window.location.href = 'login.html?next=portal.html';
+        return;
+      }
+
+      currentUser = session.user;
+      
+      // Display user email
+      const emailEl = document.getElementById('userEmail');
+      if (emailEl) emailEl.textContent = currentUser.email;
+
+      // Set initials
+      const initialsEl = document.getElementById('userInitials');
+      if (initialsEl && currentUser.email) {
+        const initial = currentUser.email.charAt(0).toUpperCase();
+        initialsEl.textContent = initial;
+      }
+
+      // Force update header to show My Account link
+      const portalBtn = document.getElementById('portalBtn');
+      const portalBtnMobile = document.getElementById('portalBtnMobile');
+      const signupBtn = document.getElementById('signupBtn');
+      const loginBtn = document.getElementById('loginBtn');
+      const signupBtnMobile = document.getElementById('signupBtnMobile');
+      const loginBtnMobile = document.getElementById('loginBtnMobile');
+      
+      if (portalBtn) portalBtn.classList.remove('hidden');
+      if (portalBtnMobile) portalBtnMobile.classList.remove('hidden');
+      if (signupBtn) signupBtn.classList.add('hidden');
+      if (loginBtn) loginBtn.classList.add('hidden');
+      if (signupBtnMobile) signupBtnMobile.classList.add('hidden');
+      if (loginBtnMobile) loginBtnMobile.classList.add('hidden');
+
+      // Load client data
+      await loadClientData();
+
+      // Show default section
+      const hash = window.location.hash.slice(1) || 'details';
+      showSection(hash);
+    });
+
+    // Load client data from database
+    async function loadClientData() {
+      try {
+        const { data, error } = await window.supabaseClient
+          .from('client')
+          .select('*')
+          .eq('id', currentUser.id)
+          .single();
+
+        if (error) throw error;
+        
+        clientData = data;
+        
+        // Trigger custom event for other components
+        window.dispatchEvent(new CustomEvent('clientDataLoaded', { detail: clientData }));
+      } catch (err) {
+        console.error('Error loading client data:', err);
+        Modal.error('Could not load your profile data. Please try refreshing the page.');
+      }
+    }
+
+    // Section navigation
+    function showSection(sectionName) {
+      // Hide all sections
+      document.querySelectorAll('.section-content').forEach(section => {
+        section.classList.add('hidden');
+      });
+
+      // Remove active class from all nav items
+      document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('bg-blue-50', 'text-blue-600');
+      });
+
+      // Show selected section
+      const section = document.getElementById('section-' + sectionName);
+      if (section) {
+        section.classList.remove('hidden');
+      }
+
+      // Highlight active nav item
+      const navItem = document.getElementById('nav-' + sectionName);
+      if (navItem) {
+        navItem.classList.add('bg-blue-50', 'text-blue-600');
+      }
+
+      // Update URL hash
+      window.location.hash = sectionName;
+    }
+
+    // Logout handler
+    async function handleLogout() {
+      Modal.confirm(
+        'Are you sure you want to log out?',
+        async function() {
+          await window.supabaseClient.auth.signOut();
+          window.location.href = 'index.html';
+        },
+        null,
+        'Log Out'
+      );
+    }
+
+    // Handle browser back/forward
+    window.addEventListener('hashchange', function() {
+      const hash = window.location.hash.slice(1) || 'details';
+      showSection(hash);
+    });
+  </script>
+</body>
+</html>

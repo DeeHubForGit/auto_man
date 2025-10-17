@@ -52,7 +52,7 @@ supabase functions deploy google-calendar-webhook
 
 Your webhook URL will be:
 ```
-https://YOUR_PROJECT_REF.supabase.co/functions/v1/google-calendar-webhook
+https://ugxxxvhanwckgciaedna.supabase.co/functions/v1/google-calendar-webhook
 ```
 
 ### 3. Configure Google Calendar Webhook

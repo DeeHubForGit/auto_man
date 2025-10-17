@@ -134,6 +134,23 @@ BEGIN NEW.updated_at = NOW(); RETURN NEW; END $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS t_client_updated ON client;
 CREATE TRIGGER t_client_updated  BEFORE UPDATE ON client  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+-- Auto-create client record when user signs up
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.client (id, email, created_at, updated_at)
+  VALUES (NEW.id, NEW.email, NOW(), NOW())
+  ON CONFLICT (email) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();
+
 DROP TRIGGER IF EXISTS t_booking_updated ON booking;
 CREATE TRIGGER t_booking_updated BEFORE UPDATE ON booking FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
@@ -263,9 +280,15 @@ INSERT INTO service (code, name, description, duration_minutes, price_cents, sor
   ('manual_60',  'Manual Driving Lesson — 1 hour',    'Manual transmission lesson', 60,  8500, 4, false),
   ('manual_90',  'Manual Driving Lesson — 1.5 hours', 'Manual transmission lesson', 90, 12500, 5, false),
   ('manual_120', 'Manual Driving Lesson — 2 hours',    'Manual transmission lesson',120, 16500, 6, false),
-  ('senior_auto_60','Senior Automatic Driving Lesson — 1 hour','For senior drivers focusing on safety and confidence',60, 7500, 7, true)
+  ('senior_auto_60','Senior Automatic Driving Lesson — 1 hour','For senior drivers focusing on safety and confidence',60, 7500, 7, true),
   ('senior_manual_60', 'Senior Manual Driving Lesson — 1 hour', 'Senior manual lesson', 60, 7500, 8, false)
-ON CONFLICT DO NOTHING;
+ON CONFLICT (code) DO UPDATE
+SET name = EXCLUDED.name,
+    description = EXCLUDED.description,
+    duration_minutes = EXCLUDED.duration_minutes,
+    price_cents = EXCLUDED.price_cents,
+    sort_order = EXCLUDED.sort_order,
+    is_active  = EXCLUDED.is_active;
 
 -- ================= MAPPER =================
 CREATE OR REPLACE FUNCTION map_service_code(p_summary TEXT, p_minutes INT)

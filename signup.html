@@ -3,10 +3,19 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Sign Up - Auto-Man</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <title>Sign Up - Auto-Man Driving School</title>
+  <meta name="description" content="Create your Auto-Man Driving School account to book lessons and manage your bookings." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="assets/theme.css" rel="stylesheet">
   <script src="assets/config.js"></script>
+  <script src="assets/render-helpers.js" defer></script>
   <script src="assets/include.js" defer></script>
+  <!-- Supabase JS Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/js/config.local.js"></script>
+  <script src="assets/js/supabaseClient.js"></script>
+  <script src="assets/js/modal.js"></script>
+  <script src="assets/js/auth.js" defer></script>
 </head>
 <body class="bg-gray-50 text-gray-900">
   <div data-include="partials/header.html"></div>
@@ -16,17 +25,19 @@
       <div class="max-w-md mx-auto bg-white rounded-2xl border p-8 shadow">
         <h1 class="text-3xl font-extrabold mb-6 text-center">Sign Up</h1>
 
-        <form id="signupForm" class="space-y-4">
+        <form id="signupForm" class="space-y-4" novalidate>
           <div>
             <label class="block text-sm font-medium mb-1" for="signupEmail">Email</label>
-            <input id="signupEmail" type="email" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring" required />
+            <input id="signupEmail" type="email" class="w-full border rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" required />
+            <p id="emailError" class="text-xs text-red-400 mt-1 hidden"></p>
           </div>
           <div>
             <label class="block text-sm font-medium mb-1" for="signupPassword">Password</label>
-            <input id="signupPassword" type="password" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring" required />
-            <p class="text-xs text-gray-500 mt-1">Minimum 6 characters (Supabase default).</p>
+            <input id="signupPassword" type="password" class="w-full border rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" required minlength="6" />
+            <p id="passwordError" class="text-xs text-red-400 mt-1 hidden"></p>
+            <p class="text-xs text-gray-500 mt-1">Minimum 6 characters.</p>
           </div>
-          <button class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Create account</button>
+          <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors">Create account</button>
         </form>
 
         <div class="mt-4 text-sm text-center">
@@ -42,14 +53,101 @@
   <script>
     document.addEventListener('DOMContentLoaded', function(){
       const form = document.getElementById('signupForm');
+      const emailInput = document.getElementById('signupEmail');
+      const passwordInput = document.getElementById('signupPassword');
+      const emailError = document.getElementById('emailError');
+      const passwordError = document.getElementById('passwordError');
+
+      // Real-time validation
+      emailInput.addEventListener('blur', function() {
+        validateEmail();
+      });
+
+      passwordInput.addEventListener('blur', function() {
+        validatePassword();
+      });
+
+      // Clear errors on input
+      emailInput.addEventListener('input', function() {
+        if (emailError.textContent) {
+          emailError.classList.add('hidden');
+          emailInput.classList.remove('border-red-400');
+        }
+      });
+
+      passwordInput.addEventListener('input', function() {
+        if (passwordError.textContent) {
+          passwordError.classList.add('hidden');
+          passwordInput.classList.remove('border-red-400');
+        }
+      });
+
+      function validateEmail() {
+        const email = emailInput.value.trim();
+        if (!email) {
+          showError(emailInput, emailError, 'Email is required');
+          return false;
+        }
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          showError(emailInput, emailError, 'Please enter a valid email address');
+          return false;
+        }
+        hideError(emailInput, emailError);
+        return true;
+      }
+
+      function validatePassword() {
+        const password = passwordInput.value;
+        if (!password) {
+          showError(passwordInput, passwordError, 'Password is required');
+          return false;
+        }
+        if (password.length < 6) {
+          showError(passwordInput, passwordError, 'Password must be at least 6 characters');
+          return false;
+        }
+        hideError(passwordInput, passwordError);
+        return true;
+      }
+
+      function showError(input, errorEl, message) {
+        errorEl.textContent = message;
+        errorEl.classList.remove('hidden');
+        input.classList.add('border-red-400');
+      }
+
+      function hideError(input, errorEl) {
+        errorEl.textContent = '';
+        errorEl.classList.add('hidden');
+        input.classList.remove('border-red-400');
+      }
+
       form.addEventListener('submit', async function(e){
         e.preventDefault();
-        const email = document.getElementById('signupEmail').value.trim();
-        const password = document.getElementById('signupPassword').value;
+        
+        // Validate all fields
+        const emailValid = validateEmail();
+        const passwordValid = validatePassword();
+
+        if (!emailValid || !passwordValid) {
+          return;
+        }
+
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
+        
         try {
           await AuthUI.signUpWithEmail(email, password);
+          // Success handled by AuthUI (shows confirmation message)
         } catch (err) {
-          alert(err?.message || 'Sign up failed');
+          // Show error in a better way
+          const errorMsg = err?.message || 'Sign up failed';
+          if (errorMsg.toLowerCase().includes('email')) {
+            showError(emailInput, emailError, errorMsg);
+          } else {
+            showError(passwordInput, passwordError, errorMsg);
+          }
         }
       });
     });

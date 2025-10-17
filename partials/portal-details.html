@@ -1,0 +1,314 @@
+<div class="bg-white rounded-2xl border shadow-sm">
+  <!-- Header -->
+  <div class="px-6 py-4 border-b">
+    <h2 class="text-2xl font-bold text-gray-900">My Details</h2>
+    <p class="text-sm text-gray-600 mt-1">Manage your personal information and preferences</p>
+  </div>
+
+  <!-- Form -->
+  <form id="clientDetailsForm" class="p-6 space-y-6">
+    
+    <!-- Personal Information -->
+    <div>
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">Personal Information</h3>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="firstName">
+            First Name <span class="text-red-500">*</span>
+          </label>
+          <input 
+            type="text" 
+            id="firstName" 
+            name="first_name"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            required
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="lastName">
+            Last Name <span class="text-red-500">*</span>
+          </label>
+          <input 
+            type="text" 
+            id="lastName" 
+            name="last_name"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            required
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="mobile">
+            Mobile Number <span class="text-red-500">*</span>
+          </label>
+          <input 
+            type="tel" 
+            id="mobile" 
+            name="mobile"
+            placeholder="04XX XXX XXX"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            required
+          />
+          <p class="text-xs text-gray-500 mt-1">For lesson reminders and updates</p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="dateOfBirth">
+            Date of Birth
+          </label>
+          <input 
+            type="date" 
+            id="dateOfBirth" 
+            name="date_of_birth"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="address">
+            Address
+          </label>
+          <input 
+            type="text" 
+            id="address" 
+            name="address"
+            placeholder="Street address, suburb, postcode"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="learnerPermitNumber">
+            Learner Permit Number
+          </label>
+          <input 
+            type="text" 
+            id="learnerPermitNumber" 
+            name="learner_permit_number"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Emergency Contact -->
+    <div class="pt-6 border-t">
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">Emergency Contact</h3>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="emergencyContactName">
+            Contact Name
+          </label>
+          <input 
+            type="text" 
+            id="emergencyContactName" 
+            name="emergency_contact_name"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="emergencyContactPhone">
+            Contact Phone
+          </label>
+          <input 
+            type="tel" 
+            id="emergencyContactPhone" 
+            name="emergency_contact_phone"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Medical & Learning Needs -->
+    <div class="pt-6 border-t">
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">Medical & Learning Information</h3>
+      
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2" for="medicalConditions">
+          Medical Conditions
+        </label>
+        <textarea 
+          id="medicalConditions" 
+          name="medical_conditions"
+          rows="3"
+          placeholder="Please list any medical conditions we should be aware of (e.g., epilepsy, diabetes, anxiety)"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        ></textarea>
+        <p class="text-xs text-gray-500 mt-1">This information helps us provide better support during lessons</p>
+      </div>
+
+      <div class="space-y-3">
+        <label class="flex items-start gap-3 cursor-pointer">
+          <input 
+            type="checkbox" 
+            id="isAnxiousNervous" 
+            name="is_anxious_nervous"
+            class="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          />
+          <div>
+            <span class="text-sm font-medium text-gray-900">I am an anxious or nervous driver</span>
+            <p class="text-xs text-gray-500">We'll provide extra support and patience</p>
+          </div>
+        </label>
+
+        <label class="flex items-start gap-3 cursor-pointer">
+          <input 
+            type="checkbox" 
+            id="isBeginner" 
+            name="is_beginner"
+            class="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          />
+          <div>
+            <span class="text-sm font-medium text-gray-900">I am a complete beginner</span>
+            <p class="text-xs text-gray-500">We'll start with the basics</p>
+          </div>
+        </label>
+
+        <label class="flex items-start gap-3 cursor-pointer">
+          <input 
+            type="checkbox" 
+            id="isSenior" 
+            name="is_senior"
+            class="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          />
+          <div>
+            <span class="text-sm font-medium text-gray-900">I am a senior driver</span>
+            <p class="text-xs text-gray-500">Preparing for retest or refresher</p>
+          </div>
+        </label>
+      </div>
+
+      <div class="mt-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2" for="learningNeedsOther">
+          Other Learning Needs or Preferences
+        </label>
+        <textarea 
+          id="learningNeedsOther" 
+          name="learning_needs_other"
+          rows="3"
+          placeholder="Any other information that would help us tailor your lessons"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        ></textarea>
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="pt-6 border-t">
+      <label class="block text-sm font-medium text-gray-700 mb-2" for="notes">
+        Additional Notes
+      </label>
+      <textarea 
+        id="notes" 
+        name="notes"
+        rows="3"
+        placeholder="Any other information you'd like to share"
+        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      ></textarea>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex gap-3 pt-6 border-t">
+      <button 
+        type="submit" 
+        class="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+      >
+        Save Changes
+      </button>
+      <button 
+        type="button" 
+        onclick="loadClientDetails()"
+        class="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+      >
+        Reset
+      </button>
+    </div>
+
+    <p class="text-xs text-gray-500">
+      <span class="text-red-500">*</span> Required fields
+    </p>
+  </form>
+</div>
+
+<script>
+  // Load client details when data is available
+  window.addEventListener('clientDataLoaded', function(e) {
+    loadClientDetails();
+  });
+
+  function loadClientDetails() {
+    if (!window.clientData) return;
+
+    const data = window.clientData;
+    
+    // Populate form fields
+    document.getElementById('firstName').value = data.first_name || '';
+    document.getElementById('lastName').value = data.last_name || '';
+    document.getElementById('mobile').value = data.mobile || '';
+    document.getElementById('dateOfBirth').value = data.date_of_birth || '';
+    document.getElementById('address').value = data.address || '';
+    document.getElementById('learnerPermitNumber').value = data.learner_permit_number || '';
+    document.getElementById('emergencyContactName').value = data.emergency_contact_name || '';
+    document.getElementById('emergencyContactPhone').value = data.emergency_contact_phone || '';
+    document.getElementById('medicalConditions').value = data.medical_conditions || '';
+    document.getElementById('isAnxiousNervous').checked = data.is_anxious_nervous || false;
+    document.getElementById('isBeginner').checked = data.is_beginner || false;
+    document.getElementById('isSenior').checked = data.is_senior || false;
+    document.getElementById('learningNeedsOther').value = data.learning_needs_other || '';
+    document.getElementById('notes').value = data.notes || '';
+  }
+
+  // Handle form submission
+  document.getElementById('clientDetailsForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    if (!window.supabaseClient || !window.currentUser) {
+      Modal.error('Not authenticated. Please log in again.');
+      return;
+    }
+
+    // Collect form data
+    const formData = {
+      first_name: document.getElementById('firstName').value.trim(),
+      last_name: document.getElementById('lastName').value.trim(),
+      mobile: document.getElementById('mobile').value.trim(),
+      date_of_birth: document.getElementById('dateOfBirth').value || null,
+      address: document.getElementById('address').value.trim() || null,
+      learner_permit_number: document.getElementById('learnerPermitNumber').value.trim() || null,
+      emergency_contact_name: document.getElementById('emergencyContactName').value.trim() || null,
+      emergency_contact_phone: document.getElementById('emergencyContactPhone').value.trim() || null,
+      medical_conditions: document.getElementById('medicalConditions').value.trim() || null,
+      is_anxious_nervous: document.getElementById('isAnxiousNervous').checked,
+      is_beginner: document.getElementById('isBeginner').checked,
+      is_senior: document.getElementById('isSenior').checked,
+      learning_needs_other: document.getElementById('learningNeedsOther').value.trim() || null,
+      notes: document.getElementById('notes').value.trim() || null,
+      updated_at: new Date().toISOString()
+    };
+
+    // Validate required fields
+    if (!formData.first_name || !formData.last_name || !formData.mobile) {
+      Modal.warning('Please fill in all required fields (First Name, Last Name, and Mobile Number).');
+      return;
+    }
+
+    try {
+      const { data, error } = await window.supabaseClient
+        .from('client')
+        .update(formData)
+        .eq('id', window.currentUser.id);
+
+      if (error) throw error;
+
+      // Update local data
+      window.clientData = { ...window.clientData, ...formData };
+
+      Modal.success('Your details have been saved successfully!', 'Details Updated');
+    } catch (err) {
+      console.error('Error saving details:', err);
+      Modal.error('Could not save your details. Please try again.', 'Save Failed');
+    }
+  });
+</script>

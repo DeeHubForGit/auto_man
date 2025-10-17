@@ -31,33 +31,63 @@
 
   // Auth actions
   async function signInWithOAuth(provider){
-    if (!window.supabaseClient) return alert('Auth not configured');
+    if (!window.supabaseClient) {
+      if (window.Modal) return window.Modal.error('Authentication is not configured. Please contact support.');
+      return alert('Auth not configured');
+    }
     const redirectTo = window.location.origin + '/index.html';
     const { error } = await window.supabaseClient.auth.signInWithOAuth({ provider, options: { redirectTo } });
-    if (error) alert('Sign-in error: ' + error.message);
+    if (error && window.Modal) window.Modal.error(error.message, 'Sign-in Error');
+    else if (error) alert('Sign-in error: ' + error.message);
   }
 
   async function signInWithMagicLink(email){
-    if (!window.supabaseClient) return alert('Auth not configured');
+    if (!window.supabaseClient) {
+      if (window.Modal) return window.Modal.error('Authentication is not configured. Please contact support.');
+      return alert('Auth not configured');
+    }
     const redirectTo = window.location.origin + '/index.html';
     const { error } = await window.supabaseClient.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo } });
-    if (error) alert('Error: ' + error.message); else alert('Check your email for the login link.');
+    if (error && window.Modal) window.Modal.error(error.message);
+    else if (error) alert('Error: ' + error.message);
+    else if (window.Modal) window.Modal.success('Check your email for the login link.', 'Email Sent');
+    else alert('Check your email for the login link.');
   }
 
   async function signUpWithEmail(email, password){
-    if (!window.supabaseClient) return alert('Auth not configured');
+    if (!window.supabaseClient) {
+      if (window.Modal) return window.Modal.error('Authentication is not configured. Please contact support.');
+      return alert('Auth not configured');
+    }
     const redirectTo = window.location.origin + '/index.html';
     const { error } = await window.supabaseClient.auth.signUp({ email, password, options: { emailRedirectTo: redirectTo } });
-    if (error) alert('Sign-up error: ' + error.message); else alert('Check your email to confirm your account.');
+    if (error) {
+      if (window.Modal) window.Modal.error(error.message, 'Sign-up Error');
+      else alert('Sign-up error: ' + error.message);
+    } else {
+      if (window.Modal) window.Modal.success('Please check your email to confirm your account. You may need to check your spam folder.', 'Account Created');
+      else alert('Check your email to confirm your account.');
+    }
   }
 
   async function signInWithPassword(email, password){
-    if (!window.supabaseClient) return alert('Auth not configured');
+    if (!window.supabaseClient) {
+      const msg = 'Authentication is not configured. Please contact support.';
+      if (window.Modal) window.Modal.error(msg);
+      throw new Error(msg);
+    }
     const { data, error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
-    if (error) return alert('Login error: ' + error.message);
-    // logged in
-    const next = new URLSearchParams(location.search).get('next') || 'index.html';
-    location.href = next;
+    if (error) {
+      console.error('Login error:', error);
+      if (window.Modal) window.Modal.error(error.message, 'Login Error');
+      throw error;
+    }
+    // logged in - redirect to portal immediately
+    console.log('Login successful, user:', data.user?.email);
+    const next = new URLSearchParams(window.location.search).get('next') || 'portal.html';
+    console.log('Redirecting to:', next);
+    window.location.replace(next); // Use replace to avoid back button issues
+    return data; // Return data but redirect will happen first
   }
 
   // Expose

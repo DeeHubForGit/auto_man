@@ -6,7 +6,7 @@
   </div>
 
   <!-- Form -->
-  <form id="clientDetailsForm" class="p-6 space-y-6">
+  <form id="clientDetailsForm" class="p-6 space-y-6" novalidate>
     
     <!-- Personal Information -->
     <div>
@@ -23,6 +23,7 @@
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             required
           />
+          <p id="firstNameError" class="text-xs text-red-500 mt-1 hidden"></p>
         </div>
 
         <div>
@@ -36,6 +37,7 @@
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             required
           />
+          <p id="lastNameError" class="text-xs text-red-500 mt-1 hidden"></p>
         </div>
 
         <div>
@@ -50,37 +52,13 @@
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             required
           />
+          <p id="mobileError" class="text-xs text-red-500 mt-1 hidden"></p>
           <p class="text-xs text-gray-500 mt-1">For lesson reminders and updates</p>
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1" for="dateOfBirth">
-            Date of Birth
-          </label>
-          <input 
-            type="date" 
-            id="dateOfBirth" 
-            name="date_of_birth"
-            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-
-        <div class="md:col-span-2">
-          <label class="block text-sm font-medium text-gray-700 mb-1" for="address">
-            Address
-          </label>
-          <input 
-            type="text" 
-            id="address" 
-            name="address"
-            placeholder="Street address, suburb, postcode"
-            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-
-        <div>
           <label class="block text-sm font-medium text-gray-700 mb-1" for="learnerPermitNumber">
-            Learner Permit Number
+            License/Permit Number
           </label>
           <input 
             type="text" 
@@ -247,8 +225,6 @@
     document.getElementById('firstName').value = data.first_name || '';
     document.getElementById('lastName').value = data.last_name || '';
     document.getElementById('mobile').value = data.mobile || '';
-    document.getElementById('dateOfBirth').value = data.date_of_birth || '';
-    document.getElementById('address').value = data.address || '';
     document.getElementById('learnerPermitNumber').value = data.learner_permit_number || '';
     document.getElementById('emergencyContactName').value = data.emergency_contact_name || '';
     document.getElementById('emergencyContactPhone').value = data.emergency_contact_phone || '';
@@ -260,9 +236,41 @@
     document.getElementById('notes').value = data.notes || '';
   }
 
+  // Validation helper functions
+  function showError(fieldId, errorId, message) {
+    console.log('Showing error for', fieldId, ':', message);
+    const field = document.getElementById(fieldId);
+    const error = document.getElementById(errorId);
+    
+    if (!field || !error) {
+      console.error('Field or error element not found:', fieldId, errorId);
+      return;
+    }
+    
+    field.classList.add('border-red-400');
+    error.textContent = message;
+    error.classList.remove('hidden');
+    field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function clearError(fieldId, errorId) {
+    const field = document.getElementById(fieldId);
+    const error = document.getElementById(errorId);
+    
+    if (!field || !error) return;
+    
+    field.classList.remove('border-red-400');
+    error.classList.add('hidden');
+  }
+
   // Handle form submission
   document.getElementById('clientDetailsForm').addEventListener('submit', async function(e) {
     e.preventDefault();
+
+    // Clear all errors
+    clearError('firstName', 'firstNameError');
+    clearError('lastName', 'lastNameError');
+    clearError('mobile', 'mobileError');
 
     if (!window.supabaseClient || !window.currentUser) {
       Modal.error('Not authenticated. Please log in again.');
@@ -274,8 +282,6 @@
       first_name: document.getElementById('firstName').value.trim(),
       last_name: document.getElementById('lastName').value.trim(),
       mobile: document.getElementById('mobile').value.trim(),
-      date_of_birth: document.getElementById('dateOfBirth').value || null,
-      address: document.getElementById('address').value.trim() || null,
       learner_permit_number: document.getElementById('learnerPermitNumber').value.trim() || null,
       emergency_contact_name: document.getElementById('emergencyContactName').value.trim() || null,
       emergency_contact_phone: document.getElementById('emergencyContactPhone').value.trim() || null,
@@ -288,11 +294,34 @@
       updated_at: new Date().toISOString()
     };
 
-    // Validate required fields
-    if (!formData.first_name || !formData.last_name || !formData.mobile) {
-      Modal.warning('Please fill in all required fields (First Name, Last Name, and Mobile Number).');
+    // Validate required fields with inline errors
+    console.log('Validating form data:', formData);
+    let hasError = false;
+    
+    if (!formData.first_name) {
+      console.log('First name is empty');
+      showError('firstName', 'firstNameError', 'First name is required');
+      hasError = true;
+    }
+    
+    if (!formData.last_name) {
+      console.log('Last name is empty');
+      showError('lastName', 'lastNameError', 'Last name is required');
+      if (!hasError) hasError = true;
+    }
+    
+    if (!formData.mobile) {
+      console.log('Mobile is empty');
+      showError('mobile', 'mobileError', 'Mobile number is required');
+      if (!hasError) hasError = true;
+    }
+    
+    if (hasError) {
+      console.log('Validation failed, stopping submission');
       return;
     }
+    
+    console.log('Validation passed, saving data...');
 
     try {
       const { data, error } = await window.supabaseClient

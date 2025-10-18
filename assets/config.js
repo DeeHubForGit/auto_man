@@ -6,6 +6,10 @@ const SITE_CONFIG = {
   PHONE_NUMBER_DISPLAY: '0403 632 313', // For display (with spaces)
   EMAIL: 'automangeelong@gmail.com',
   
+  // Social media
+  FACEBOOK_URL: 'https://www.facebook.com/auto.man.driving',
+  FACEBOOK_HANDLE: '@auto.man.driving',
+  
   // Service overviews for marketing/homepage (high-level categories)
   SERVICE_OVERVIEWS: [
     {
@@ -302,7 +306,7 @@ window.SITE_CONFIG.loadFromAPI = async function(apiUrl) {
 
 // Auto-replace phone number placeholders on page load
 (function() {
-  function replacePhoneNumbers() {
+  function replacePhoneNumbers(){
     // Replace tel: links
     document.querySelectorAll('a[href^="tel:"]').forEach(link => {
       if (link.href.includes('{{PHONE}}') || link.href.includes('{{PHONE_LINK}}') || link.href.includes('0410166232') || link.href.includes('04XXXXXXXX')) {
@@ -318,23 +322,23 @@ window.SITE_CONFIG.loadFromAPI = async function(apiUrl) {
     });
 
     // Replace text content and href attributes with placeholders
-    const walker = document.createTreeWalker(
+    const walkerPhone = document.createTreeWalker(
       document.body,
       NodeFilter.SHOW_TEXT,
       null,
       false
     );
 
-    const nodesToReplace = [];
+    const phoneNodesToReplace = [];
     let node;
-    while (node = walker.nextNode()) {
+    while (node = walkerPhone.nextNode()) {
       if (node.textContent.includes('{{PHONE}}') || node.textContent.includes('{{OWNER}}') || node.textContent.includes('{{EMAIL}}')) {
-        nodesToReplace.push(node);
+        phoneNodesToReplace.push(node);
       }
     }
 
-    nodesToReplace.forEach(node => {
-      node.textContent = node.textContent
+    phoneNodesToReplace.forEach(n => {
+      n.textContent = n.textContent
         .replace(/\{\{PHONE\}\}/g, SITE_CONFIG.PHONE_NUMBER_DISPLAY)
         .replace(/\{\{OWNER\}\}/g, SITE_CONFIG.OWNER_NAME)
         .replace(/\{\{EMAIL\}\}/g, SITE_CONFIG.EMAIL);
@@ -349,6 +353,42 @@ window.SITE_CONFIG.loadFromAPI = async function(apiUrl) {
     document.querySelectorAll('a[href*="{{EMAIL}}"]').forEach(link => {
       link.href = link.href.replace(/\{\{EMAIL\}\}/g, SITE_CONFIG.EMAIL);
     });
+
+    // Replace {{PHONE_LINK}} in href attributes
+    document.querySelectorAll('a[href*="{{PHONE_LINK}}"]').forEach(link => {
+      link.href = link.href.replace(/\{\{PHONE_LINK\}\}/g, SITE_CONFIG.PHONE_NUMBER_LINK);
+    });
+
+    // Replace {{FACEBOOK_URL}} in href attributes
+    document.querySelectorAll('a[href*="{{FACEBOOK_URL}}"]').forEach(link => {
+      link.href = link.href.replace(/\{\{FACEBOOK_URL\}\}/g, SITE_CONFIG.FACEBOOK_URL);
+    });
+
+    // Replace {{FACEBOOK}} in href attributes
+    document.querySelectorAll('a[href*="{{FACEBOOK}}"]').forEach(link => {
+      link.href = link.href.replace(/\{\{FACEBOOK\}\}/g, SITE_CONFIG.FACEBOOK_HANDLE);
+    });
+
+    // Replace placeholders in all text nodes (robust)
+    const TOKEN_MAP = new Map([
+      ['{{EMAIL}}', SITE_CONFIG.EMAIL],
+      ['{{PHONE}}', SITE_CONFIG.PHONE_NUMBER_DISPLAY || ''],
+      ['{{FACEBOOK}}', SITE_CONFIG.FACEBOOK_HANDLE || ''],
+    ]);
+    const walkerTokens = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+    const textNodes = [];
+    while (walkerTokens.nextNode()) textNodes.push(walkerTokens.currentNode);
+    textNodes.forEach(n => {
+      let txt = n.nodeValue;
+      let changed = false;
+      TOKEN_MAP.forEach((val, key) => {
+        if (txt && txt.includes(key)) {
+          txt = txt.split(key).join(val);
+          changed = true;
+        }
+      });
+      if (changed) n.nodeValue = txt;
+    });
   }
 
   if (document.readyState === 'loading') {
@@ -359,7 +399,9 @@ window.SITE_CONFIG.loadFromAPI = async function(apiUrl) {
 
   // Also run after config is updated from API
   window.addEventListener('configUpdated', replacePhoneNumbers);
-  
-  // Run after partials (header/footer) are loaded
+  // Run after shared partials are injected
   window.addEventListener('partialsLoaded', replacePhoneNumbers);
+  // As a final safety, run after full window load
+  window.addEventListener('load', replacePhoneNumbers);
+  
 })();

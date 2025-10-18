@@ -37,18 +37,19 @@
       <a href="portal.html" id="portalBtn" class="hidden hover:text-blue-600">My Account</a>
     </nav>
 
-    <div class="flex items-center gap-3">
+    <!-- Auth controls (middle cluster) -->
+    <div class="hidden md:flex items-center gap-3">
       <!-- Sign Up as text link -->
-      <a href="signup.html" id="signupBtn" class="hidden md:inline-block text-sm text-gray-700 hover:text-blue-600 transition-colors">
-        Sign Up
-      </a>
-
+      <a href="signup.html" id="signupBtn" class="md:inline-block text-sm text-gray-700 hover:text-blue-600 transition-colors">Sign Up</a>
       <!-- Login as button -->
-      <a href="login.html" id="loginBtn"
-        class="hidden md:inline-block text-blue-600 border border-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors">
-        Login
-      </a>
+      <a href="login.html" id="loginBtn" class="md:inline-block text-blue-600 border border-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors">Login</a>
+      <!-- My Account -->
+      <a href="portal.html" id="portalBtnHeader" class="hidden md:inline-block hover:text-blue-600 transition-colors">My Account</a>
+      <!-- Sign Out button (desktop) -->
+      <button id="logoutBtnHeader" class="hidden md:inline-block border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">Sign Out</button>
+    </div>
 
+    <div class="flex items-center gap-3">
       <a href="tel:{{PHONE_LINK}}" class="hidden md:inline-flex items-center gap-2 text-blue-500 font-semibold hover:text-blue-600">📞 {{PHONE}}</a>
 
       <!-- WhatsApp button (placeholder for now) -->
@@ -62,7 +63,7 @@
         class="hidden md:inline-block bg-blue-600 text-white px-5 py-2.5 rounded-lg shadow-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-semibold transition-all">
         Book Now
       </a>
-      <button class="md:hidden px-3 py-2 border rounded" onclick="toggleMenu()" aria-label="Toggle menu">☰</button>
+      <button id="menuToggleBtn" type="button" class="md:hidden px-3 py-2 border rounded" onclick="toggleMenu()" aria-label="Toggle menu" aria-expanded="false" aria-controls="mobileMenu">☰</button>
     </div>
   </div>
 
@@ -105,11 +106,21 @@
   <!-- tiny helpers -->
   <script>
 // Basic mobile menu toggle (if you already have this elsewhere, keep one copy)
-function toggleMenu() {
+window.toggleMenu = function () {
       var m = document.getElementById('mobileMenu');
+      var btn = document.getElementById('menuToggleBtn');
       if (!m) return;
-      m.classList.toggle('hidden');
-    }
+      var isHidden = m.classList.toggle('hidden');
+      if (btn) btn.setAttribute('aria-expanded', (!isHidden).toString());
+    };
+    // Fallback binding in case inline handler is blocked
+    (function(){
+      var btn = document.getElementById('menuToggleBtn');
+      if (btn && !btn._bound) {
+        btn.addEventListener('click', window.toggleMenu);
+        btn._bound = true;
+      }
+    })();
 
     // Check auth state and update header buttons
     async function updateHeaderAuth() {
@@ -126,6 +137,8 @@ function toggleMenu() {
         const signupBtn = document.getElementById('signupBtn');
         const loginBtn = document.getElementById('loginBtn');
         const portalBtn = document.getElementById('portalBtn');
+        const portalBtnHeader = document.getElementById('portalBtnHeader');
+        const logoutBtnHeader = document.getElementById('logoutBtnHeader');
         const signupBtnMobile = document.getElementById('signupBtnMobile');
         const loginBtnMobile = document.getElementById('loginBtnMobile');
         const portalBtnMobile = document.getElementById('portalBtnMobile');
@@ -139,6 +152,19 @@ function toggleMenu() {
             portalBtn.classList.remove('hidden');
             console.log('My Account link shown');
           }
+          if (portalBtnHeader) portalBtnHeader.classList.remove('hidden');
+          if (logoutBtnHeader) {
+            logoutBtnHeader.classList.remove('hidden');
+            // Wire sign out each time defensively
+            logoutBtnHeader.onclick = async function() {
+              try {
+                await window.supabaseClient.auth.signOut();
+                window.location.href = 'index.html';
+              } catch (e) {
+                console.error('Error signing out:', e);
+              }
+            };
+          }
           if (signupBtnMobile) signupBtnMobile.classList.add('hidden');
           if (loginBtnMobile) loginBtnMobile.classList.add('hidden');
           if (portalBtnMobile) portalBtnMobile.classList.remove('hidden');
@@ -148,6 +174,8 @@ function toggleMenu() {
           if (signupBtn) signupBtn.classList.remove('hidden');
           if (loginBtn) loginBtn.classList.remove('hidden');
           if (portalBtn) portalBtn.classList.add('hidden');
+          if (portalBtnHeader) portalBtnHeader.classList.add('hidden');
+          if (logoutBtnHeader) logoutBtnHeader.classList.add('hidden');
           if (signupBtnMobile) signupBtnMobile.classList.remove('hidden');
           if (loginBtnMobile) loginBtnMobile.classList.remove('hidden');
           if (portalBtnMobile) portalBtnMobile.classList.add('hidden');

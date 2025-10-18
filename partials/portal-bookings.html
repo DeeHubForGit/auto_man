@@ -30,18 +30,17 @@
     
     <!-- Upcoming Bookings -->
     <div id="upcoming-bookings" class="booking-content">
-      <div id="upcoming-list" class="space-y-4">
-        <!-- Loading state -->
-        <div class="text-center py-8">
-          <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p class="text-gray-500 mt-2">Loading bookings...</p>
+      <div id="upcoming-list" class="space-y-4" aria-live="polite" aria-busy="true">
+        <div class="flex items-center justify-center py-12">
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <span class="ml-3 text-gray-600">Loading bookings...</span>
         </div>
       </div>
     </div>
 
     <!-- Past Bookings -->
     <div id="past-bookings" class="booking-content hidden">
-      <div id="past-list" class="space-y-4">
+      <div id="past-list" class="space-y-4" aria-live="polite" aria-busy="false">
         <!-- Will be populated by JS -->
       </div>
     </div>

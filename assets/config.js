@@ -404,4 +404,42 @@ window.SITE_CONFIG.loadFromAPI = async function(apiUrl) {
   // As a final safety, run after full window load
   window.addEventListener('load', replacePhoneNumbers);
   
+  // Ensure favicon and title branding across all pages
+  function ensureBrandingHead(){
+    try {
+      const href = 'images/auto-man-small-logo120x120.png';
+      let link = document.querySelector('link[rel="icon"]');
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.head.appendChild(link);
+      }
+      link.type = 'image/png';
+      link.sizes = '120x120';
+      link.href = href;
+
+      // Apple touch icon too
+      let apple = document.querySelector('link[rel="apple-touch-icon"]');
+      if (!apple) {
+        apple = document.createElement('link');
+        apple.rel = 'apple-touch-icon';
+        document.head.appendChild(apple);
+      }
+      apple.sizes = '120x120';
+      apple.href = href;
+
+      if (!document.title || document.title === 'Driving Test Package Geelong | Auto-Man Driving School' || document.title.includes('Auto-Man Driving School') || document.title.includes('Book a Lesson')) {
+        document.title = 'Auto-Man';
+      }
+    } catch (e) {
+      console.warn('Branding head update failed', e);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ensureBrandingHead);
+  } else {
+    ensureBrandingHead();
+  }
+  window.addEventListener('partialsLoaded', ensureBrandingHead);
 })();

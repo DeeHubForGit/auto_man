@@ -2,7 +2,7 @@
   <div class="container mx-auto px-4 py-3 flex items-center justify-between">
     <!-- Left: logo + title grouped -->
     <div class="flex items-center gap-2 md:gap-3 min-w-0">
-      <img src="images/auto-man-small-logo-website-header.png" alt="Auto-Man Driving School logo" class="h-8 w-auto" />
+      <img src="images/auto-man-small-logo-website-header.png" alt="Auto-Man Driving School logo" class="h-8 w-auto" decoding="async" />
       <a href="index.html" class="logo text-lg md:text-xl font-bold tracking-tight whitespace-nowrap" style="font-family: Tahoma, Verdana, sans-serif;">Auto-Man Driving School</a>
     </div>
 
@@ -57,7 +57,7 @@
       <a href="tel:{{PHONE_LINK}}" class="hidden md:inline-flex items-center gap-2 text-blue-500 font-semibold hover:text-blue-600">📞 {{PHONE}}</a>
 
       <!-- WhatsApp button (placeholder for now) -->
-      <a href="https://wa.me/61403632313" target="_blank"
+      <a href="https://wa.me/61403632313" target="_blank" rel="noopener"
         class="hidden md:inline-block border border-blue-400 text-blue-400 hover:bg-blue-500 hover:text-white rounded-lg px-4 py-2 text-sm transition">
         <i class="fa-brands fa-whatsapp"></i> WhatsApp
       </a>
@@ -214,30 +214,13 @@
       else if (window.event) window.event.cancelBubble = true;
       const caret = servicesBtn.querySelector('[data-caret]');
       const nowHidden = servicesSub.classList.toggle('hidden');
-      if (!nowHidden) {
-        servicesSub.classList.add('block');
-      } else {
-        servicesSub.classList.remove('block');
-      }
       servicesBtn.setAttribute('aria-expanded', nowHidden ? 'false' : 'true');
       if (caret) caret.classList.toggle('rotate-180', !nowHidden);
       return false;
     }
     window.toggleSubmenu = toggleSubmenu;
 
-    // Prefer JS listeners over inline handlers
-    if (menuToggleBtn && !menuToggleBtn._bound) {
-      menuToggleBtn.addEventListener('click', toggleMenu);
-      // leave touchend out to avoid double-fire; Chrome synthesises click from touch
-      menuToggleBtn.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleMenu(); }
-      });
-      menuToggleBtn._bound = true;
-    }
-    if (servicesBtn && !servicesBtn._bound) {
-      servicesBtn.addEventListener('click', function(e){ toggleSubmenu(e); });
-      servicesBtn._bound = true;
-    }
+    // Prefer inline handlers for reliability; no duplicate JS bindings
 
     // Close on Esc or outside click
     document.addEventListener('keydown', (e) => {

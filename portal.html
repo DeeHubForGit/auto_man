@@ -561,6 +561,7 @@
       
       document.getElementById(tab + '-bookings').classList.remove('hidden');
     }
+    window.switchBookingTab = switchBookingTab;
 
     async function cancelBooking(bookingId) {
       Modal.confirm(
@@ -654,6 +655,38 @@
       }
       
       console.log('Form validation listener attached');
+
+      // Hard guard: capture submit first and block if invalid, regardless of other listeners
+      document.addEventListener('submit', function(ev){
+        const target = ev.target;
+        if (!(target && target.id === 'clientDetailsForm')) return;
+        // Use partial validator if present
+        if (typeof window.validateClientDetailsForm === 'function') {
+          const ok = window.validateClientDetailsForm();
+          if (!ok) { ev.preventDefault(); ev.stopImmediatePropagation(); console.log('Guard blocked submit (partial validator)'); }
+          return;
+        }
+        // Fallback quick validation
+        const first = document.getElementById('firstName')?.value.trim() || '';
+        const last  = document.getElementById('lastName')?.value.trim() || '';
+        const mobile= document.getElementById('mobile')?.value.trim() || '';
+        const ePhone= document.getElementById('emergencyContactPhone')?.value.trim() || '';
+        function digits(v){ return (v||'').replace(/\D+/g,''); }
+        function isValidAuMobile(v){ const d=digits(v); return /^04\d{8}$/.test(d)||/^614\d{8}$/.test(d); }
+        function isValidAuPhone(v){ const d=digits(v); return /^0\d{9}$/.test(d)||/^61\d{9}$/.test(d); }
+        let bad = false;
+        if (!first) { bad = true; }
+        if (!last)  { bad = true; }
+        if (!mobile || !isValidAuMobile(mobile)) { bad = true; }
+        if (ePhone && !isValidAuPhone(ePhone)) { bad = true; }
+        if (bad) { ev.preventDefault(); ev.stopImmediatePropagation(); console.log('Guard blocked submit (fallback validator)'); }
+      }, true);
+
+      // If the partial provided its own validator/submit handler, prefer that and avoid adding a second submit listener
+      if (typeof window.validateClientDetailsForm === 'function') {
+        console.log('Using partial-provided validator/handler');
+        // Still set up autosave listeners below, but skip our own submit handler
+      }
       
       // Clear error when user starts typing AND auto-save to localStorage
       ['firstName', 'lastName', 'mobile'].forEach(id => {
@@ -682,54 +715,43 @@
         }
       });
       
-      form.addEventListener('submit', async function(e) {
+      if (typeof window.validateClientDetailsForm !== 'function') form.addEventListener('submit', async function(e) {
         e.preventDefault();
         console.log('=== FORM SUBMITTED ===');
 
-        // Clear previous errors
-        clearAllErrors();
+        // If the partial exposed a validator, use it so rules stay in one place
+        if (typeof window.validateClientDetailsForm === 'function') {
+          const ok = window.validateClientDetailsForm();
+          if (!ok) { console.log('Validation failed in partial validator'); return; }
+        } else {
+          // Fallback minimal validation (keep in sync with partial)
+          const first = document.getElementById('firstName')?.value.trim() || '';
+          const last  = document.getElementById('lastName')?.value.trim() || '';
+          const mobile= document.getElementById('mobile')?.value.trim() || '';
+          const ePhone= document.getElementById('emergencyContactPhone')?.value.trim() || '';
 
-        const formData = {
-          first_name: document.getElementById('firstName')?.value.trim() || '',
-          last_name: document.getElementById('lastName')?.value.trim() || '',
-          mobile: document.getElementById('mobile')?.value.trim() || ''
-        };
+          function digits(v){ return (v||'').replace(/\D+/g,''); }
+          function isValidAuMobile(v){ const d=digits(v); return /^04\d{8}$/.test(d)||/^614\d{8}$/.test(d); }
+          function isValidAuPhone(v){ const d=digits(v); return /^0\d{9}$/.test(d)||/^61\d{9}$/.test(d); }
 
-        console.log('Form data:', formData);
+          let hasError = false;
+          clearAllErrors();
+          if (!first) { showFieldError('firstName','firstNameError','First name is required'); hasError = true; }
+          if (!last)  { showFieldError('lastName','lastNameError','Last name is required');   hasError = true; }
+          if (!mobile) { showFieldError('mobile','mobileError','Mobile number is required'); hasError = true; }
+          else if (!isValidAuMobile(mobile)) { showFieldError('mobile','mobileError','Enter a valid AU mobile (e.g. 04XX XXX XXX)'); hasError = true; }
+          if (ePhone && !isValidAuPhone(ePhone)) { showFieldError('emergencyContactPhone','emergencyContactPhoneError','Enter a valid AU phone number'); hasError = true; }
 
-        // Validate
-        let hasError = false;
-        
-        if (!formData.first_name) {
-          console.log('First name validation failed');
-          showFieldError('firstName', 'firstNameError', 'First name is required');
-          hasError = true;
-        }
-        
-        if (!formData.last_name) {
-          console.log('Last name validation failed');
-          showFieldError('lastName', 'lastNameError', 'Last name is required');
-          hasError = true;
-        }
-        
-        if (!formData.mobile) {
-          console.log('Mobile validation failed');
-          showFieldError('mobile', 'mobileError', 'Mobile number is required');
-          hasError = true;
-        }
-
-        if (hasError) {
-          console.log('Validation failed, stopping');
-          return;
+          if (hasError) { console.log('Validation failed, stopping'); return; }
         }
 
         console.log('Validation passed, saving to database...');
         
         // Collect all form data
         const fullFormData = {
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          mobile: formData.mobile,
+          first_name: document.getElementById('firstName')?.value.trim() || '',
+          last_name: document.getElementById('lastName')?.value.trim() || '',
+          mobile: document.getElementById('mobile')?.value.trim() || '',
           learner_permit_number: document.getElementById('learnerPermitNumber')?.value.trim() || null,
           emergency_contact_name: document.getElementById('emergencyContactName')?.value.trim() || null,
           emergency_contact_phone: document.getElementById('emergencyContactPhone')?.value.trim() || null,

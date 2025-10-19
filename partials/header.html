@@ -1,6 +1,10 @@
 <header class="bg-white shadow-sm sticky top-0 z-50">
   <div class="container mx-auto px-4 py-3 flex items-center justify-between">
-    <a href="index.html" class="logo text-xl font-bold tracking-tight">Auto-Man Driving School</a>
+    <!-- Left: logo + title grouped -->
+    <div class="flex items-center gap-2 md:gap-3 min-w-0">
+      <img src="images/auto-man-small-logo-website-header.png" alt="Auto-Man Driving School logo" class="h-8 w-auto" />
+      <a href="index.html" class="logo text-lg md:text-xl font-bold tracking-tight whitespace-nowrap" style="font-family: Tahoma, Verdana, sans-serif;">Auto-Man Driving School</a>
+    </div>
 
     <!-- Desktop nav -->
     <nav class="hidden md:flex items-center gap-6 text-sm relative">
@@ -49,12 +53,12 @@
       <button id="logoutBtnHeader" class="hidden md:inline-block border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">Sign Out</button>
     </div>
 
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-4">
       <a href="tel:{{PHONE_LINK}}" class="hidden md:inline-flex items-center gap-2 text-blue-500 font-semibold hover:text-blue-600">📞 {{PHONE}}</a>
 
       <!-- WhatsApp button (placeholder for now) -->
       <a href="https://wa.me/61403632313" target="_blank"
-        class="border border-blue-400 text-blue-400 hover:bg-blue-500 hover:text-white rounded-lg px-4 py-2 text-sm transition">
+        class="hidden md:inline-block border border-blue-400 text-blue-400 hover:bg-blue-500 hover:text-white rounded-lg px-4 py-2 text-sm transition">
         <i class="fa-brands fa-whatsapp"></i> WhatsApp
       </a>
 
@@ -63,129 +67,103 @@
         class="hidden md:inline-block bg-blue-600 text-white px-5 py-2.5 rounded-lg shadow-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-semibold transition-all">
         Book Now
       </a>
-      <button id="menuToggleBtn" type="button" class="md:hidden px-3 py-2 border rounded" onclick="toggleMenu()" aria-label="Toggle menu" aria-expanded="false" aria-controls="mobileMenu">☰</button>
+      <!-- Mobile Book button -->
+      <a href="booking.html" class="md:hidden bg-blue-600 text-white px-3 py-2 rounded-lg shadow hover:bg-blue-700 text-sm ml-2">Book</a>
+      <button id="menuToggleBtn" type="button" class="md:hidden px-3 py-2 border rounded select-none touch-manipulation z-50 pointer-events-auto" style="-webkit-tap-highlight-color: transparent;" onclick="toggleMenu()" aria-label="Toggle menu" aria-expanded="false" aria-controls="mobileMenu" role="button">☰</button>
     </div>
   </div>
 
   <!-- Mobile Nav -->
-  <div id="mobileMenu" class="md:hidden hidden border-t">
-    <nav class="container mx-auto px-4 py-3 grid gap-2 text-sm">
+  <div id="mobileMenu"
+      class="md:hidden hidden fixed inset-x-0 top-14 z-50 bg-white text-slate-900 border-t shadow-lg">
+    <nav class="px-4 py-3 flex flex-col gap-2 text-base">
       <!-- Services (collapsible) -->
-      <button id="mobileServicesBtn" class="flex items-center justify-between w-full py-2 text-left" onclick="toggleSubmenu()">
+      <button id="mobileServicesBtn"
+              type="button"
+              class="flex items-center justify-between w-full py-2 font-medium"
+              aria-controls="mobileServicesSubmenu"
+              aria-expanded="false"
+              onclick="(function(e){e.preventDefault();e.stopPropagation();var s=document.getElementById('mobileServicesSubmenu');var btn=document.getElementById('mobileServicesBtn');if(!s||!btn)return false;var hidden=s.classList.toggle('hidden');if(!hidden){s.classList.add('block');}else{s.classList.remove('block');}btn.setAttribute('aria-expanded', hidden?'false':'true');var c=btn.querySelector('[data-caret]');if(c)c.classList.toggle('rotate-180',!hidden);return false;})(event)">
         <span>Services</span>
-        <span aria-hidden="true">▾</span>
+        <span data-caret class="transition-transform transform">▾</span>
       </button>
-      <div id="mobileServicesSubmenu" class="ml-3 grid gap-2 pl-3 border-l hidden">
-        <a href="index.html#services" onclick="toggleMenu()">All Services</a>
-        <a href="beginner-drivers.html" onclick="toggleMenu()">Beginner Drivers</a>
-        <a href="driving-test-package.html" onclick="toggleMenu()">Driving Test Package</a>
-        <a href="overseas-licence.html" onclick="toggleMenu()">Overseas Licence Conversion</a>
-        <a href="nervous-drivers.html" onclick="toggleMenu()">Nervous Drivers</a>
-        <a href="senior-drivers.html" onclick="toggleMenu()">Senior Driver Retests</a>
-        <a href="special-requirements.html" onclick="toggleMenu()">Special Requirements</a>
+
+      <div id="mobileServicesSubmenu" class="hidden pl-3 border-l flex flex-col gap-2">
+        <a class="block py-1 hover:underline" href="index.html#services" onclick="window.closeMenu?window.closeMenu():null">All Services</a>
+        <a class="block py-1 hover:underline" href="beginner-drivers.html" onclick="window.closeMenu?window.closeMenu():null">Beginner Drivers</a>
+        <a class="block py-1 hover:underline" href="driving-test-package.html" onclick="window.closeMenu?window.closeMenu():null">Driving Test Package</a>
+        <a class="block py-1 hover:underline" href="overseas-licence.html" onclick="window.closeMenu?window.closeMenu():null">Overseas Licence Conversion</a>
+        <a class="block py-1 hover:underline" href="nervous-drivers.html" onclick="window.closeMenu?window.closeMenu():null">Nervous Drivers</a>
+        <a class="block py-1 hover:underline" href="senior-drivers.html" onclick="window.closeMenu?window.closeMenu():null">Senior Driver Retests</a>
+        <a class="block py-1 hover:underline" href="special-requirements.html" onclick="window.closeMenu?window.closeMenu():null">Special Requirements</a>
       </div>
 
-      <a href="about.html" onclick="toggleMenu()">About Us</a>
-      <a href="faq.html" onclick="toggleMenu()">FAQs</a>
+      <a class="block py-2 hover:underline" href="about.html" onclick="window.closeMenu?window.closeMenu():null">About Us</a>
+      <a class="block py-2 hover:underline" href="faq.html" onclick="window.closeMenu?window.closeMenu():null">FAQs</a>
+      <a class="block py-2 hover:underline" href="index.html#contact" onclick="window.closeMenu?window.closeMenu():null">Contact</a>
 
-      <!--
-      <a href="index.html#pricing" onclick="toggleMenu()">Lesson Packages</a>
-      -->
-      <a href="index.html#contact" onclick="toggleMenu()">Contact</a>
-      <a href="portal.html" id="portalBtnMobile" class="hidden" onclick="toggleMenu()">My Account</a>
-      <a href="signup.html" id="signupBtnMobile" class="hidden" onclick="toggleMenu()">Sign Up</a>
+      <!-- Auth -->
+      <a href="login.html" id="loginBtnMobile"
+        class="mt-1 px-4 py-2 rounded border border-blue-600 text-blue-600 hover:bg-blue-50 text-center"
+        onclick="window.closeMenu?window.closeMenu():null">Login</a>
 
-      <!-- Login and Book Now buttons in mobile menu -->
-      <a href="login.html" id="loginBtnMobile" class="px-4 py-2 rounded border border-blue-600 text-blue-600 hover:bg-blue-50 text-center" onclick="toggleMenu()">Login</a>
+      <!-- Phone & CTA -->
+      <a href="tel:{{PHONE_LINK}}"
+        class="flex items-center gap-2 py-2 font-semibold text-blue-700"
+        onclick="window.closeMenu?window.closeMenu():null">📞 Call {{PHONE}}</a>
 
-      <a href="tel:{{PHONE_LINK}}" class="flex items-center gap-2 text-blue-700 font-semibold" onclick="toggleMenu()">📞 Call {{PHONE}}</a>
-      <a href="booking.html" class="bg-blue-500 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-600" onclick="toggleMenu()">Book Now</a>
+      <a href="booking.html"
+        class="bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 text-center"
+        onclick="window.closeMenu?window.closeMenu():null">Book Now</a>
     </nav>
   </div>
 
   <!-- tiny helpers -->
   <script>
-// Basic mobile menu toggle (if you already have this elsewhere, keep one copy)
-window.toggleMenu = function () {
-      var m = document.getElementById('mobileMenu');
-      var btn = document.getElementById('menuToggleBtn');
-      if (!m) return;
-      var isHidden = m.classList.toggle('hidden');
-      if (btn) btn.setAttribute('aria-expanded', (!isHidden).toString());
-    };
-    // Fallback binding in case inline handler is blocked
-    (function(){
-      var btn = document.getElementById('menuToggleBtn');
-      if (btn && !btn._bound) {
-        btn.addEventListener('click', window.toggleMenu);
-        btn._bound = true;
-      }
-    })();
-
-    // Check auth state and update header buttons
+    // ---------- Auth state ----------
     async function updateHeaderAuth() {
       if (!window.supabaseClient) {
-        console.log('Supabase client not ready, retrying...');
         setTimeout(updateHeaderAuth, 100);
         return;
       }
-      
       try {
         const { data: { session } } = await window.supabaseClient.auth.getSession();
-        console.log('Auth state:', session ? 'logged in' : 'logged out');
-        
+
         const signupBtn = document.getElementById('signupBtn');
         const loginBtn = document.getElementById('loginBtn');
         const portalBtn = document.getElementById('portalBtn');
         const portalBtnHeader = document.getElementById('portalBtnHeader');
         const logoutBtnHeader = document.getElementById('logoutBtnHeader');
         const signupBtnMobile = document.getElementById('signupBtnMobile');
-        const loginBtnMobile = document.getElementById('loginBtnMobile');
+        const loginBtnMobile  = document.getElementById('loginBtnMobile');
         const portalBtnMobile = document.getElementById('portalBtnMobile');
-        
-        if (session && session.user) {
-          // User is logged in - show My Account, hide signup/login
-          console.log('Showing My Account link for:', session.user.email);
-          if (signupBtn) signupBtn.classList.add('hidden');
-          if (loginBtn) loginBtn.classList.add('hidden');
-          if (portalBtn) {
-            portalBtn.classList.remove('hidden');
-            console.log('My Account link shown');
-          }
-          if (portalBtnHeader) portalBtnHeader.classList.remove('hidden');
-          if (logoutBtnHeader) {
-            logoutBtnHeader.classList.remove('hidden');
-            // Wire sign out each time defensively
-            logoutBtnHeader.onclick = async function() {
-              try {
-                await window.supabaseClient.auth.signOut();
-                window.location.href = 'index.html';
-              } catch (e) {
-                console.error('Error signing out:', e);
-              }
+
+        const loggedIn = !!(session && session.user);
+
+        // Desktop
+        if (signupBtn) signupBtn.classList.toggle('hidden', loggedIn);
+        if (loginBtn)  loginBtn.classList.toggle('hidden', loggedIn);
+        if (portalBtn) portalBtn.classList.toggle('hidden', !loggedIn);
+        if (portalBtnHeader) portalBtnHeader.classList.toggle('hidden', !loggedIn);
+        if (logoutBtnHeader) {
+          logoutBtnHeader.classList.toggle('hidden', !loggedIn);
+          if (loggedIn) {
+            logoutBtnHeader.onclick = async () => {
+              try { await window.supabaseClient.auth.signOut(); window.location.href = 'index.html'; }
+              catch (e) { console.error('Error signing out:', e); }
             };
           }
-          if (signupBtnMobile) signupBtnMobile.classList.add('hidden');
-          if (loginBtnMobile) loginBtnMobile.classList.add('hidden');
-          if (portalBtnMobile) portalBtnMobile.classList.remove('hidden');
-        } else {
-          // User is not logged in - show signup/login, hide My Account
-          console.log('User not logged in, hiding My Account');
-          if (signupBtn) signupBtn.classList.remove('hidden');
-          if (loginBtn) loginBtn.classList.remove('hidden');
-          if (portalBtn) portalBtn.classList.add('hidden');
-          if (portalBtnHeader) portalBtnHeader.classList.add('hidden');
-          if (logoutBtnHeader) logoutBtnHeader.classList.add('hidden');
-          if (signupBtnMobile) signupBtnMobile.classList.remove('hidden');
-          if (loginBtnMobile) loginBtnMobile.classList.remove('hidden');
-          if (portalBtnMobile) portalBtnMobile.classList.add('hidden');
         }
+
+        // Mobile
+        if (signupBtnMobile) signupBtnMobile.classList.toggle('hidden', loggedIn);
+        if (loginBtnMobile)  loginBtnMobile.classList.toggle('hidden', loggedIn);
+        if (portalBtnMobile) portalBtnMobile.classList.toggle('hidden', !loggedIn);
       } catch (err) {
         console.error('Error checking auth state:', err);
       }
     }
 
-    // Run on page load with retry
     function initHeaderAuth() {
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', updateHeaderAuth);
@@ -195,37 +173,94 @@ window.toggleMenu = function () {
     }
     initHeaderAuth();
 
-    // Also run when auth state changes
     setTimeout(() => {
       if (window.supabaseClient) {
-        window.supabaseClient.auth.onAuthStateChange((event, session) => {
-          console.log('Auth state changed:', event);
-          updateHeaderAuth();
-        });
+        window.supabaseClient.auth.onAuthStateChange(() => updateHeaderAuth());
       }
     }, 500);
-    function toggleSubmenu() {
-      var s = document.getElementById('mobileServicesSubmenu');
-      if (!s) return;
-      s.classList.toggle('hidden');
+
+    // ---------- Menu logic (single source of truth) ----------
+    const menuToggleBtn = document.getElementById('menuToggleBtn'); // ☰ button
+    const mobileMenu    = document.getElementById('mobileMenu');
+    const servicesBtn   = document.getElementById('mobileServicesBtn');
+    const servicesSub   = document.getElementById('mobileServicesSubmenu');
+
+    function openMenu() {
+      if (!mobileMenu) return;
+      mobileMenu.classList.remove('hidden');
+      document.body.classList.add('overflow-hidden');
+      if (menuToggleBtn) menuToggleBtn.setAttribute('aria-expanded', 'true');
+      console.log('[header] mobile menu opened');
+    }
+    function closeMenu() {
+      if (!mobileMenu) return;
+      mobileMenu.classList.add('hidden');
+      document.body.classList.remove('overflow-hidden');
+      if (menuToggleBtn) menuToggleBtn.setAttribute('aria-expanded', 'false');
+      console.log('[header] mobile menu closed');
+    }
+    window.closeMenu = closeMenu;   // because links call closeMenu() inline
+    function toggleMenu() {
+      if (!mobileMenu) return;
+      mobileMenu.classList.contains('hidden') ? openMenu() : closeMenu();
+    }
+    window.toggleMenu = toggleMenu; // if HTML uses onclick
+
+    function toggleSubmenu(ev) {
+      if (!servicesBtn || !servicesSub) return;
+      // Prevent outside click handler from closing immediately on iOS
+      if (ev && ev.stopPropagation) ev.stopPropagation();
+      if (ev && ev.preventDefault) ev.preventDefault();
+      else if (window.event) window.event.cancelBubble = true;
+      const caret = servicesBtn.querySelector('[data-caret]');
+      const nowHidden = servicesSub.classList.toggle('hidden');
+      if (!nowHidden) {
+        servicesSub.classList.add('block');
+      } else {
+        servicesSub.classList.remove('block');
+      }
+      servicesBtn.setAttribute('aria-expanded', nowHidden ? 'false' : 'true');
+      if (caret) caret.classList.toggle('rotate-180', !nowHidden);
+      return false;
+    }
+    window.toggleSubmenu = toggleSubmenu;
+
+    // Prefer JS listeners over inline handlers
+    if (menuToggleBtn && !menuToggleBtn._bound) {
+      menuToggleBtn.addEventListener('click', toggleMenu);
+      // leave touchend out to avoid double-fire; Chrome synthesises click from touch
+      menuToggleBtn.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleMenu(); }
+      });
+      menuToggleBtn._bound = true;
+    }
+    if (servicesBtn && !servicesBtn._bound) {
+      servicesBtn.addEventListener('click', function(e){ toggleSubmenu(e); });
+      servicesBtn._bound = true;
     }
 
-    // Make the desktop Services dropdown also open on click for touch devices
-    (function () {
-      var trigger = document.getElementById('nav-services');
-      var menu = document.getElementById('nav-services-menu');
-      if (!trigger || !menu) return;
+    // Close on Esc or outside click
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && mobileMenu && !mobileMenu.classList.contains('hidden')) closeMenu();
+    });
+    document.addEventListener('click', (e) => {
+      if (!mobileMenu || mobileMenu.classList.contains('hidden')) return;
+      const clickInside = mobileMenu.contains(e.target) || (menuToggleBtn && menuToggleBtn.contains(e.target));
+      if (!clickInside) closeMenu();
+    });
 
+    // ---------- Desktop services dropdown (click support for touch) ----------
+    (function () {
+      const trigger = document.getElementById('nav-services');
+      const menu    = document.getElementById('nav-services-menu');
+      if (!trigger || !menu) return;
       trigger.addEventListener('click', function (e) {
-        // Only intercept on desktop area (md and up) when it's likely a touch device
         if (window.innerWidth >= 768) {
-          // If the menu is hidden (no hover), toggle it on click
-          var isHidden = menu.classList.contains('hidden');
-          if (isHidden) {
+          const hidden = menu.classList.contains('hidden');
+          if (hidden) {
             e.preventDefault();
             menu.classList.remove('hidden');
-            // click outside to close
-            var closer = function (evt) {
+            const closer = (evt) => {
               if (!menu.contains(evt.target) && evt.target !== trigger) {
                 menu.classList.add('hidden');
                 document.removeEventListener('click', closer);
@@ -237,4 +272,5 @@ window.toggleMenu = function () {
       });
     })();
   </script>
+
 </header>

@@ -115,7 +115,7 @@ const SITE_CONFIG = {
           duration: '1 hour',
           price: 85,
           description: 'Perfect for beginners and skill improvement',
-          bookingUrl: 'https://calendar.app.google/aFUFekxQM1QkqDcr6'
+          bookingUrl: 'https://calendar.app.google/3ehp4B9MRcF83CEE9'
         },
         {
           id: 'auto-1-5hr',
@@ -123,7 +123,7 @@ const SITE_CONFIG = {
           duration: '1.5 hours',
           price: 125,
           description: 'Extra time for complex skills',
-          bookingUrl: 'https://calendar.app.google/ESS16P28U72565wF7'
+          bookingUrl: 'https://calendar.app.google/tTykRfbx3w9izTY86'
         },
         {
           id: 'auto-2hr',
@@ -131,7 +131,7 @@ const SITE_CONFIG = {
           duration: '2 hours',
           price: 165,
           description: 'Extended session for comprehensive practice',
-          bookingUrl: 'https://calendar.app.google/sRWs2apky6bjsKKN7'
+          bookingUrl: 'https://calendar.app.google/QtGWGiyNpcqq9C1z8'
         }
       ]
     },
@@ -180,7 +180,7 @@ const SITE_CONFIG = {
           duration: '1 hour',
           price: 75,
           description: 'Includes pensioner discount',
-          bookingUrl: 'https://calendar.app.google/REPLACE_WITH_SENIOR_AUTO_1H_LINK'
+          bookingUrl: 'https://calendar.app.google/vvE6utyXe4aa7BQb9'
         }
         /* Manual services coming soon - no manual vehicle available yet
         {

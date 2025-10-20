@@ -125,20 +125,30 @@
         initialsEl.textContent = initial;
       }
 
-      // Force update header to show My Account link
+      // Ensure header has been included before toggling buttons
+      try {
+        await waitForEl('#loginBtn');
+      } catch(_) {}
       const portalBtn = document.getElementById('portalBtn');
       const portalBtnMobile = document.getElementById('portalBtnMobile');
       const signupBtn = document.getElementById('signupBtn');
       const loginBtn = document.getElementById('loginBtn');
       const signupBtnMobile = document.getElementById('signupBtnMobile');
       const loginBtnMobile = document.getElementById('loginBtnMobile');
-      
-      if (portalBtn) portalBtn.classList.remove('hidden');
-      if (portalBtnMobile) portalBtnMobile.classList.remove('hidden');
-      if (signupBtn) signupBtn.classList.add('hidden');
-      if (loginBtn) loginBtn.classList.add('hidden');
-      if (signupBtnMobile) signupBtnMobile.classList.add('hidden');
-      if (loginBtnMobile) loginBtnMobile.classList.add('hidden');
+      const logoutBtnHeader = document.getElementById('logoutBtnHeader');
+      const logoutBtnMobile = document.getElementById('logoutBtnMobile');
+      function showEl(el){ if(!el) return; el.classList.remove('hidden','md:hidden'); el.style.display=''; }
+      function hideEl(el){ if(!el) return; el.classList.add('hidden','md:hidden'); el.style.display='none'; }
+      showEl(portalBtn);
+      showEl(portalBtnMobile);
+      showEl(logoutBtnHeader);
+      showEl(logoutBtnMobile);
+      hideEl(signupBtn);
+      hideEl(loginBtn);
+      hideEl(signupBtnMobile);
+      hideEl(loginBtnMobile);
+      // Ask header partial to re-evaluate too (if loaded)
+      if (window.updateHeaderAuth) window.updateHeaderAuth();
 
       // Load client data
       await loadClientData();
@@ -211,6 +221,14 @@
         null,
         'Log Out'
       );
+    }
+
+    // Fallback: ensure headerLogout exists for header button inline onclick
+    if (!window.headerLogout) {
+      window.headerLogout = async function(){
+        try { if (window.supabaseClient) await window.supabaseClient.auth.signOut(); } catch(e) { /* ignore */ }
+        window.location.href = 'index.html';
+      };
     }
 
     // Handle browser back/forward

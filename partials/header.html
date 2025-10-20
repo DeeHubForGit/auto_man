@@ -45,12 +45,12 @@
     <div class="hidden md:flex items-center gap-3">
       <!-- Sign Up as text link -->
       <a href="signup.html" id="signupBtn" class="md:inline-block text-sm text-gray-700 hover:text-blue-600 transition-colors">Sign Up</a>
-      <!-- Login as button -->
+      <!-- Login as button (this position is reused by Sign Out when logged in) -->
       <a href="login.html" id="loginBtn" class="md:inline-block text-blue-600 border border-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors">Login</a>
+      <!-- Sign Out button (desktop) appears in the same cluster position as Login -->
+      <button id="logoutBtnHeader" onclick="headerLogout()" class="hidden md:hidden md:inline-block border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">Sign Out</button>
       <!-- My Account -->
-      <a href="portal.html" id="portalBtnHeader" class="hidden md:inline-block hover:text-blue-600 transition-colors">My Account</a>
-      <!-- Sign Out button (desktop) -->
-      <button id="logoutBtnHeader" class="hidden md:inline-block border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">Sign Out</button>
+      <a href="portal.html" id="portalBtnHeader" class="hidden md:hidden md:inline-block hover:text-blue-600 transition-colors">My Account</a>
     </div>
 
     <div class="flex items-center gap-4">
@@ -103,9 +103,18 @@
       <a class="block py-2 hover:underline" href="index.html#contact" onclick="window.closeMenu?window.closeMenu():null">Contact</a>
 
       <!-- Auth -->
+      <a href="signup.html" id="signupBtnMobile"
+        class="mt-1 px-4 py-2 rounded text-gray-700 border border-gray-300 hover:bg-gray-50 text-center"
+        onclick="window.closeMenu?window.closeMenu():null">Sign Up</a>
       <a href="login.html" id="loginBtnMobile"
-        class="mt-1 px-4 py-2 rounded border border-blue-600 text-blue-600 hover:bg-blue-50 text-center"
+        class="px-4 py-2 rounded border border-blue-600 text-blue-600 hover:bg-blue-50 text-center"
         onclick="window.closeMenu?window.closeMenu():null">Login</a>
+      <a href="portal.html" id="portalBtnMobile"
+        class="hidden px-4 py-2 rounded border border-gray-300 text-gray-800 hover:bg-gray-50 text-center"
+        onclick="window.closeMenu?window.closeMenu():null">My Account</a>
+      <button id="logoutBtnMobile"
+        class="hidden px-4 py-2 rounded border border-gray-300 text-gray-800 hover:bg-gray-50 text-center"
+        onclick="window.closeMenu?window.closeMenu():null; headerLogout()">Sign Out</button>
 
       <!-- Phone & CTA -->
       <a href="tel:{{PHONE_LINK}}"
@@ -121,8 +130,18 @@
   <!-- tiny helpers -->
   <script>
     // ---------- Auth state ----------
+    function setVisible(el, show) {
+      if (!el) return;
+      el.classList.toggle('hidden', !show);
+      el.classList.toggle('md:hidden', !show); // override md:inline-block at desktop
+      el.setAttribute('aria-hidden', show ? 'false' : 'true');
+      // Force display in case other styles conflict
+      el.style.display = show ? '' : 'none';
+    }
+
     async function updateHeaderAuth() {
       if (!window.supabaseClient) {
+        console.log('[header] supabase not ready, retrying...');
         setTimeout(updateHeaderAuth, 100);
         return;
       }
@@ -137,16 +156,25 @@
         const signupBtnMobile = document.getElementById('signupBtnMobile');
         const loginBtnMobile  = document.getElementById('loginBtnMobile');
         const portalBtnMobile = document.getElementById('portalBtnMobile');
+        const logoutBtnMobile = document.getElementById('logoutBtnMobile');
 
         const loggedIn = !!(session && session.user);
+        console.log('[header] auth state:', loggedIn ? 'logged-in' : 'logged-out');
 
         // Desktop
-        if (signupBtn) signupBtn.classList.toggle('hidden', loggedIn);
-        if (loginBtn)  loginBtn.classList.toggle('hidden', loggedIn);
-        if (portalBtn) portalBtn.classList.toggle('hidden', !loggedIn);
-        if (portalBtnHeader) portalBtnHeader.classList.toggle('hidden', !loggedIn);
+        setVisible(signupBtn, !loggedIn);
+        setVisible(loginBtn,  !loggedIn);
+        setVisible(portalBtn, loggedIn);
+        setVisible(portalBtnHeader, loggedIn);
+        console.log('[header] desktop toggled', {
+          signupBtn: !!signupBtn && signupBtn.className,
+          loginBtn: !!loginBtn && loginBtn.className,
+          portalBtn: !!portalBtn && portalBtn.className,
+          portalBtnHeader: !!portalBtnHeader && portalBtnHeader.className,
+          logoutBtnHeader: !!logoutBtnHeader && logoutBtnHeader.className,
+        });
         if (logoutBtnHeader) {
-          logoutBtnHeader.classList.toggle('hidden', !loggedIn);
+          setVisible(logoutBtnHeader, loggedIn);
           if (loggedIn) {
             logoutBtnHeader.onclick = async () => {
               try { await window.supabaseClient.auth.signOut(); window.location.href = 'index.html'; }
@@ -156,26 +184,99 @@
         }
 
         // Mobile
-        if (signupBtnMobile) signupBtnMobile.classList.toggle('hidden', loggedIn);
-        if (loginBtnMobile)  loginBtnMobile.classList.toggle('hidden', loggedIn);
-        if (portalBtnMobile) portalBtnMobile.classList.toggle('hidden', !loggedIn);
+        setVisible(signupBtnMobile, !loggedIn);
+        setVisible(loginBtnMobile,  !loggedIn);
+        setVisible(portalBtnMobile, loggedIn);
+        console.log('[header] mobile toggled', {
+          signupBtnMobile: !!signupBtnMobile && signupBtnMobile.className,
+          loginBtnMobile: !!loginBtnMobile && loginBtnMobile.className,
+          portalBtnMobile: !!portalBtnMobile && portalBtnMobile.className,
+          logoutBtnMobile: !!logoutBtnMobile && logoutBtnMobile.className,
+        });
+        if (logoutBtnMobile) {
+          setVisible(logoutBtnMobile, loggedIn);
+          if (loggedIn) {
+            logoutBtnMobile.onclick = async () => {
+              try { await window.supabaseClient.auth.signOut(); window.location.href = 'index.html'; }
+              catch (e) { console.error('Error signing out:', e); }
+            };
+          }
+        }
       } catch (err) {
         console.error('Error checking auth state:', err);
       }
     }
 
     function initHeaderAuth() {
+      console.log('[header] initHeaderAuth start');
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', updateHeaderAuth);
       } else {
         updateHeaderAuth();
       }
+      // In case session arrives slightly later, poll a few times
+      let tries = 0;
+      const iv = setInterval(() => {
+        tries++;
+        updateHeaderAuth();
+        if (tries >= 6) clearInterval(iv);
+      }, 300);
     }
     initHeaderAuth();
 
+    // Expose for other pages to invoke after their own auth readiness
+    window.updateHeaderAuth = updateHeaderAuth;
+
+    // Global logout that immediately updates UI and redirects
+    async function headerLogout(){
+      try {
+        const signupBtn = document.getElementById('signupBtn');
+        const loginBtn = document.getElementById('loginBtn');
+        const portalBtn = document.getElementById('portalBtn');
+        const portalBtnHeader = document.getElementById('portalBtnHeader');
+        const logoutBtnHeader = document.getElementById('logoutBtnHeader');
+        const signupBtnMobile = document.getElementById('signupBtnMobile');
+        const loginBtnMobile  = document.getElementById('loginBtnMobile');
+        const portalBtnMobile = document.getElementById('portalBtnMobile');
+        const logoutBtnMobile = document.getElementById('logoutBtnMobile');
+
+        // Immediate UI toggle
+        setVisible(signupBtn, true); setVisible(loginBtn, true);
+        setVisible(portalBtn, false); setVisible(portalBtnHeader, false);
+        setVisible(logoutBtnHeader, false);
+        setVisible(signupBtnMobile, true); setVisible(loginBtnMobile, true);
+        setVisible(portalBtnMobile, false); setVisible(logoutBtnMobile, false);
+
+        // Sign out (best-effort)
+        if (window.supabaseClient) {
+          try { await window.supabaseClient.auth.signOut(); } catch(e) { console.warn('[header] signOut error (ignored):', e); }
+        }
+      } finally {
+        // Always go home
+        window.location.href = 'index.html';
+      }
+    }
+    window.headerLogout = headerLogout;
+    // Also bind programmatically in case inline onclick cannot see globals
+    (function bindLogoutButtons(){
+      const btn1 = document.getElementById('logoutBtnHeader');
+      const btn2 = document.getElementById('logoutBtnMobile');
+      if (btn1) btn1.onclick = headerLogout;
+      if (btn2) btn2.onclick = function(){ if (window.closeMenu) window.closeMenu(); headerLogout(); };
+    })();
+
+    // If partials were (re)loaded dynamically, update again
+    window.addEventListener('partialsLoaded', () => {
+      console.log('[header] partialsLoaded -> updateHeaderAuth');
+      updateHeaderAuth();
+    });
+
     setTimeout(() => {
       if (window.supabaseClient) {
-        window.supabaseClient.auth.onAuthStateChange(() => updateHeaderAuth());
+        window.supabaseClient.auth.onAuthStateChange((_event, _session) => {
+          console.log('[header] onAuthStateChange');
+          updateHeaderAuth();
+        });
       }
     }, 500);
 

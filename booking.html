@@ -139,9 +139,7 @@
               </div>
               <div class="flex items-center gap-4">
                 <span class="text-gray-300 font-medium">$${service.price}</span>
-                <a href="${service.bookingUrl}"
-                   target="_blank"
-                   rel="noopener noreferrer"
+                <a href="google-booking.html?bookingUrl=${encodeURIComponent(service.bookingUrl)}"
                    class="px-3 py-1.5 rounded-lg border border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-white transition whitespace-nowrap">
                   Book Now
                 </a>

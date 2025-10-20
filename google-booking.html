@@ -5,107 +5,62 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Book a Lesson - Auto-Man Driving School</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="css/styles.css">
   <link href="assets/theme.css" rel="stylesheet">
+  <script src="assets/include.js" defer></script>
 </head>
 <body class="bg-slate-900 text-white">
-  <!-- Header -->
-  <div id="header-placeholder"></div>
+  <!-- Auth scripts (global Supabase client) MUST load before header -->
+  <div data-include="partials/auth-scripts.html"></div>
+  <!-- Shared Header -->
+  <div data-include="partials/header.html"></div>
   
   <!-- Main Content -->
-  <main class="min-h-screen pt-20 pb-16">
-    <section class="mx-auto max-w-3xl p-6">
-      <h1 class="text-3xl font-bold mb-4">Book a Driving Lesson</h1>
-      <p class="text-slate-400 mb-8">Choose a lesson type below. You'll be taken to our secure Google booking page to select your preferred date and time.</p>
-
-      <div class="grid gap-6 sm:grid-cols-2">
-        <!-- 1 Hour Auto -->
-        <a href="https://calendar.app.google/JYThbjZ2hABn75co8"
-          target="_blank" rel="noopener noreferrer"
-          class="block rounded-2xl border border-slate-700 p-6 hover:bg-slate-800 transition hover:border-blue-500">
-          <div class="text-xl font-semibold">Automatic Lesson</div>
-          <div class="text-blue-400 font-medium mt-1">1 hour session</div>
-          <div class="text-slate-300 mt-3">Perfect for beginners and those wanting to improve specific skills.</div>
-          <div class="mt-5 flex justify-between items-center">
-            <span class="text-lg font-medium">AU$85</span>
-            <span class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 transition">
-              Book now
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-              </svg>
-            </span>
-          </div>
-        </a>
-
-        <!-- Test Prep -->
-        <a href="https://calendar.app.google/SJ3W2CWRqjMRdqEH8"
-          target="_blank" rel="noopener noreferrer"
-          class="block rounded-2xl border border-slate-700 p-6 hover:bg-slate-800 transition hover:border-blue-500">
-          <div class="text-xl font-semibold">Automatic Lesson</div>
-          <div class="text-blue-400 font-medium mt-1">90 minute session</div>
-          <div class="text-slate-300 mt-3">Perfect for beginners and those wanting to improve specific skills.</div>
-          <div class="mt-5 flex justify-between items-center">
-            <span class="text-lg font-medium">AU$125</span>
-            <span class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 transition">
-              Book now
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-              </svg>
-            </span>
-          </div>
-        </a>
+  <main class="min-h-screen pt-6 pb-10">
+    <section class="container mx-auto px-3 sm:px-4 max-w-7xl">
+      <div class="rounded-2xl bg-white text-slate-900 shadow border border-slate-200 max-w-none">
+        <div class="p-3 sm:p-4">
+          <h1 class="text-2xl sm:text-3xl font-bold">Book a Driving Lesson</h1>
+        </div>
+        <div class="border-t">
+          <!-- Google Calendar Appointment Scheduling begin -->
+          <iframe
+            id="gcalBookingFrame"
+            class="w-full h-[820px] block [color-scheme:light]"
+            src="https://calendar.google.com/calendar/appointments/schedules/AcZssZ3X-StUtNHnSturB2uIJg4-jt2pQ04vsiuYyASi-eQyGfSkXmSe-5oRgYnaTnEk3njdqRUjO5xK?gv=true"
+            style="border:0;background:#fff"
+            loading="lazy" frameborder="0"
+            referrerpolicy="no-referrer-when-downgrade">
+          </iframe>
+          <!-- end Google Calendar Appointment Scheduling -->
+        </div>
       </div>
 
-      <div class="mt-10 p-6 bg-slate-800/50 rounded-xl">
-        <h3 class="text-lg font-semibold mb-3">Booking Information</h3>
-        <ul class="space-y-2 text-slate-300">
-          <li class="flex items-start">
-            <svg class="h-5 w-5 text-green-400 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-            </svg>
-            <span>Select your preferred time slot from the available options</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="h-5 w-5 text-green-400 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-            </svg>
-            <span>You'll receive a confirmation email with all the details</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="h-5 w-5 text-green-400 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-            </svg>
-            <span>24-hour cancellation policy applies</span>
-          </li>
-        </ul>
-      </div>
-
-      <p class="text-sm text-slate-500 mt-6 text-center">
-        Booking opens in a new tab on calendar.google.com. Please ensure pop-ups are enabled for this site.
+      <p class="text-sm text-slate-400 mt-4">
+        If the calendar doesn’t load,
+        <a class="text-blue-400 underline"
+           href="https://calendar.google.com/calendar/appointments/schedules/AcZssZ3X-StUtNHnSturB2uIJg4-jt2pQ04vsiuYyASi-eQyGfSkXmSe-5oRgYnaTnEk3njdqRUjO5xK?gv=true"
+           target="_blank" rel="noopener">open in a new tab</a>.
       </p>
     </section>
   </main>
 
-  <!-- Footer -->
-  <div id="footer-placeholder"></div>
-
+  <!-- Shared Footer -->
+  <div data-include="partials/footer.html"></div>
   <script>
-    // Load header and footer
-    document.addEventListener('DOMContentLoaded', function() {
-      // Load header
-      fetch('partials/header.html')
-        .then(response => response.text())
-        .then(data => {
-          document.getElementById('header-placeholder').innerHTML = data;
-        });
-      
-      // Load footer
-      fetch('partials/footer.html')
-        .then(response => response.text())
-        .then(data => {
-          document.getElementById('footer-placeholder').innerHTML = data;
-        });
-    });
+    (function(){
+      const params = new URLSearchParams(window.location.search);
+      const url = params.get('bookingUrl');
+      if (!url) return;
+      try {
+        const u = new URL(url, window.location.href);
+        const s = u.toString();
+        // Allow Google booking endpoints only
+        if (/^https:\/\/(calendar\.google\.com|calendar\.app\.google)\//.test(s)) {
+          const frame = document.getElementById('gcalBookingFrame');
+          if (frame) frame.src = s;
+        }
+      } catch(_) { /* ignore invalid URL */ }
+    })();
   </script>
 </body>
 </html>

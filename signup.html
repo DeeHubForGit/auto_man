@@ -33,9 +33,29 @@
           </div>
           <div>
             <label class="block text-sm font-medium mb-1" for="signupPassword">Password</label>
-            <input id="signupPassword" type="password" class="w-full border rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" required minlength="6" />
+            <div class="relative">
+              <input id="signupPassword" type="password" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2 pr-48 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" required minlength="6" />
+              <div class="absolute right-2 top-1/2 -translate-y-1/2 flex gap-2">
+                <button type="button" id="toggleSignupPwd" class="px-2 py-1 text-sm border rounded bg-white text-gray-800 hover:bg-gray-100 font-medium">Show</button>
+                <button type="button" id="genSignupPwd" class="px-2 py-1 text-sm border rounded bg-white text-gray-800 hover:bg-gray-100 font-medium">Generate</button>
+                <button type="button" id="copySignupPwdTop" class="px-2 py-1 text-sm border rounded bg-white text-gray-800 hover:bg-gray-100" aria-label="Copy password" title="Copy password">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block align-middle"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                </button>
+              </div>
+            </div>
             <p id="passwordError" class="text-xs text-red-400 mt-1 hidden"></p>
             <p class="text-xs text-gray-500 mt-1">Minimum 6 characters.</p>
+            <div id="signupPwdContainer" class="mt-20 relative h-24">
+              <div id="signupPwdTip" role="status" aria-live="polite" class="absolute inset-0 w-full rounded border bg-white text-sm p-2 shadow hidden">
+                <div class="flex items-center justify-between">
+                  <span id="signupStrengthText">Strength: —</span>
+                </div>
+                <div class="h-1 bg-gray-200 rounded mt-1">
+                  <div id="signupStrengthBar" class="h-1 w-0 bg-red-500 rounded"></div>
+                </div>
+                <p class="mt-2 text-gray-600">Tip: Use 3–4 random words or a generated password (16+ chars).</p>
+              </div>
+            </div>
           </div>
           <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors">Create account</button>
         </form>
@@ -55,6 +75,13 @@
       const form = document.getElementById('signupForm');
       const emailInput = document.getElementById('signupEmail');
       const passwordInput = document.getElementById('signupPassword');
+      const togglePwd = document.getElementById('toggleSignupPwd');
+      const genPwd = document.getElementById('genSignupPwd');
+      const copyPwd = document.getElementById('copySignupPwd');
+      const copyTop = document.getElementById('copySignupPwdTop');
+      const tip = document.getElementById('signupPwdTip');
+      const bar = document.getElementById('signupStrengthBar');
+      const txt = document.getElementById('signupStrengthText');
       const emailError = document.getElementById('emailError');
       const passwordError = document.getElementById('passwordError');
 
@@ -80,6 +107,65 @@
           passwordError.classList.add('hidden');
           passwordInput.classList.remove('border-red-400');
         }
+        const val = passwordInput.value;
+        if (val && tip.classList.contains('hidden')) showTip();
+        if (!val) hideTip();
+        updateStrength(val);
+      });
+
+      function assessStrength(val) {
+        let score = 0;
+        if (val.length >= 8) score++;
+        if (val.length >= 12) score++;
+        if (/[A-Z]/.test(val)) score++;
+        if (/[0-9]/.test(val)) score++;
+        if (/[^A-Za-z0-9]/.test(val)) score++;
+        return Math.min(score, 4);
+      }
+      function updateStrength(val) {
+        const s = assessStrength(val || '');
+        const pct = [0,25,50,75,100][s];
+        const colors = ['bg-red-500','bg-orange-500','bg-yellow-500','bg-green-500','bg-green-600'];
+        bar.style.width = pct + '%';
+        bar.className = 'h-1 rounded ' + colors[s];
+        txt.textContent = s <= 1 ? 'Strength: Weak' : s === 2 ? 'Strength: Fair' : s === 3 ? 'Strength: Good' : 'Strength: Strong';
+      }
+      function generatePassword(len = 18) {
+        const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{};:,.?';
+        const arr = crypto.getRandomValues(new Uint32Array(len));
+        return Array.from(arr, n => chars[n % chars.length]).join('');
+      }
+
+      // Strength panel behavior: hidden by default, shown when user types or generates
+      function showTip(){ tip.classList.remove('hidden'); }
+      function hideTip(){ tip.classList.add('hidden'); }
+      if (passwordInput.value) { showTip(); updateStrength(passwordInput.value); }
+
+      togglePwd?.addEventListener('click', function(){
+        const show = passwordInput.type === 'password';
+        passwordInput.type = show ? 'text' : 'password';
+        togglePwd.setAttribute('aria-pressed', String(show));
+        togglePwd.textContent = show ? 'Hide' : 'Show';
+      });
+
+      genPwd?.addEventListener('click', function(){
+        passwordInput.value = generatePassword();
+        passwordInput.type = 'text';
+        togglePwd?.setAttribute('aria-pressed', 'true');
+        togglePwd && (togglePwd.textContent = 'Hide');
+        showTip();
+        updateStrength(passwordInput.value);
+        // Clear any prior validation error
+        passwordError.classList.add('hidden');
+        passwordInput.classList.remove('border-red-400');
+      });
+
+      copyPwd?.addEventListener('click', async function(){
+        try { await navigator.clipboard.writeText(passwordInput.value); copyPwd.textContent = 'Copied'; setTimeout(()=>copyPwd.textContent='Copy', 1200); } catch(e){}
+      });
+
+      copyTop?.addEventListener('click', async function(){
+        try { await navigator.clipboard.writeText(passwordInput.value); copyTop.title = 'Copied'; setTimeout(()=>copyTop.title='Copy password', 1200); } catch(e){}
       });
 
       function validateEmail() {

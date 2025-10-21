@@ -1,3 +1,4 @@
+<!-- partials/header.html -->
 <header class="bg-white shadow-sm sticky top-0 z-50">
   <div class="container mx-auto px-4 py-3 flex items-center justify-between">
     <!-- Left: logo + title grouped -->
@@ -129,34 +130,30 @@
 
   <!-- tiny helpers -->
   <script>
-    // ---------- Auth state ----------
+    // ---------- Auth state (await authReady + bind once) ----------
     function setVisible(el, show) {
       if (!el) return;
       el.classList.toggle('hidden', !show);
       el.classList.toggle('md:hidden', !show); // override md:inline-block at desktop
       el.setAttribute('aria-hidden', show ? 'false' : 'true');
-      // Force display in case other styles conflict
       el.style.display = show ? '' : 'none';
     }
 
     async function updateHeaderAuth() {
-      if (!window.supabaseClient) {
-        console.log('[header] supabase not ready, retrying...');
-        setTimeout(updateHeaderAuth, 100);
-        return;
-      }
+      if (!window.supabaseClient) return;
       try {
         const { data: { session } } = await window.supabaseClient.auth.getSession();
 
-        const signupBtn = document.getElementById('signupBtn');
-        const loginBtn = document.getElementById('loginBtn');
-        const portalBtn = document.getElementById('portalBtn');
-        const portalBtnHeader = document.getElementById('portalBtnHeader');
-        const logoutBtnHeader = document.getElementById('logoutBtnHeader');
-        const signupBtnMobile = document.getElementById('signupBtnMobile');
-        const loginBtnMobile  = document.getElementById('loginBtnMobile');
-        const portalBtnMobile = document.getElementById('portalBtnMobile');
-        const logoutBtnMobile = document.getElementById('logoutBtnMobile');
+        const signupBtn        = document.getElementById('signupBtn');
+        const loginBtn         = document.getElementById('loginBtn');
+        const portalBtn        = document.getElementById('portalBtn');
+        const portalBtnHeader  = document.getElementById('portalBtnHeader');
+        const logoutBtnHeader  = document.getElementById('logoutBtnHeader');
+
+        const signupBtnMobile  = document.getElementById('signupBtnMobile');
+        const loginBtnMobile   = document.getElementById('loginBtnMobile');
+        const portalBtnMobile  = document.getElementById('portalBtnMobile');
+        const logoutBtnMobile  = document.getElementById('logoutBtnMobile');
 
         const loggedIn = !!(session && session.user);
         console.log('[header] auth state:', loggedIn ? 'logged-in' : 'logged-out');
@@ -166,119 +163,78 @@
         setVisible(loginBtn,  !loggedIn);
         setVisible(portalBtn, loggedIn);
         setVisible(portalBtnHeader, loggedIn);
-        console.log('[header] desktop toggled', {
-          signupBtn: !!signupBtn && signupBtn.className,
-          loginBtn: !!loginBtn && loginBtn.className,
-          portalBtn: !!portalBtn && portalBtn.className,
-          portalBtnHeader: !!portalBtnHeader && portalBtnHeader.className,
-          logoutBtnHeader: !!logoutBtnHeader && logoutBtnHeader.className,
-        });
-        if (logoutBtnHeader) {
-          setVisible(logoutBtnHeader, loggedIn);
-          if (loggedIn) {
-            logoutBtnHeader.onclick = async () => {
-              try { await window.supabaseClient.auth.signOut(); window.location.href = 'index.html'; }
-              catch (e) { console.error('Error signing out:', e); }
-            };
-          }
-        }
+        setVisible(logoutBtnHeader, loggedIn);
 
         // Mobile
         setVisible(signupBtnMobile, !loggedIn);
         setVisible(loginBtnMobile,  !loggedIn);
         setVisible(portalBtnMobile, loggedIn);
-        console.log('[header] mobile toggled', {
-          signupBtnMobile: !!signupBtnMobile && signupBtnMobile.className,
-          loginBtnMobile: !!loginBtnMobile && loginBtnMobile.className,
-          portalBtnMobile: !!portalBtnMobile && portalBtnMobile.className,
-          logoutBtnMobile: !!logoutBtnMobile && logoutBtnMobile.className,
-        });
-        if (logoutBtnMobile) {
-          setVisible(logoutBtnMobile, loggedIn);
-          if (loggedIn) {
-            logoutBtnMobile.onclick = async () => {
-              try { await window.supabaseClient.auth.signOut(); window.location.href = 'index.html'; }
-              catch (e) { console.error('Error signing out:', e); }
-            };
-          }
+        setVisible(logoutBtnMobile, loggedIn);
+
+        // Wire logout handlers only when visible
+        const wireLogout = (btn) => {
+          if (!btn) return;
+          btn.onclick = async () => {
+            try { await window.supabaseClient.auth.signOut(); }
+            catch (e) { console.warn('[header] signOut error (ignored):', e); }
+            finally { window.location.href = 'index.html'; }
+          };
+        };
+        if (loggedIn) {
+          wireLogout(logoutBtnHeader);
+          wireLogout(logoutBtnMobile);
         }
       } catch (err) {
         console.error('Error checking auth state:', err);
       }
     }
 
-    function initHeaderAuth() {
-      console.log('[header] initHeaderAuth start');
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', updateHeaderAuth);
+    // Bind exactly once and wait for authReady before first render
+    (async function initHeaderAuthOnce() {
+      if (window.__headerAuthBound) return;
+      window.__headerAuthBound = true;
+
+      // Wait for the auth bootstrap to finish its getSession() call
+      if (window.authReady) {
+        try { await window.authReady; } catch(e) { console.warn('[header] authReady error:', e); }
       } else {
-        updateHeaderAuth();
+        console.warn('[header] authReady not found — continuing anyway');
       }
-      // In case session arrives slightly later, poll a few times
-      let tries = 0;
-      const iv = setInterval(() => {
-        tries++;
-        updateHeaderAuth();
-        if (tries >= 6) clearInterval(iv);
-      }, 300);
-    }
-    initHeaderAuth();
 
-    // Expose for other pages to invoke after their own auth readiness
-    window.updateHeaderAuth = updateHeaderAuth;
+      const run = () => window.supabaseClient && updateHeaderAuth();
 
-    // Global logout that immediately updates UI and redirects
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', run, { once: true });
+      } else {
+        run();
+      }
+
+      // Subscribe once to future auth changes
+      if (window.supabaseClient && !window.__headerAuthSub) {
+        window.__headerAuthSub = window.supabaseClient.auth.onAuthStateChange((_event, _session) => {
+          console.log('[header] onAuthStateChange');
+          run();
+        });
+      }
+
+      // If your include loader fires a custom event after partials load, re-check
+      window.addEventListener('partialsLoaded', () => {
+        console.log('[header] partialsLoaded -> updateHeaderAuth');
+        run();
+      });
+    })();
+
+    // Global logout (if other code calls it)
     async function headerLogout(){
       try {
-        const signupBtn = document.getElementById('signupBtn');
-        const loginBtn = document.getElementById('loginBtn');
-        const portalBtn = document.getElementById('portalBtn');
-        const portalBtnHeader = document.getElementById('portalBtnHeader');
-        const logoutBtnHeader = document.getElementById('logoutBtnHeader');
-        const signupBtnMobile = document.getElementById('signupBtnMobile');
-        const loginBtnMobile  = document.getElementById('loginBtnMobile');
-        const portalBtnMobile = document.getElementById('portalBtnMobile');
-        const logoutBtnMobile = document.getElementById('logoutBtnMobile');
-
-        // Immediate UI toggle
-        setVisible(signupBtn, true); setVisible(loginBtn, true);
-        setVisible(portalBtn, false); setVisible(portalBtnHeader, false);
-        setVisible(logoutBtnHeader, false);
-        setVisible(signupBtnMobile, true); setVisible(loginBtnMobile, true);
-        setVisible(portalBtnMobile, false); setVisible(logoutBtnMobile, false);
-
-        // Sign out (best-effort)
         if (window.supabaseClient) {
           try { await window.supabaseClient.auth.signOut(); } catch(e) { console.warn('[header] signOut error (ignored):', e); }
         }
       } finally {
-        // Always go home
         window.location.href = 'index.html';
       }
     }
     window.headerLogout = headerLogout;
-    // Also bind programmatically in case inline onclick cannot see globals
-    (function bindLogoutButtons(){
-      const btn1 = document.getElementById('logoutBtnHeader');
-      const btn2 = document.getElementById('logoutBtnMobile');
-      if (btn1) btn1.onclick = headerLogout;
-      if (btn2) btn2.onclick = function(){ if (window.closeMenu) window.closeMenu(); headerLogout(); };
-    })();
-
-    // If partials were (re)loaded dynamically, update again
-    window.addEventListener('partialsLoaded', () => {
-      console.log('[header] partialsLoaded -> updateHeaderAuth');
-      updateHeaderAuth();
-    });
-
-    setTimeout(() => {
-      if (window.supabaseClient) {
-        window.supabaseClient.auth.onAuthStateChange((_event, _session) => {
-          console.log('[header] onAuthStateChange');
-          updateHeaderAuth();
-        });
-      }
-    }, 500);
 
     // ---------- Menu logic (single source of truth) ----------
     const menuToggleBtn = document.getElementById('menuToggleBtn'); // ☰ button
@@ -320,8 +276,6 @@
       return false;
     }
     window.toggleSubmenu = toggleSubmenu;
-
-    // Prefer inline handlers for reliability; no duplicate JS bindings
 
     // Close on Esc or outside click
     document.addEventListener('keydown', (e) => {

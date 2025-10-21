@@ -4,7 +4,7 @@ const SITE_CONFIG = {
   PHONE_NUMBER: '0403 632 313',
   PHONE_NUMBER_LINK: '0403632313', // For tel: links (no spaces)
   PHONE_NUMBER_DISPLAY: '0403 632 313', // For display (with spaces)
-  EMAIL: 'automangeelong@gmail.com',
+  EMAIL: 'info@automandrivingschool.com.au',
   
   // Social media
   FACEBOOK_URL: 'https://www.facebook.com/auto.man.driving',

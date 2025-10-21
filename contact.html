@@ -7,16 +7,14 @@
   <meta name="description" content="Get in touch with Auto-Man Driving School. Call, email, or send us a message to book your driving lesson in Geelong."/>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="assets/theme.css" rel="stylesheet" />
-  <!-- Supabase (for header auth state) -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="assets/js/config.local.js"></script>
-  <script src="assets/js/supabaseClient.js"></script>
   <script src="assets/config.js"></script>
   <script src="assets/include.js" defer></script>
   <!-- Google Analytics -->
   <div data-include="partials/analytics.html"></div>
 </head>
 <body>
+  <!-- Auth scripts (global Supabase client) MUST load before header -->
+  <div data-include="partials/auth-scripts.html"></div>
   <!-- Shared Header -->
   <div data-include="partials/header.html"></div>
 
@@ -41,6 +39,11 @@
           <h2 class="text-2xl md:text-3xl font-bold mb-6">Send Us a Message</h2>
 
           <form id="contactForm" class="bg-white rounded-xl shadow-lg p-6 md:p-8">
+            <!-- Honeypot to deter bots -->
+            <input type="text" name="_honey" class="hidden" tabindex="-1" autocomplete="off" />
+            <!-- FormSubmit options -->
+            <input type="hidden" name="_subject" value="Website contact form (Auto-Man)" />
+            <input type="hidden" name="_captcha" value="false" />
             <div class="mb-6">
               <label for="name" class="block text-gray-900 font-semibold mb-2">Name *</label>
               <input
@@ -48,7 +51,7 @@
                 id="name"
                 name="name"
                 required
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900"
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-black"
                 placeholder="Your full name"
               />
             </div>
@@ -60,7 +63,7 @@
                 id="email"
                 name="email"
                 required
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900"
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-black"
                 placeholder="your.email@example.com"
               />
             </div>
@@ -71,7 +74,7 @@
                 type="tel"
                 id="phone"
                 name="phone"
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900"
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-black"
                 placeholder="0403 632 313"
               />
             </div>
@@ -83,7 +86,7 @@
                 name="message"
                 rows="6"
                 required
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-vertical text-gray-900"
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-vertical text-black"
                 placeholder="Tell us how we can help you..."
               ></textarea>
             </div>
@@ -200,20 +203,28 @@
       submitButton.disabled = true;
       submitButton.textContent = 'Sending...';
 
-      // Placeholder success
-      setTimeout(() => {
+      // Send via Supabase Edge Function (via client)
+      if (!window.supabaseClient) {
+        throw new Error('Supabase not ready');
+      }
+      window.supabaseClient.functions.invoke('contact', { body: formData })
+      .then(() => {
         formMessage.textContent = "Thank you! We'll get back to you soon.";
         formMessage.className = 'mt-4 text-center text-green-600 font-semibold';
         formMessage.classList.remove('hidden');
-        this.reset();
+        (document.getElementById('contactForm')).reset();
+      })
+      .catch((err) => {
+        console.error('Contact submit error:', err);
+        formMessage.textContent = 'Sorry, something went wrong. Please email darren@automandrivingschool.com.au or try again later.';
+        formMessage.className = 'mt-4 text-center text-red-600 font-semibold';
+        formMessage.classList.remove('hidden');
+      })
+      .finally(() => {
         submitButton.disabled = false;
         submitButton.textContent = originalButtonText;
-
-        setTimeout(() => formMessage.classList.add('hidden'), 5000);
-      }, 1000);
-
-      // TODO: Hook up to backend/email service
-      // fetch('/api/contact', { ... })
+        setTimeout(() => formMessage.classList.add('hidden'), 7000);
+      });
     });
   </script>
 </body>

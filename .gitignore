@@ -31,11 +31,13 @@ node_modules/
 # Local frontend config (Supabase keys)
 assets/js/config.local.js
 
+# Backend and API credentials
+.env
+credentials.json
+token.json
+
 # Yarn Integrity file
 .yarn-integrity
-
-# dotenv environment variables file
-.env
 
 # IDE files
 .vscode/

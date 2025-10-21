@@ -11,14 +11,12 @@
   <script src="assets/config.js"></script>
   <script src="assets/render-helpers.js" defer></script>
   <script src="assets/include.js" defer></script>
-  <!-- Supabase JS Library -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="assets/js/config.local.js"></script>
-  <script src="assets/js/supabaseClient.js"></script>
   <script src="assets/js/modal.js"></script>
   <script src="assets/js/auth.js" defer></script>
 </head>
 <body class="bg-gray-50 text-gray-900">
+  <!-- Auth scripts (global Supabase client) MUST load before header -->
+  <div data-include="partials/auth-scripts.html"></div>
   <div data-include="partials/header.html"></div>
 
   <div class="container mx-auto px-4 py-8">
@@ -94,9 +92,19 @@
     let currentUser = null;
     let clientData = null;
 
+    // Wait for Supabase client to be ready (handles partial loader timing)
+    async function waitForSupabaseClient(timeoutMs = 5000) {
+      const t0 = Date.now();
+      while (!window.supabaseClient && Date.now() - t0 < timeoutMs) {
+        await new Promise(r => setTimeout(r, 100));
+      }
+      return !!window.supabaseClient;
+    }
+
     // Check authentication on load
     document.addEventListener('DOMContentLoaded', async function() {
-      if (!window.supabaseClient) {
+      const ready = await waitForSupabaseClient(6000);
+      if (!ready) {
         Modal.error('Authentication is not configured. Please contact support.');
         setTimeout(() => window.location.href = 'index.html', 2000);
         return;

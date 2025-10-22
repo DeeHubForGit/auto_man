@@ -1,0 +1,150 @@
+<!-- Admin Test SMS & Email Section -->
+<section id="section-messaging" class="section-content bg-white border rounded-2xl shadow-sm p-5 hidden">
+  <!-- Header with help text -->
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-xl font-semibold">Test SMS & Email</h2>
+    <span class="text-gray-400 cursor-help" title="Send test messages to verify SMS and email functionality">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+    </span>
+  </div>
+  
+  <div class="grid gap-4">
+    <div>
+      <label class="block text-sm font-medium mb-2 text-gray-900">Mobile (AU)</label>
+      <input id="smsTo" type="text" class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="04XXXXXXXX or +614XXXXXXXX" />
+      <label class="block text-sm font-medium mt-3 mb-2 text-gray-900">Message</label>
+      <textarea id="smsBody" class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="3" placeholder="Your message..."></textarea>
+      <button id="sendSms" class="mt-3 px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:brightness-110 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">Send SMS</button>
+      <div id="smsMsg" class="text-sm mt-2"></div>
+    </div>
+    <div class="border-t pt-4">
+      <label class="block text-sm font-medium mb-2 text-gray-900">Email</label>
+      <input id="emailTo" type="email" class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="you@example.com" />
+      <label class="block text-sm font-medium mt-3 mb-2 text-gray-900">Subject</label>
+      <input id="emailSubj" class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Subject" />
+      <label class="block text-sm font-medium mt-3 mb-2 text-gray-900">Body</label>
+      <textarea id="emailBody" class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="4" placeholder="Email text..."></textarea>
+      <button id="sendEmail" class="mt-3 px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:brightness-110 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">Send Email</button>
+      <div id="emailMsg" class="text-sm mt-2"></div>
+    </div>
+  </div>
+</section>
+
+<script>
+(function() {
+  // Test SMS & Email logic
+  async function sendSms(){
+    const to = (document.getElementById('smsTo').value || '').trim();
+    const message = (document.getElementById('smsBody').value || '').trim(); // <-- was "body"
+    const msgEl = document.getElementById('smsMsg');
+
+    if (!to || !message) { msgEl.textContent = 'Please enter mobile and message.'; return; }
+
+    msgEl.textContent = 'Sending...';
+    try{
+      // invoker adds the auth headers for you
+      const { data, error } = await window.supabaseClient.functions.invoke('sms', {
+        body: { to, message },
+        headers: {
+          apikey: window.SITE_CONFIG.SUPABASE_ANON_KEY
+        }
+      });
+      
+      console.log('[admin-messaging] SMS response:', data);
+
+      if (error) {
+        msgEl.textContent = 'Error: ' + (error.message || 'failed');
+        msgEl.className = 'text-sm mt-2 text-red-600';
+      } else if (data?.ok) {
+        // Handle both old (data.data) and new (data.clicksend) response formats
+        const cs = data.clicksend || data.data;
+        console.log('[admin-messaging] ClickSend data:', cs);
+        
+        if (cs?.response_code === 'SUCCESS' || cs?.http_code === 200) {
+          msgEl.textContent = 'Sent ✅ Check ClickSend dashboard';
+          msgEl.className = 'text-sm mt-2 text-green-600';
+        } else if (cs?.response_msg) {
+          msgEl.textContent = `ClickSend: ${cs.response_msg} (code: ${cs.response_code || 'unknown'})`;
+          msgEl.className = 'text-sm mt-2 text-orange-600';
+        } else {
+          msgEl.textContent = 'Unexpected response. Check console for details.';
+          msgEl.className = 'text-sm mt-2 text-orange-600';
+          console.log('[admin-messaging] Full ClickSend response:', cs);
+        }
+      } else {
+        msgEl.textContent = 'Unexpected response. Check console for details.';
+        msgEl.className = 'text-sm mt-2 text-orange-600';
+        console.log('[admin-messaging] Full response:', data);
+      }
+    } catch(e){
+      console.error('[admin-messaging] SMS error:', e);
+      msgEl.textContent = 'Error sending: ' + (e.message || 'Unknown error');
+      msgEl.className = 'text-sm mt-2 text-red-600';
+    }
+  }
+  
+  async function sendEmail(){
+    const to = (document.getElementById('emailTo').value||'').trim();
+    const subject = (document.getElementById('emailSubj').value||'').trim();
+    const text = (document.getElementById('emailBody').value||'').trim();
+    const msgEl = document.getElementById('emailMsg');
+    
+    if (!to || !subject || !text) {
+      msgEl.textContent = 'Please fill in all email fields';
+      msgEl.className = 'text-sm mt-2 text-orange-600';
+      return;
+    }
+    
+    msgEl.textContent = 'Sending...';
+    msgEl.className = 'text-sm mt-2';
+    
+    try{
+      const { data, error } = await window.supabaseClient.functions.invoke('admin-email', { 
+        body: { to, subject, text } 
+      });
+      
+      console.log('[admin-messaging] Email response:', { data, error });
+      
+      if (error) {
+        msgEl.textContent = 'Error: ' + (error.message || 'Failed to send');
+        msgEl.className = 'text-sm mt-2 text-red-600';
+        console.error('[admin-messaging] Email error:', error);
+      } else if (data?.ok) {
+        msgEl.textContent = 'Email sent ✅';
+        msgEl.className = 'text-sm mt-2 text-green-600';
+      } else {
+        msgEl.textContent = 'Unexpected response. Check console.';
+        msgEl.className = 'text-sm mt-2 text-orange-600';
+        console.log('[admin-messaging] Email data:', data);
+      }
+    } catch(e){
+      console.error('[admin-messaging] Email exception:', e);
+      msgEl.textContent = 'Error: ' + (e.message || 'Unknown error');
+      msgEl.className = 'text-sm mt-2 text-red-600';
+    }
+  }
+
+  // Wire up when partial loads
+  if (window.adminMessagingReady) {
+    // Already initialized
+  } else {
+    window.adminMessagingReady = true;
+    
+    const initMessaging = () => {
+      const sendSmsBtn = document.getElementById('sendSms');
+      if (sendSmsBtn) sendSmsBtn.onclick = sendSms;
+      
+      const sendEmailBtn = document.getElementById('sendEmail');
+      if (sendEmailBtn) sendEmailBtn.onclick = sendEmail;
+    };
+    
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initMessaging);
+    } else {
+      initMessaging();
+    }
+  }
+})();
+</script>

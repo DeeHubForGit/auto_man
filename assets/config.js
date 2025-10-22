@@ -253,6 +253,22 @@ const SITE_CONFIG = {
       bookingPackageId: 3
     }
   ]
+  ,
+  // Driving tasks checklist for admin client progress
+  DRIVING_TASKS: [
+    'Parallel park',
+    'Reverse park',
+    'Three-point turn',
+    'Hill start',
+    'Lane change',
+    'Merging',
+    'Roundabouts',
+    'Overtaking',
+    'Observation',
+    'Speed control',
+    'Parking (angle/perpendicular)',
+    'School zones'
+  ]
 };
 
 // Make config available globally

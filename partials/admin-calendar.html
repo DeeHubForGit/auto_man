@@ -1,0 +1,70 @@
+<!-- Admin Calendar Section -->
+<section id="section-calendar" class="section-content bg-white border rounded-2xl shadow-sm p-5">
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="text-xl font-semibold">Calendar</h2>
+    <div class="space-x-2">
+      <button id="prevWeek" class="px-3 py-1 border rounded">Prev</button>
+      <button id="todayBtn" class="px-3 py-1 border rounded">Today</button>
+      <button id="nextWeek" class="px-3 py-1 border rounded">Next</button>
+    </div>
+  </div>
+  <div class="text-sm text-gray-500 mb-2">Showing mirrored entries from `bookings` table.</div>
+  <div id="calendar" class="overflow-x-auto">
+    <div id="weekGrid" class="grid grid-cols-8 gap-2 text-sm"></div>
+  </div>
+</section>
+
+<script>
+(function() {
+  // Calendar logic
+  function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+  let weekStart = new Date();
+
+  function renderWeek(startDate) {
+    weekStart = new Date(startDate);
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    const grid = document.getElementById('weekGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    // Header row
+    const headerRow = document.createElement('div');
+    headerRow.className = 'contents';
+    ['Time', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(day => {
+      const cell = document.createElement('div');
+      cell.className = 'font-semibold p-2 bg-gray-100 border';
+      cell.textContent = day;
+      headerRow.appendChild(cell);
+    });
+    grid.appendChild(headerRow);
+
+    // Time slots (8am-6pm)
+    for (let h = 8; h < 18; h++) {
+      const row = document.createElement('div');
+      row.className = 'contents';
+      const timeCell = document.createElement('div');
+      timeCell.className = 'p-2 border bg-gray-50';
+      timeCell.textContent = `${h}:00`;
+      row.appendChild(timeCell);
+      for (let d = 0; d < 7; d++) {
+        const cell = document.createElement('div');
+        cell.className = 'p-2 border min-h-[60px]';
+        row.appendChild(cell);
+      }
+      grid.appendChild(row);
+    }
+
+    // Controls
+    document.getElementById('todayBtn').onclick = () => renderWeek(new Date());
+    document.getElementById('prevWeek').onclick = () => { const d = addDays(weekStart,-7); renderWeek(d); };
+    document.getElementById('nextWeek').onclick = () => { const d = addDays(weekStart,7); renderWeek(d); };
+  }
+
+  // Initialize calendar when this partial loads
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => renderWeek(new Date()));
+  } else {
+    renderWeek(new Date());
+  }
+})();
+</script>

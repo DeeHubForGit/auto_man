@@ -1,0 +1,245 @@
+<!-- Admin Client Progress Section -->
+<section id="section-progress" class="section-content bg-white border rounded-2xl shadow-sm p-5 hidden">
+  <!-- Header with help text -->
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-xl font-semibold">Client Progress</h2>
+    <div class="flex items-center gap-2">
+      <span class="text-sm text-gray-500">Track lesson skills</span>
+      <span class="text-gray-400 cursor-help" title="Select a client to view and update their driving skill progress">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+      </span>
+    </div>
+  </div>
+  
+  <!-- Client selector -->
+  <div class="mb-4">
+    <label class="block text-sm font-medium mb-2 text-gray-900">Select Client</label>
+    <div class="flex gap-2">
+      <select id="cpClient" class="flex-1 bg-white border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        <option value="">Select a client…</option>
+      </select>
+      <button id="cpRefresh" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:brightness-110 transition-all focus:outline-none focus:ring-2 focus:ring-gray-500">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+        </svg>
+      </button>
+    </div>
+  </div>
+  
+  <!-- Skills checklist (2-3 column responsive grid) -->
+  <div id="cpSkills" class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 mb-4"></div>
+  
+  <!-- Actions -->
+  <div class="flex items-center gap-3">
+    <button id="cpSave" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:brightness-110 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
+      Save Progress
+    </button>
+    <div id="cpMsg" class="text-sm"></div>
+  </div>
+</section>
+
+<script>
+(function() {
+  // Client Progress logic
+  function renderSkills(values){
+    const box = document.getElementById('cpSkills');
+    box.innerHTML='';
+    const tasks = Array.isArray(window.SITE_CONFIG?.DRIVING_TASKS) ? window.SITE_CONFIG.DRIVING_TASKS : [];
+    
+    // Show the skills container now that we have a client selected
+    box.style.display = tasks.length > 0 ? '' : 'none';
+    
+    // Calculate completion percentage
+    let completedCount = 0;
+    for (const s of tasks) {
+      if (values?.[s]) completedCount++;
+    }
+    const percentage = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : 0;
+    
+    // Update client selector label with completion badge if client selected
+    const sel = document.getElementById('cpClient');
+    if (sel && sel.value && tasks.length > 0) {
+      const label = sel.options[sel.selectedIndex]?.text || '';
+      const clientName = label.split('<')[0].trim();
+      const badge = `<span class="ml-2 px-2 py-0.5 text-xs font-medium rounded-full ${
+        percentage === 100 ? 'bg-green-100 text-green-800' : 
+        percentage >= 50 ? 'bg-blue-100 text-blue-800' : 
+        'bg-gray-100 text-gray-800'
+      }">${completedCount}/${tasks.length} skills (${percentage}%)</span>`;
+      
+      // Show completion in message area
+      const msg = document.getElementById('cpMsg');
+      if (msg) {
+        msg.innerHTML = badge;
+        msg.className = 'text-sm';
+      }
+    }
+    
+    // Render checkboxes
+    for (const s of tasks){
+      const id = 'skill_'+s.replace(/[^a-z0-9]/gi,'_');
+      const wrap = document.createElement('label');
+      wrap.className='flex items-center gap-2 cursor-pointer hover:text-blue-600 transition-colors text-gray-900';
+      
+      const cb = document.createElement('input');
+      cb.type='checkbox'; 
+      cb.id=id; 
+      cb.checked = !!values?.[s];
+      cb.className='w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer';
+      
+      const span = document.createElement('span'); 
+      span.textContent = s;
+      span.className='text-sm select-none text-gray-900';
+      
+      wrap.appendChild(cb); 
+      wrap.appendChild(span);
+      box.appendChild(wrap);
+    }
+  }
+
+  async function cpLoad(){
+    const sel = document.getElementById('cpClient');
+    const email = (sel && sel.value) ? sel.value : '';
+    const msg = document.getElementById('cpMsg');
+    
+    if (!email) { 
+      // No client selected - hide checkboxes and clear message
+      document.getElementById('cpSkills').style.display = 'none';
+      msg.textContent = '';
+      return; 
+    }
+    
+    if (!window.supabaseClient) return;
+    
+    const { data } = await window.supabaseClient.from('client_progress').select('*').eq('email', email).maybeSingle();
+    renderSkills(data?.skills || {});
+    
+    // Clear message after loading
+    msg.textContent = '';
+  }
+
+  async function cpSave(){
+    const sel = document.getElementById('cpClient');
+    const email = (sel && sel.value) ? sel.value : '';
+    const msg = document.getElementById('cpMsg');
+    
+    if (!email) { 
+      msg.textContent = 'Please select a client';
+      return; 
+    }
+    
+    const skills = {}; 
+    (window.SITE_CONFIG?.DRIVING_TASKS||[]).forEach(s => { 
+      const id='skill_'+s.replace(/[^a-z0-9]/gi,'_'); 
+      const el=document.getElementById(id); 
+      skills[s] = !!(el && el.checked); 
+    });
+    
+    const row = { email, skills };
+    const { error } = await window.supabaseClient.from('client_progress').upsert(row, { onConflict: 'email' });
+    
+    if (error) {
+      msg.textContent = 'Error: ' + error.message;
+      msg.className = 'mt-3 text-sm text-red-600';
+    } else {
+      msg.textContent = 'Client progress saved successfully';
+      msg.className = 'mt-3 text-sm text-green-600';
+      // Clear success message after 3 seconds
+      setTimeout(() => { msg.textContent = ''; }, 3000);
+    }
+  }
+
+  async function loadClientOptions(){
+    const sel = document.getElementById('cpClient');
+    const msg = document.getElementById('cpMsg');
+    
+    console.log('[admin-progress] loadClientOptions called');
+    console.log('[admin-progress] supabaseClient exists:', !!window.supabaseClient);
+    
+    if (!sel) {
+      console.error('[admin-progress] cpClient element not found');
+      return;
+    }
+    
+    if (!window.supabaseClient) {
+      console.error('[admin-progress] supabaseClient not available');
+      sel.innerHTML = '<option value="">Supabase not connected</option>';
+      if (msg) msg.textContent = 'Supabase client not initialized';
+      return;
+    }
+    
+    sel.innerHTML = '<option value="">Loading…</option>';
+    if (msg) msg.textContent = 'Loading clients...';
+    
+    try {
+      console.log('[admin-progress] Querying client table...');
+      const { data, error, status, statusText } = await window.supabaseClient
+        .from('client')
+        .select('*')
+        .order('first_name', { ascending: true });
+      
+      console.log('[admin-progress] Query response:', { status, statusText, error, rowCount: data?.length });
+      
+      if (error) throw error;
+      
+      const rows = Array.isArray(data) ? data : [];
+      const opts = ['<option value="">Select a client…</option>'];
+      rows.forEach(c => {
+        const name = [c.first_name, c.last_name].filter(Boolean).join(' ');
+        const label = name ? `${name} <${c.email}>` : c.email;
+        opts.push(`<option value="${c.email}">${label}</option>`);
+      });
+      sel.innerHTML = opts.join('');
+      
+      if (rows.length === 0) {
+        console.warn('[admin-progress] Zero clients returned. Check: 1) Table has data, 2) SELECT grant exists, 3) RLS policies if enabled');
+      } else {
+        console.log('[admin-progress] Successfully loaded', rows.length, 'clients');
+      }
+      
+      // Clear any messages after loading
+      if (msg) msg.textContent = '';
+    } catch (e) {
+      sel.innerHTML = '<option value="">Failed to load clients</option>';
+      if (msg) msg.textContent = 'Error: ' + (e?.message || String(e));
+      console.error('[admin-progress] loadClientOptions error:', e);
+    }
+  }
+
+  // Wire up when partial loads
+  if (window.adminProgressReady) {
+    // Already initialized
+  } else {
+    window.adminProgressReady = true;
+    
+    // Wait for DOM and auth
+    const initProgress = async () => {
+      // Hide skills initially until a client is selected
+      const cpSkillsBox = document.getElementById('cpSkills');
+      if (cpSkillsBox) cpSkillsBox.style.display = 'none';
+      
+      // Wire up buttons
+      const cpSaveBtn = document.getElementById('cpSave');
+      if (cpSaveBtn) cpSaveBtn.onclick = cpSave;
+      
+      const cpRefreshBtn = document.getElementById('cpRefresh');
+      if (cpRefreshBtn) cpRefreshBtn.onclick = loadClientOptions;
+      
+      // Load clients into dropdown
+      loadClientOptions();
+      
+      // Auto-load progress when client is selected from dropdown
+      const cpClientSelect = document.getElementById('cpClient');
+      if (cpClientSelect) cpClientSelect.addEventListener('change', cpLoad);
+    };
+    
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initProgress);
+    } else {
+      initProgress();
+    }
+  }
+})();
+</script>

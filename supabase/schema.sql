@@ -333,6 +333,31 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
+-- ================= CONTACT & PROGRESS TABLES =================
+CREATE TABLE IF NOT EXISTS contact_messages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  phone TEXT,
+  message TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_contact_messages_created ON contact_messages(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS client_progress (
+  email TEXT PRIMARY KEY,
+  skills JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE OR REPLACE FUNCTION set_client_progress_updated() RETURNS TRIGGER AS $$
+BEGIN NEW.updated_at = NOW(); RETURN NEW; END $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS t_client_progress_updated ON client_progress;
+CREATE TRIGGER t_client_progress_updated BEFORE UPDATE ON client_progress
+FOR EACH ROW EXECUTE FUNCTION set_client_progress_updated();
+
 -- ================= UPSERT FROM GOOGLE =================
 CREATE OR REPLACE FUNCTION upsert_booking_from_google(
   p_google_event_id TEXT,

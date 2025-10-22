@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin - Auto-Man Driving School</title>
+  <meta name="description" content="Admin dashboard for Auto-Man Driving School" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="assets/theme.css" rel="stylesheet">
+  <script src="assets/config.js"></script>
+  <script src="assets/render-helpers.js" defer></script>
+  <script src="assets/include.js" defer></script>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <!-- Auth scripts before header -->
+  <div data-include="partials/auth-scripts.html"></div>
+  <div data-include="partials/header.html"></div>
+
+  <main class="container mx-auto px-4 py-8">
+    <h1 class="text-3xl font-extrabold mb-6">Admin Dashboard</h1>
+
+    <div id="notAdmin" class="hidden p-4 border rounded bg-amber-50 text-amber-800 mb-8">
+      You do not have access to this page.
+    </div>
+
+    <div id="adminContent" class="flex flex-col lg:flex-row gap-6">
+      <!-- Sidebar Navigation -->
+      <aside class="lg:w-64 flex-shrink-0">
+        <div class="bg-white rounded-2xl border shadow-sm p-6 sticky top-24">
+          <nav class="space-y-1">
+            <a href="#calendar" onclick="showSection('calendar')" id="nav-calendar"
+               class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+              <span class="font-medium">Calendar</span>
+            </a>
+            <a href="#progress" onclick="showSection('progress')" id="nav-progress"
+               class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+              <span class="font-medium">Client Progress</span>
+            </a>
+            <a href="#messaging" onclick="showSection('messaging')" id="nav-messaging"
+               class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+              <span class="font-medium">Test SMS & Email</span>
+            </a>
+            <a href="#contacts" onclick="showSection('contacts')" id="nav-contacts"
+               class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+              <span class="font-medium">Contact Messages</span>
+            </a>
+          </nav>
+        </div>
+      </aside>
+
+      <!-- Main Content Area -->
+      <div class="flex-1 min-w-0">
+        <!-- Include all admin sections as partials -->
+        <div data-include="partials/admin-calendar.html"></div>
+        <div data-include="partials/admin-progress.html"></div>
+        <div data-include="partials/admin-messaging.html"></div>
+        <div data-include="partials/admin-contacts.html"></div>
+      </div>
+    </div>
+  </main>
+
+  <div data-include="partials/footer.html"></div>
+
+  <script>
+    // Admin allowlist from SITE_CONFIG.ADMIN_EMAILS (array)
+    const ADMIN_EMAILS = Array.isArray(window.SITE_CONFIG?.ADMIN_EMAILS) ? window.SITE_CONFIG.ADMIN_EMAILS : [
+      'darren@automandrivingschool.com.au'
+    ];
+
+    async function ensureAdmin() {
+      const adminContent = document.getElementById('adminContent');
+      const notAdmin = document.getElementById('notAdmin');
+      if (!window.supabaseClient) { 
+        console.error('[admin] supabaseClient not available');
+        notAdmin.classList.remove('hidden'); 
+        return false; 
+      }
+      const { data: { session } } = await window.supabaseClient.auth.getSession();
+      const email = session?.user?.email || '';
+      const ok = ADMIN_EMAILS.includes(email);
+      
+      console.log('[admin] ensureAdmin check:', { 
+        email, 
+        isAdmin: ok, 
+        allowedEmails: ADMIN_EMAILS,
+        hasSession: !!session 
+      });
+      
+      // Show banner if not admin, but do not block the UI so you can test features
+      notAdmin.classList.toggle('hidden', ok);
+      adminContent.style.display = '';
+      return ok;
+    }
+
+    // Section navigation like portal.html
+    function showSection(section) {
+      document.querySelectorAll('.section-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('bg-blue-50', 'text-blue-600');
+        item.classList.add('text-gray-700');
+      });
+      
+      const targetSection = document.getElementById(`section-${section}`);
+      if (targetSection) targetSection.classList.remove('hidden');
+      
+      const navItem = document.getElementById(`nav-${section}`);
+      if (navItem) {
+        navItem.classList.add('bg-blue-50', 'text-blue-600');
+        navItem.classList.remove('text-gray-700');
+      }
+    }
+
+    // Wire up
+    document.addEventListener('DOMContentLoaded', async function(){
+      console.log('[admin] DOMContentLoaded - waiting for auth...');
+      
+      // Wait for authReady promise if it exists
+      if (window.authReady) { 
+        try { 
+          await window.authReady; 
+          console.log('[admin] authReady resolved');
+        } catch(e) { 
+          console.warn('[admin] authReady error:', e);
+        } 
+      }
+      
+      // Additional wait for supabaseClient if not ready yet
+      let attempts = 0;
+      while (!window.supabaseClient && attempts < 50) {
+        console.log('[admin] Waiting for supabaseClient... attempt', attempts + 1);
+        await new Promise(r => setTimeout(r, 100));
+        attempts++;
+      }
+      
+      if (!window.supabaseClient) {
+        console.error('[admin] supabaseClient still not available after waiting');
+      } else {
+        console.log('[admin] supabaseClient is ready!');
+      }
+      
+      const ok = await ensureAdmin();
+      
+      // Show first section by default
+      showSection('calendar');
+    });
+  </script>
+</body>
+</html>

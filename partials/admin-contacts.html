@@ -1,0 +1,197 @@
+<!-- Admin Contact Messages Section -->
+<section id="section-contacts" class="section-content bg-white border rounded-2xl shadow-sm p-5 hidden">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-xl font-semibold">Contact Messages</h2>
+    <button id="reloadContacts" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+      <span id="reloadContactsText">Reload</span>
+      <span id="reloadContactsSpinner" class="hidden">
+        <svg class="animate-spin h-4 w-4 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      </span>
+    </button>
+  </div>
+  
+  <!-- Filters -->
+  <div class="flex flex-wrap items-center gap-3 mb-4">
+    <input 
+      id="contactSearch" 
+      type="text" 
+      placeholder="Search by name, email, or message..." 
+      class="flex-1 min-w-[200px] bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+    />
+    <select 
+      id="contactSort" 
+      class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+    >
+      <option value="newest">Newest first</option>
+      <option value="oldest">Oldest first</option>
+    </select>
+  </div>
+  
+  <!-- Messages list -->
+  <div id="contactsList" class="space-y-3"></div>
+</section>
+
+<script>
+(function() {
+  // Contact Messages - Store for filtering
+  let allContactMessages = [];
+  
+  async function loadContacts(){
+    const box = document.getElementById('contactsList');
+    const reloadBtn = document.getElementById('reloadContacts');
+    const reloadText = document.getElementById('reloadContactsText');
+    const reloadSpinner = document.getElementById('reloadContactsSpinner');
+    
+    if (!box) {
+      console.error('[admin-contacts] contactsList element not found');
+      return;
+    }
+    
+    if (!window.supabaseClient) {
+      console.error('[admin-contacts] supabaseClient not available for loadContacts');
+      box.innerHTML = '<div class="p-4 text-center text-gray-500">Supabase not connected</div>';
+      return;
+    }
+    
+    // Show loading spinner
+    if (reloadText) reloadText.classList.add('hidden');
+    if (reloadSpinner) reloadSpinner.classList.remove('hidden');
+    if (reloadBtn) reloadBtn.disabled = true;
+    
+    console.log('[admin-contacts] Loading contact messages...');
+    box.innerHTML = '<div class="p-8 text-center text-gray-500">Loading messages...</div>';
+    
+    try {
+      const { data, error, status, statusText } = await window.supabaseClient
+        .from('contact_messages')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      
+      console.log('[admin-contacts] Contact messages response:', { status, statusText, error, rowCount: data?.length });
+      
+      if (error) {
+        console.error('[admin-contacts] Error loading contacts:', error);
+        box.innerHTML = `<div class="p-4 text-center text-red-600">Error: ${error.message}</div>`;
+        return;
+      }
+      
+      allContactMessages = Array.isArray(data) ? data : [];
+      renderContactMessages();
+      
+      console.log('[admin-contacts] Loaded', allContactMessages.length, 'contact messages');
+    } catch (e) {
+      console.error('[admin-contacts] Unexpected error loading contacts:', e);
+      box.innerHTML = `<div class="p-4 text-center text-red-600">Error: ${e?.message || String(e)}</div>`;
+    } finally {
+      // Hide loading spinner
+      if (reloadText) reloadText.classList.remove('hidden');
+      if (reloadSpinner) reloadSpinner.classList.add('hidden');
+      if (reloadBtn) reloadBtn.disabled = false;
+    }
+  }
+  
+  function renderContactMessages() {
+    const box = document.getElementById('contactsList');
+    const searchTerm = (document.getElementById('contactSearch')?.value || '').toLowerCase();
+    const sortOrder = document.getElementById('contactSort')?.value || 'newest';
+    
+    if (!box) return;
+    
+    // Filter messages
+    let filtered = allContactMessages.filter(row => {
+      if (!searchTerm) return true;
+      const name = (row.name || '').toLowerCase();
+      const email = (row.email || '').toLowerCase();
+      const message = (row.message || '').toLowerCase();
+      const phone = (row.phone || '').toLowerCase();
+      return name.includes(searchTerm) || email.includes(searchTerm) || 
+             message.includes(searchTerm) || phone.includes(searchTerm);
+    });
+    
+    // Sort messages
+    filtered.sort((a, b) => {
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
+      return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+    });
+    
+    // Render
+    box.innerHTML = '';
+    
+    if (filtered.length === 0) {
+      const emptyMsg = searchTerm 
+        ? `<div class="p-8 text-center text-gray-500">No messages match "${searchTerm}"</div>`
+        : '<div class="p-8 text-center text-gray-500">📭 No contact messages yet</div>';
+      box.innerHTML = emptyMsg;
+      return;
+    }
+    
+    filtered.forEach(row => {
+      const card = document.createElement('div');
+      card.className = 'bg-[#111827] p-4 rounded-2xl shadow-md border border-[#1f2937] hover:bg-[#1a2332] transition-colors cursor-pointer';
+      
+      const name = row.name || 'Anonymous';
+      const email = row.email || '';
+      const phone = row.phone || '';
+      const message = row.message || '';
+      const date = new Date(row.created_at).toLocaleString('en-AU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      
+      card.innerHTML = `
+        <div class="font-semibold text-white">${name}</div>
+        <div class="text-sm text-gray-400">${email}</div>
+        ${phone ? `<div class="text-sm text-gray-400 mb-2">${phone}</div>` : '<div class="mb-2"></div>'}
+        <div class="text-gray-200 whitespace-pre-wrap">${message}</div>
+        <div class="text-xs text-gray-500 mt-2">${date}</div>
+      `;
+      
+      box.appendChild(card);
+    });
+  }
+
+  // Wire up when partial loads
+  if (window.adminContactsReady) {
+    // Already initialized
+  } else {
+    window.adminContactsReady = true;
+    
+    const initContacts = () => {
+      const reloadContactsBtn = document.getElementById('reloadContacts');
+      if (reloadContactsBtn) reloadContactsBtn.onclick = loadContacts;
+      
+      // Wire up search and sort filters
+      const contactSearch = document.getElementById('contactSearch');
+      if (contactSearch) {
+        contactSearch.addEventListener('input', () => {
+          renderContactMessages();
+        });
+      }
+      
+      const contactSort = document.getElementById('contactSort');
+      if (contactSort) {
+        contactSort.addEventListener('change', () => {
+          renderContactMessages();
+        });
+      }
+      
+      loadContacts();
+    };
+    
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initContacts);
+    } else {
+      initContacts();
+    }
+  }
+})();
+</script>

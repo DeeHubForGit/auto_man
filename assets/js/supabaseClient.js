@@ -2,10 +2,11 @@
 (function () {
   if (window.supabaseClient) return; // already initialized
 
-  var url = window.SUPABASE_URL;
-  var key = window.SUPABASE_ANON_KEY;
+  // Try both direct globals and SITE_CONFIG for backwards compatibility
+  var url = window.SUPABASE_URL || window.SITE_CONFIG?.SUPABASE_URL;
+  var key = window.SUPABASE_ANON_KEY || window.SITE_CONFIG?.SUPABASE_ANON_KEY;
   if (!url || !key || !window.supabase) {
-    console.error('[supabaseClient] Missing SUPABASE_URL/ANON_KEY or supabase lib');
+    console.error('[supabaseClient] Missing SUPABASE_URL/ANON_KEY or supabase lib. Check config.local.js');
     return;
   }
 

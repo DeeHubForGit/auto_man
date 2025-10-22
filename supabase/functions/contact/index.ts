@@ -38,6 +38,23 @@ serve(async (req) => {
     const subject = `Website contact form (Auto-Man)`;
     const text = `New contact enquiry\n\nName: ${name}\nEmail: ${email}\nPhone: ${phone || '-'}\n\nMessage:\n${message}\n`;
 
+    // Log into contact_messages (if table exists)
+    try {
+      const supa = Deno.env.get('SUPABASE_URL')!;
+      const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      await fetch(`${supa}/rest/v1/contact_messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': key,
+          'Authorization': `Bearer ${key}`,
+        },
+        body: JSON.stringify([{ name, email, phone, message, created_at: new Date().toISOString() }])
+      });
+    } catch (_) {
+      // best effort
+    }
+
     // Send via Resend API
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',

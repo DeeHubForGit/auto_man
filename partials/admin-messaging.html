@@ -84,42 +84,51 @@
       msgEl.className = 'text-sm mt-2 text-red-600';
     }
   }
-  
+
   async function sendEmail(){
     const to = (document.getElementById('emailTo').value||'').trim();
     const subject = (document.getElementById('emailSubj').value||'').trim();
     const text = (document.getElementById('emailBody').value||'').trim();
     const msgEl = document.getElementById('emailMsg');
-    
+
     if (!to || !subject || !text) {
       msgEl.textContent = 'Please fill in all email fields';
       msgEl.className = 'text-sm mt-2 text-orange-600';
       return;
     }
-    
+
+    const html = `<p>${text.replace(/\n/g, '<br>')}</p>`;
+    const fnUrl = `${window.SITE_CONFIG.SUPABASE_URL}/functions/v1/email`;
+
     msgEl.textContent = 'Sending...';
     msgEl.className = 'text-sm mt-2';
-    
-    try{
-      const { data, error } = await window.supabaseClient.functions.invoke('admin-email', { 
-        body: { to, subject, text } 
+
+    try {
+      // direct fetch to the Edge Function (matches the working console/dashboard tests)
+      const resp = await fetch(fnUrl, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'authorization': 'Bearer ' + window.SITE_CONFIG.SUPABASE_ANON_KEY,
+          'apikey': window.SITE_CONFIG.SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({ to, subject, html })
       });
-      
-      console.log('[admin-messaging] Email response:', { data, error });
-      
-      if (error) {
-        msgEl.textContent = 'Error: ' + (error.message || 'Failed to send');
+
+      const data = await resp.json().catch(() => null);
+      console.log('[admin-messaging] Email response:', { status: resp.status, data });
+
+      if (!resp.ok) {
+        msgEl.textContent = `Error: HTTP ${resp.status}`;
         msgEl.className = 'text-sm mt-2 text-red-600';
-        console.error('[admin-messaging] Email error:', error);
       } else if (data?.ok) {
         msgEl.textContent = 'Email sent ✅';
         msgEl.className = 'text-sm mt-2 text-green-600';
       } else {
         msgEl.textContent = 'Unexpected response. Check console.';
         msgEl.className = 'text-sm mt-2 text-orange-600';
-        console.log('[admin-messaging] Email data:', data);
       }
-    } catch(e){
+    } catch (e) {
       console.error('[admin-messaging] Email exception:', e);
       msgEl.textContent = 'Error: ' + (e.message || 'Unknown error');
       msgEl.className = 'text-sm mt-2 text-red-600';

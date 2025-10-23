@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Complete Your Profile | Auto-Man Driving School</title>
+  <meta name="description" content="Complete your profile to get started with Auto-Man Driving School" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="assets/theme.css" rel="stylesheet">
+  <script src="assets/config.js"></script>
+  <script src="assets/js/modal.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .wizard-step {
+      display: none;
+      animation: fadeIn 0.4s ease-in;
+    }
+    .wizard-step.active {
+      display: block;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .progress-bar {
+      transition: width 0.3s ease;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-blue-100 min-h-screen flex items-center justify-center p-4">
+  
+  <div class="w-full max-w-2xl">
+    <!-- Progress Bar -->
+    <div class="mb-8">
+      <div class="bg-white rounded-full h-2 shadow-inner">
+        <div id="progressBar" class="progress-bar bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
+      </div>
+      <p class="text-center mt-2 text-sm text-gray-600">
+        <span id="stepIndicator">Step 1 of 5</span>
+      </p>
+    </div>
+
+    <!-- Wizard Container -->
+    <div class="bg-white rounded-2xl shadow-2xl p-8 md:p-12">
+      
+      <!-- Step 1: Name -->
+      <div class="wizard-step active" data-step="1">
+        <div class="mb-8">
+          <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-3">Welcome! Let's get started 👋</h1>
+          <p class="text-lg text-gray-600">First, what's your name?</p>
+        </div>
+        
+        <div class="space-y-4 mb-8">
+          <div>
+            <label for="firstName" class="block text-sm font-medium text-gray-700 mb-2">First Name *</label>
+            <input 
+              type="text" 
+              id="firstName" 
+              required
+              class="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:border-blue-600 transition-colors text-black"
+              placeholder="Enter your first name"
+              autocomplete="given-name"
+            />
+          </div>
+          <div>
+            <label for="lastName" class="block text-sm font-medium text-gray-700 mb-2">Last Name *</label>
+            <input 
+              type="text" 
+              id="lastName" 
+              required
+              class="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:border-blue-600 transition-colors text-black"
+              placeholder="Enter your last name"
+              autocomplete="family-name"
+            />
+          </div>
+        </div>
+
+        <div class="flex justify-end">
+          <button onclick="nextStep()" class="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-lg">
+            Next →
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2: Mobile Number -->
+      <div class="wizard-step" data-step="2">
+        <div class="mb-8">
+          <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-3 flex items-center gap-3">📱 What's your contact number</h2>
+          <p class="text-lg text-gray-600">We'll use this to send you lesson reminders</p>
+        </div>
+        
+        <div class="mb-8">
+          <label for="mobile" class="block text-sm font-medium text-gray-700 mb-2">Mobile Number *</label>
+          <input 
+            type="tel" 
+            id="mobile" 
+            required
+            class="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:border-blue-600 transition-colors text-black"
+            placeholder="04XX XXX XXX"
+            autocomplete="tel"
+            pattern="[0-9\s\-\+\(\)]+"
+          />
+          <p class="text-sm text-gray-500 mt-2">Australian mobile format (e.g. 0412 345 678)</p>
+        </div>
+
+        <div class="flex justify-between">
+          <button onclick="prevStep()" class="px-6 py-3 bg-blue-400 text-blue-700 rounded-lg font-semibold hover:bg-blue-500 transition-colors">
+            ← Back
+          </button>
+          <button onclick="nextStep()" class="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-lg">
+            Next →
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 3: License/Permit Number -->
+      <div class="wizard-step" data-step="3">
+        <div class="mb-8">
+          <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-3 flex items-center gap-3">🪪 Your license details</h2>
+          <p class="text-lg text-gray-600">Enter your learner's permit or license number</p>
+        </div>
+        
+        <div class="mb-8">
+          <label for="licenseNumber" class="block text-sm font-medium text-gray-700 mb-2">License/Permit Number *</label>
+          <input 
+            type="text" 
+            id="licenseNumber" 
+            required
+            class="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:border-blue-600 transition-colors text-black"
+            placeholder="Enter your license or permit number"
+          />
+          <p class="text-sm text-gray-500 mt-2">You'll need to show this at your first lesson</p>
+        </div>
+
+        <div class="flex justify-between">
+          <button onclick="prevStep()" class="px-6 py-3 bg-blue-400 text-blue-700 rounded-lg font-semibold hover:bg-blue-500 transition-colors">
+            ← Back
+          </button>
+          <button onclick="nextStep()" class="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-lg">
+            Next →
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 4: Medical Conditions -->
+      <div class="wizard-step" data-step="4">
+        <div class="mb-8">
+          <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-3 flex items-center gap-3">🏥 Medical information</h2>
+          <p class="text-lg text-gray-600">Do you have any medical conditions that may affect your driving?</p>
+        </div>
+        
+        <div class="mb-8">
+          <label for="medicalConditions" class="block text-sm font-medium text-gray-700 mb-2">Medical Conditions (Optional)</label>
+          <textarea 
+            id="medicalConditions" 
+            rows="4"
+            class="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:border-blue-600 transition-colors resize-none text-black placeholder:text-gray-400"
+            placeholder="E.g. epilepsy, diabetes, vision impairment, etc. (or leave blank if none)"
+          ></textarea>
+          <p class="text-sm text-gray-500 mt-2">This helps us provide better support during your lessons</p>
+        </div>
+
+        <div class="flex justify-between">
+          <button onclick="prevStep()" class="px-6 py-3 bg-blue-400 text-blue-700 rounded-lg font-semibold hover:bg-blue-500 transition-colors">
+            ← Back
+          </button>
+          <button onclick="nextStep()" class="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-lg">
+            Next →
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 5: Driver Profile -->
+      <div class="wizard-step" data-step="5">
+        <div class="mb-8">
+          <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-3 flex items-center gap-3">🎯 Almost done!</h2>
+          <p class="text-lg text-gray-600">Tell us about your driving experience</p>
+        </div>
+        
+        <div class="mb-8 space-y-4">
+          <p class="text-sm font-medium text-gray-700 mb-3">Select all that apply:</p>
+          
+          <label class="flex items-start gap-3 p-4 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 transition-colors">
+            <input type="checkbox" id="isBeginner" class="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500">
+            <div>
+              <span class="font-semibold text-gray-900">Beginner Driver</span>
+              <p class="text-sm text-gray-600">I'm just starting out with my learner's permit</p>
+            </div>
+          </label>
+
+          <label class="flex items-start gap-3 p-4 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 transition-colors">
+            <input type="checkbox" id="isAnxious" class="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500">
+            <div>
+              <span class="font-semibold text-gray-900">Anxious/Nervous Driver</span>
+              <p class="text-sm text-gray-600">I feel nervous or anxious about driving</p>
+            </div>
+          </label>
+
+          <label class="flex items-start gap-3 p-4 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 transition-colors">
+            <input type="checkbox" id="isSenior" class="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500">
+            <div>
+              <span class="font-semibold text-gray-900">Senior Driver</span>
+              <p class="text-sm text-gray-600">I need a retest or refresher course</p>
+            </div>
+          </label>
+
+          <label class="flex items-start gap-3 p-4 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 transition-colors">
+            <input type="checkbox" id="isOther" class="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" onchange="toggleOtherText()">
+            <div class="flex-1">
+              <span class="font-semibold text-gray-900">Other</span>
+              <p class="text-sm text-gray-600 mb-2">Something else we should know</p>
+              <input 
+                type="text" 
+                id="otherDetails" 
+                disabled
+                class="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:border-blue-600 transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed text-black"
+                placeholder="Please specify..."
+              />
+            </div>
+          </label>
+        </div>
+
+        <div class="flex justify-between">
+          <button onclick="prevStep()" class="px-6 py-3 bg-blue-400 text-blue-700 rounded-lg font-semibold hover:bg-blue-500 transition-colors">
+            ← Back
+          </button>
+          <button onclick="submitForm()" class="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-lg">
+            Complete Setup ✓
+          </button>
+        </div>
+      </div>
+
+      <!-- Success Message (hidden initially) -->
+      <div id="successMessage" class="hidden text-center">
+        <div class="mb-6">
+          <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg class="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+          </div>
+          <h2 class="text-3xl font-bold text-gray-900 mb-3">All set! 🎉</h2>
+          <p class="text-lg text-gray-600 mb-6">Your profile has been completed successfully</p>
+        </div>
+        <a href="portal.html" class="inline-block bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-lg">
+          Go to Dashboard
+        </a>
+      </div>
+
+    </div>
+
+    <!-- Skip Link (optional) -->
+    <div class="text-center mt-6">
+      <a href="portal.html" class="text-sm text-gray-600 hover:text-gray-900 underline">
+        Skip for now (you can complete this later)
+      </a>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 1;
+    const totalSteps = 5;
+    const CACHE_KEY = 'onboarding_form_data';
+    const STEP_KEY = 'onboarding_current_step';
+
+    // Initialize Supabase
+    const supabaseUrl = window.SUPABASE_URL || '';
+    const supabaseKey = window.SUPABASE_ANON_KEY || '';
+    const supabase = window.supabase?.createClient(supabaseUrl, supabaseKey);
+
+    // Save form data to localStorage
+    function saveToCache() {
+      const formData = {
+        firstName: document.getElementById('firstName').value,
+        lastName: document.getElementById('lastName').value,
+        mobile: document.getElementById('mobile').value,
+        licenseNumber: document.getElementById('licenseNumber').value,
+        medicalConditions: document.getElementById('medicalConditions').value,
+        isBeginner: document.getElementById('isBeginner').checked,
+        isAnxious: document.getElementById('isAnxious').checked,
+        isSenior: document.getElementById('isSenior').checked,
+        isOther: document.getElementById('isOther').checked,
+        otherDetails: document.getElementById('otherDetails').value
+      };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(formData));
+      localStorage.setItem(STEP_KEY, currentStep.toString());
+    }
+
+    // Load form data from localStorage
+    function loadFromCache() {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        try {
+          const data = JSON.parse(cached);
+          document.getElementById('firstName').value = data.firstName || '';
+          document.getElementById('lastName').value = data.lastName || '';
+          document.getElementById('mobile').value = data.mobile || '';
+          document.getElementById('licenseNumber').value = data.licenseNumber || '';
+          document.getElementById('medicalConditions').value = data.medicalConditions || '';
+          document.getElementById('isBeginner').checked = data.isBeginner || false;
+          document.getElementById('isAnxious').checked = data.isAnxious || false;
+          document.getElementById('isSenior').checked = data.isSenior || false;
+          document.getElementById('isOther').checked = data.isOther || false;
+          document.getElementById('otherDetails').value = data.otherDetails || '';
+          
+          // Enable/disable other textbox based on checkbox
+          document.getElementById('otherDetails').disabled = !data.isOther;
+        } catch (e) {
+          console.error('Error loading cached data:', e);
+        }
+      }
+      
+      // Restore step
+      const savedStep = localStorage.getItem(STEP_KEY);
+      if (savedStep) {
+        const step = parseInt(savedStep, 10);
+        if (step >= 1 && step <= totalSteps) {
+          showStep(step);
+        }
+      }
+    }
+
+    // Clear cache after successful submission
+    function clearCache() {
+      localStorage.removeItem(CACHE_KEY);
+      localStorage.removeItem(STEP_KEY);
+    }
+
+    function updateProgress() {
+      const progress = (currentStep / totalSteps) * 100;
+      document.getElementById('progressBar').style.width = progress + '%';
+      document.getElementById('stepIndicator').textContent = `Step ${currentStep} of ${totalSteps}`;
+    }
+
+    function showStep(step) {
+      document.querySelectorAll('.wizard-step').forEach(el => el.classList.remove('active'));
+      const stepEl = document.querySelector(`[data-step="${step}"]`);
+      if (stepEl) stepEl.classList.add('active');
+      currentStep = step;
+      updateProgress();
+      saveToCache(); // Save step progress
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function validateStep(step) {
+      if (step === 1) {
+        const firstName = document.getElementById('firstName').value.trim();
+        const lastName = document.getElementById('lastName').value.trim();
+        if (!firstName || !lastName) {
+          Modal.error('Please enter both your first and last name');
+          return false;
+        }
+      }
+      if (step === 2) {
+        const mobile = document.getElementById('mobile').value.trim();
+        if (!mobile) {
+          Modal.error('Please enter your mobile number');
+          return false;
+        }
+        // Basic Australian mobile validation
+        const mobileClean = mobile.replace(/[\s\-\(\)]/g, '');
+        if (!/^(\+61|0)[4-5]\d{8}$/.test(mobileClean)) {
+          Modal.error('Please enter a valid Australian mobile number (e.g. 0412 345 678)');
+          return false;
+        }
+      }
+      if (step === 3) {
+        const license = document.getElementById('licenseNumber').value.trim();
+        if (!license) {
+          Modal.error('Please enter your license or permit number');
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function nextStep() {
+      if (!validateStep(currentStep)) return;
+      saveToCache(); // Save before moving to next step
+      if (currentStep < totalSteps) {
+        showStep(currentStep + 1);
+      }
+    }
+
+    function prevStep() {
+      if (currentStep > 1) {
+        showStep(currentStep - 1);
+      }
+    }
+
+    function toggleOtherText() {
+      const checkbox = document.getElementById('isOther');
+      const textbox = document.getElementById('otherDetails');
+      textbox.disabled = !checkbox.checked;
+      if (checkbox.checked) {
+        textbox.focus();
+      } else {
+        textbox.value = '';
+      }
+      saveToCache(); // Save when checkbox changes
+    }
+
+    async function submitForm() {
+      if (!supabase) {
+        Modal.error('Unable to connect to database. Please try again later.');
+        return;
+      }
+
+      // Get form data
+      const formData = {
+        first_name: document.getElementById('firstName').value.trim(),
+        last_name: document.getElementById('lastName').value.trim(),
+        mobile: document.getElementById('mobile').value.trim(),
+        license_number: document.getElementById('licenseNumber').value.trim().toUpperCase(),
+        medical_conditions: document.getElementById('medicalConditions').value.trim() || null,
+        is_beginner: document.getElementById('isBeginner').checked,
+        is_anxious: document.getElementById('isAnxious').checked,
+        is_senior: document.getElementById('isSenior').checked,
+        other_notes: document.getElementById('isOther').checked ? document.getElementById('otherDetails').value.trim() : null,
+        profile_completed: true,
+        updated_at: new Date().toISOString()
+      };
+
+      try {
+        // Get current user
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+          Modal.error('Please log in to complete your profile', 'Authentication Required');
+          setTimeout(() => { window.location.href = 'login.html'; }, 2000);
+          return;
+        }
+
+        // Use upsert to handle both insert and update
+        const { error } = await supabase
+          .from('client')
+          .upsert(
+            { ...formData, user_id: user.id },
+            { onConflict: 'user_id' }
+          );
+
+        if (error) {
+          console.error('Error updating profile:', error);
+          Modal.error('There was an error saving your profile. Please try again.');
+          return;
+        }
+
+        // Clear cache on successful submission
+        clearCache();
+        
+        // Show success message
+        document.querySelectorAll('.wizard-step').forEach(el => el.classList.remove('active'));
+        document.getElementById('successMessage').classList.remove('hidden');
+        
+      } catch (err) {
+        console.error('Unexpected error:', err);
+        Modal.error('An unexpected error occurred. Please try again.');
+      }
+    }
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        const activeStep = document.querySelector('.wizard-step.active');
+        if (activeStep) {
+          const nextBtn = activeStep.querySelector('button[onclick*="next"]');
+          const submitBtn = activeStep.querySelector('button[onclick*="submit"]');
+          if (nextBtn && !document.activeElement.matches('textarea')) {
+            e.preventDefault();
+            nextBtn.click();
+          } else if (submitBtn) {
+            e.preventDefault();
+            submitBtn.click();
+          }
+        }
+      }
+    });
+
+    // Auto-uppercase license number as user types
+    document.getElementById('licenseNumber').addEventListener('input', function(e) {
+      this.value = this.value.toUpperCase();
+    });
+
+    // Auto-save on input change
+    document.addEventListener('input', (e) => {
+      if (e.target.matches('input, textarea')) {
+        saveToCache();
+      }
+    });
+
+    // Auto-save on checkbox change
+    document.addEventListener('change', (e) => {
+      if (e.target.matches('input[type="checkbox"]')) {
+        saveToCache();
+      }
+    });
+
+    // Load cached data and focus first input on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      loadFromCache();
+      document.getElementById('firstName').focus();
+    });
+  </script>
+</body>
+</html>

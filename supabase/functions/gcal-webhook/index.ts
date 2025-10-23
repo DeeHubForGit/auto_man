@@ -1,5 +1,5 @@
 // supabase/functions/gcal-webhook/index.ts
-// Minimal, reliable webhook: verify token, log ping, return 200 immediately.
+// Minimal, reliable webhook: verify channel token, log ping, return 200 immediately.
 
 Deno.serve(async (req) => {
   try {
@@ -7,16 +7,15 @@ Deno.serve(async (req) => {
     const key  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     if (!supa || !key) return new Response("ok"); // avoid Google retries
 
-    // Google headers
     const h = req.headers;
     const tokenHdr   = h.get("X-Goog-Channel-Token") ?? "";
-    const channelId  = h.get("X-Goog-Channel-ID") ?? "";
-    const resourceId = h.get("X-Goog-Resource-ID") ?? "";
+    const channelId  = h.get("X-Goog-Channel-ID") ?? h.get("X-Goog-Channel-Id") ?? "";
+    const resourceId = h.get("X-Goog-Resource-ID") ?? h.get("X-Goog-Resource-Id") ?? "";
     const state      = h.get("X-Goog-Resource-State") ?? "";
     const msgNum     = h.get("X-Goog-Message-Number") ?? "";
 
     // Auth check: still respond 200 so Google doesn't retry forever
-    const expected = Deno.env.get("GCAL_CHANNEL_TOKEN") ?? "";
+    const expected = (Deno.env.get("GCAL_CHANNEL_TOKEN") ?? "").trim();
     const authed = expected && tokenHdr === expected;
 
     // Resolve calendar_id (best-effort)
@@ -33,7 +32,7 @@ Deno.serve(async (req) => {
       }
     } catch { /* ignore */ }
 
-    // Log the ping (idempotency index is optional; see SQL below)
+    // Log the ping
     const payload = [{
       calendar_id,
       channel_id: channelId,
@@ -53,7 +52,6 @@ Deno.serve(async (req) => {
       body: JSON.stringify(payload)
     }).catch(()=>{});
 
-    // Done — respond quickly
     return new Response("ok");
   } catch {
     return new Response("ok");

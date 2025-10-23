@@ -1,6 +1,5 @@
 // supabase/functions/gcal-register-watch/index.ts
 // Admin-only: register/renew Google Calendar push notifications (watch channels)
-// Auth accepted as: x-admin-token header, Authorization: Bearer <token>, or ?token=
 
 const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
 
@@ -35,7 +34,7 @@ async function getAccessToken(): Promise<string> {
   const key = await crypto.subtle.importKey(
     "pkcs8",
     der,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    { name:"RSASSA-PKCS1-v1_5", hash:"SHA-256" },
     false,
     ["sign"]
   );
@@ -43,12 +42,12 @@ async function getAccessToken(): Promise<string> {
   const jwt = `${data}.${b64url(String.fromCharCode(...new Uint8Array(sig)))}`;
 
   const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    method:"POST",
+    headers:{ "Content-Type":"application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion: jwt,
-    }),
+      grant_type:"urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt
+    })
   });
   const tok = await res.json();
   if (!res.ok || !tok.access_token) throw new Error(`token error: ${res.status} ${JSON.stringify(tok)}`);
@@ -66,36 +65,34 @@ function getProvidedAdminToken(req: Request): string {
 
 Deno.serve(async (req) => {
   try {
-    // Admin auth (diagnostic-free variant)
+    // Admin auth
     const expected = (Deno.env.get("GCAL_CHANNEL_TOKEN") || "").trim();
     const provided = getProvidedAdminToken(req);
     if (!expected || provided !== expected) {
-      return new Response(JSON.stringify({ ok: false, error: "unauthorised" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ ok:false, error:"unauthorised" }), {
+        status: 401, headers: { "Content-Type":"application/json" }
       });
     }
 
-    // Calendars list
+    // Calendars
     const calendars = (Deno.env.get("GCAL_CALENDAR_IDS") || "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
+      .split(",").map(s=>s.trim()).filter(Boolean);
     if (!calendars.length) {
-      return new Response(JSON.stringify({ ok: false, error: "no calendars configured" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ ok:false, error:"no calendars configured" }), {
+        status: 400, headers: { "Content-Type":"application/json" }
       });
     }
 
     const accessToken = await getAccessToken();
 
-    // Build HTTPS webhook address using forwarded headers
-    const fwdHost  = req.headers.get("x-forwarded-host") || req.headers.get("host") || "";
-    const fwdProto = req.headers.get("x-forwarded-proto") || "https";
-    const address  = `${fwdProto}://${fwdHost}/gcal-webhook`; // force https via proto
+    // Build the **correct** HTTPS webhook address using SUPABASE_URL project ref
+    const supaUrl = Deno.env.get("SUPABASE_URL") || "";
+    const host = new URL(supaUrl).host;                 // e.g. ugxxxvhanwckgciaedna.supabase.co
+    const projectRef = host.split(".")[0];              // e.g. ugxxxvhanwckgciaedna
+    const address = `https://${projectRef}.functions.supabase.co/gcal-webhook`;
 
     const updates: Array<{ calendar_id: string; payload: any }> = [];
+
     for (const cal of calendars) {
       const channelId = `automan-${crypto.randomUUID()}`;
       const body = { id: channelId, type: "web_hook", address, token: expected };
@@ -103,9 +100,9 @@ Deno.serve(async (req) => {
       const res = await fetch(
         `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cal)}/events/watch`,
         {
-          method: "POST",
-          headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          method:"POST",
+          headers:{ Authorization:`Bearer ${accessToken}`, "Content-Type":"application/json" },
+          body: JSON.stringify(body)
         }
       );
       const json = await res.json();
@@ -116,36 +113,35 @@ Deno.serve(async (req) => {
     // Persist channel info (UPSERT on calendar_id)
     const supa = Deno.env.get("SUPABASE_URL")!;
     const key  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const rows = updates.map((u) => ({
+    const rows = updates.map(u => ({
       calendar_id: u.calendar_id,
       channel_id: String(u.payload.id ?? ""),
       resource_id: String(u.payload.resourceId ?? ""),
       channel_expiration: u.payload.expiration ? new Date(Number(u.payload.expiration)).toISOString() : null,
-      updated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     }));
 
     const up = await fetch(`${supa}/rest/v1/gcal_state?on_conflict=calendar_id`, {
-      method: "POST",
-      headers: {
+      method:"POST",
+      headers:{
         apikey: key,
         Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-        Prefer: "resolution=merge-duplicates,return=minimal",
+        "Content-Type":"application/json",
+        Prefer: "resolution=merge-duplicates,return=minimal"
       },
-      body: JSON.stringify(rows),
+      body: JSON.stringify(rows)
     });
     if (!up.ok) {
       const t = await up.text();
       throw new Error(`supabase upsert failed: ${up.status} ${t}`);
     }
 
-    return new Response(JSON.stringify({ ok: true, address, updates }), {
-      headers: { "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ ok:true, address, updates }), {
+      headers: { "Content-Type":"application/json" }
     });
   } catch (e) {
-    return new Response(JSON.stringify({ ok: false, error: String(e) }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ ok:false, error:String(e) }), {
+      status: 500, headers: { "Content-Type":"application/json" }
     });
   }
 });

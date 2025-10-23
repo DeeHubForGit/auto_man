@@ -27,7 +27,7 @@ serve(async (req) => {
     }
 
     const TO_EMAIL = Deno.env.get('CONTACT_TO_EMAIL') || 'info@automandrivingschool.com.au';
-    const FROM_EMAIL = Deno.env.get('CONTACT_FROM_EMAIL') || 'no-reply@automandrivingschool.com.au';
+    const FROM_EMAIL = Deno.env.get('CONTACT_FROM_EMAIL') || 'onboarding@resend.dev';
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 
     if (!RESEND_API_KEY) {

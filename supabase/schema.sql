@@ -358,81 +358,164 @@ DROP TRIGGER IF EXISTS t_client_progress_updated ON client_progress;
 CREATE TRIGGER t_client_progress_updated BEFORE UPDATE ON client_progress
 FOR EACH ROW EXECUTE FUNCTION set_client_progress_updated();
 
--- ================= UPSERT FROM GOOGLE =================
-CREATE OR REPLACE FUNCTION upsert_booking_from_google(
-  p_google_event_id TEXT,
-  p_calendar_id     TEXT,
-  p_client_email    TEXT,
-  p_first_name      TEXT,
-  p_last_name       TEXT,
-  p_mobile          TEXT,
-  p_service_code    TEXT,
-  p_price_cents     INT,
-  p_start           TIMESTAMPTZ,
-  p_end             TIMESTAMPTZ,
-  p_pickup          TEXT,
-  p_extended        JSONB DEFAULT '{}'::jsonb,
-  p_html_link       TEXT DEFAULT NULL,
-  p_ical_uid        TEXT DEFAULT NULL,
-  p_summary         TEXT DEFAULT NULL
-) RETURNS UUID AS $$
-DECLARE
-  v_client_id      UUID;
-  v_booking_id     UUID;
-  v_minutes        INT;
-  v_code           TEXT;
-  v_booking_url    TEXT;
+-- ================= GOOGLE CALENDAR SYNC & WEBHOOKS =================
+-- Watches + sync state per calendar
+CREATE TABLE IF NOT EXISTS public.gcal_state (
+  calendar_id text primary key,
+  sync_token text,
+  last_history_id text,
+  channel_id text,
+  resource_id text,
+  channel_expiration timestamptz,
+  updated_at timestamptz not null default now()
+);
+
+-- Webhook audit
+CREATE TABLE IF NOT EXISTS public.gcal_webhook_log (
+  id bigserial primary key,
+  received_at timestamptz not null default now(),
+  calendar_id text,
+  channel_id text,
+  resource_id text,
+  resource_state text,
+  message_number text,
+  processed bool default false
+);
+
+-- De-dupe retry protection
+CREATE UNIQUE INDEX IF NOT EXISTS gcal_webhook_log_dedupe
+  ON public.gcal_webhook_log (channel_id, message_number)
+  WHERE message_number is not null;
+
+-- SMS queue with de-dupe
+CREATE TABLE IF NOT EXISTS public.sms_queue (
+  id bigserial primary key,
+  phone text not null,
+  body text not null,
+  send_after timestamptz not null default now(),
+  dedupe_key text,
+  created_at timestamptz not null default now(),
+  sent_at timestamptz
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS sms_queue_dedupe_idx 
+  ON public.sms_queue(dedupe_key);
+
+-- Sync log for tracking sync operations
+CREATE TABLE IF NOT EXISTS public.gcal_sync_log (
+  id bigserial primary key,
+  calendar_id text not null,
+  started_at timestamptz not null default now(),
+  finished_at timestamptz,
+  status text not null default 'running', -- running, success, failed
+  synced_count integer default 0,
+  inserted_count integer default 0,
+  updated_count integer default 0,
+  error_message text
+);
+
+-- Event-level sync log
+CREATE TABLE IF NOT EXISTS public.gcal_sync_event_log (
+  id bigserial primary key,
+  sync_log_id int references gcal_sync_log(id) on delete cascade,
+  calendar_id text,
+  event_id text,
+  booking_id uuid,
+  action text check (action in ('inserted', 'updated', 'skipped', 'failed')),
+  message text,
+  created_at timestamptz default now()
+);
+
+-- Helper function to log event actions
+CREATE OR REPLACE FUNCTION log_gcal_event_action(
+  p_sync_log_id int,
+  p_calendar_id text,
+  p_event_id text,
+  p_booking_id uuid,
+  p_action text,
+  p_message text default null
+)
+RETURNS void AS $$
 BEGIN
-  v_minutes := GREATEST(1, CEIL(EXTRACT(EPOCH FROM (p_end - p_start)) / 60.0));
-  v_code    := COALESCE(p_service_code, map_service_code(COALESCE(p_summary,''), v_minutes));
-
-  INSERT INTO client (email, first_name, last_name, mobile)
-  VALUES (p_client_email, p_first_name, p_last_name, p_mobile)
-  ON CONFLICT (email) DO UPDATE
-    SET first_name = COALESCE(EXCLUDED.first_name, client.first_name),
-        last_name  = COALESCE(EXCLUDED.last_name,  client.last_name),
-        mobile     = COALESCE(EXCLUDED.mobile,     client.mobile),
-        updated_at = NOW()
-  RETURNING id INTO v_client_id;
-
-  IF v_code IS NOT NULL THEN
-    SELECT google_booking_url INTO v_booking_url
-    FROM service WHERE code = v_code;
-  END IF;
-
-  INSERT INTO booking (
-    client_id, google_event_id, google_calendar_id, source,
-    service_code, price_cents, start_time, end_time, timezone,
-    pickup_location, extended,
-    first_name, last_name, email, mobile,
-    google_booking_url, google_html_link, google_ical_uid
+  INSERT INTO gcal_sync_event_log (
+    sync_log_id, calendar_id, event_id, booking_id, action, message
   )
-  VALUES (
-    v_client_id, p_google_event_id, p_calendar_id, 'google',
-    v_code, p_price_cents, p_start, p_end, 'Australia/Melbourne',
-    p_pickup, p_extended,
-    p_first_name, p_last_name, p_client_email, p_mobile,
-    v_booking_url, p_html_link, p_ical_uid
-  )
-  ON CONFLICT (google_event_id) DO UPDATE
-    SET client_id          = EXCLUDED.client_id,
-        google_calendar_id = EXCLUDED.google_calendar_id,
-        service_code       = EXCLUDED.service_code,
-        price_cents        = EXCLUDED.price_cents,
-        start_time         = EXCLUDED.start_time,
-        end_time           = EXCLUDED.end_time,
-        pickup_location    = EXCLUDED.pickup_location,
-        extended           = COALESCE(booking.extended, '{}'::jsonb) || COALESCE(EXCLUDED.extended, '{}'::jsonb),
-        first_name         = EXCLUDED.first_name,
-        last_name          = EXCLUDED.last_name,
-        email              = EXCLUDED.email,
-        mobile             = EXCLUDED.mobile,
-        google_booking_url = COALESCE(EXCLUDED.google_booking_url, booking.google_booking_url),
-        google_html_link   = COALESCE(EXCLUDED.google_html_link,   booking.google_html_link),
-        google_ical_uid    = COALESCE(EXCLUDED.google_ical_uid,    booking.google_ical_uid),
-        updated_at         = NOW()
-  RETURNING id INTO v_booking_id;
-
-  RETURN v_booking_id;
+  VALUES (p_sync_log_id, p_calendar_id, p_event_id, p_booking_id, p_action, p_message);
 END;
 $$ LANGUAGE plpgsql;
+
+-- ================= UPSERT FROM GOOGLE =================
+create or replace function public.upsert_booking_from_google(
+  p_google_event_id text,
+  p_calendar_id text,
+  p_client_email text,
+  p_first_name text,
+  p_last_name text,
+  p_mobile text,
+  p_service_code text,
+  p_price_cents int,
+  p_start timestamptz,
+  p_end timestamptz,
+  p_pickup text,
+  p_extended jsonb default '{}'::jsonb
+)
+returns uuid
+language plpgsql
+security definer
+as $$
+declare
+  v_client_id uuid;
+  v_booking_id uuid;
+begin
+  -- Upsert client
+  insert into client (email, first_name, last_name, mobile)
+  values (p_client_email, p_first_name, p_last_name, p_mobile)
+  on conflict (email) do update
+    set first_name = coalesce(excluded.first_name, client.first_name),
+        last_name  = coalesce(excluded.last_name,  client.last_name),
+        mobile     = coalesce(excluded.mobile,     client.mobile),
+        updated_at = now()
+  returning id into v_client_id;
+
+  -- Upsert booking
+  insert into booking (
+    client_id,
+    google_event_id,
+    google_calendar_id,
+    source,
+    service_code,
+    price_cents,
+    start_time,
+    end_time,
+    pickup_location,
+    extended
+  )
+  values (
+    v_client_id,
+    p_google_event_id,
+    p_calendar_id,
+    'google',
+    p_service_code,
+    p_price_cents,
+    p_start,
+    p_end,
+    p_pickup,
+    p_extended
+  )
+  on conflict (google_event_id) do update
+    set client_id          = excluded.client_id,
+        google_calendar_id = excluded.google_calendar_id,
+        service_code        = excluded.service_code,
+        price_cents         = excluded.price_cents,
+        start_time          = excluded.start_time,
+        end_time            = excluded.end_time,
+        pickup_location     = excluded.pickup_location,
+        extended            = coalesce(booking.extended, '{}'::jsonb)
+                               || coalesce(excluded.extended, '{}'::jsonb),
+        updated_at          = now()
+  returning id into v_booking_id;
+
+  return v_booking_id;
+end;
+$$;
+

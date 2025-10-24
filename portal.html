@@ -172,13 +172,26 @@
         const { data, error } = await window.supabaseClient
           .from('client')
           .select('*')
-          .eq('id', currentUser.id)
-          .single();
+          .eq('email', currentUser.email)
+          .maybeSingle();
 
         if (error) throw error;
         
-        clientData = data;
-        window.clientData = data; // Make available to partials
+        // If no client record exists yet, create one
+        if (!data) {
+          const { data: newClient, error: insertError } = await window.supabaseClient
+            .from('client')
+            .insert([{ email: currentUser.email }])
+            .select()
+            .single();
+          
+          if (insertError) throw insertError;
+          clientData = newClient;
+        } else {
+          clientData = data;
+        }
+        
+        window.clientData = clientData; // Make available to partials
         
         // Trigger custom event for other components
         window.dispatchEvent(new CustomEvent('clientDataLoaded', { detail: clientData }));

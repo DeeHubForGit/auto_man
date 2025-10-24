@@ -18,6 +18,107 @@ body {
   color: var(--text-light) !important;
 }
 
+/* =================================================================== */
+/* FORM INPUTS - WHITE BACKGROUNDS WITH BLACK TEXT FOR ALL INPUTS */
+/* =================================================================== */
+input[type="text"],
+input[type="email"], 
+input[type="tel"],
+input[type="password"],
+input[type="search"],
+input[type="url"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+textarea,
+select {
+  background-color: white !important;
+  color: black !important;
+  border: 1px solid #d1d5db !important;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+}
+
+/* Placeholder text styling */
+input[type="text"]::placeholder,
+input[type="email"]::placeholder,
+input[type="tel"]::placeholder,
+input[type="password"]::placeholder,
+input[type="search"]::placeholder,
+input[type="url"]::placeholder,
+input[type="number"]::placeholder,
+textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+/* Focus states for inputs */
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="tel"]:focus,
+input[type="password"]:focus,
+input[type="search"]:focus,
+input[type="url"]:focus,
+input[type="number"]:focus,
+input[type="date"]:focus,
+input[type="time"]:focus,
+input[type="datetime-local"]:focus,
+textarea:focus,
+select:focus {
+  background-color: white !important;
+  color: black !important;
+  border-color: #3b82f6 !important;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+}
+
+/* Disabled state */
+input:disabled,
+textarea:disabled,
+select:disabled {
+  background-color: #f9fafb !important;
+  color: #6b7280 !important;
+  border-color: #d1d5db !important;
+}
+
+/* Select dropdown styling */
+select {
+  background-color: white !important;
+  color: black !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+  border: 1px solid #d1d5db !important;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* Checkbox and radio button styling */
+input[type="checkbox"],
+input[type="radio"] {
+  background-color: white !important;
+  border: 1px solid #d1d5db !important;
+  color: #3b82f6 !important;
+}
+
+input[type="checkbox"]:checked,
+input[type="radio"]:checked {
+  background-color: #3b82f6 !important;
+  border-color: #3b82f6 !important;
+}
+
+input[type="checkbox"]:focus,
+input[type="radio"]:focus {
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+}
+
+/* =================================================================== */
+
 /* Header */
 header {
   background: linear-gradient(135deg, #1e3a5f 0%, #1a2332 50%, #0f1a28 100%) !important;
@@ -66,6 +167,15 @@ section {
 .rounded-xl {
   background-color: var(--card) !important;
   border: 1px solid var(--border);
+  color: var(--text-light) !important;
+}
+
+/* Override card styling for form inputs - must come after .bg-white rule */
+select.bg-white,
+select.flex-1,
+select {
+  background-color: white !important;
+  color: black !important;
 }
 
 /* Ensure buttons keep their blue color */

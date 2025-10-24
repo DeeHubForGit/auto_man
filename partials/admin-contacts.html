@@ -132,7 +132,7 @@
     
     filtered.forEach(row => {
       const card = document.createElement('div');
-      card.className = 'bg-[#111827] p-4 rounded-2xl shadow-md border border-[#1f2937] hover:bg-[#1a2332] transition-colors cursor-pointer';
+      card.className = 'bg-blue-100 p-4 rounded-2xl shadow-md border border-sky-200 hover:bg-sky-50 transition-colors cursor-pointer';
       
       const name = row.name || 'Anonymous';
       const email = row.email || '';
@@ -148,11 +148,11 @@
       });
       
       card.innerHTML = `
-        <div class="font-semibold text-white">${name}</div>
-        <div class="text-sm text-gray-400">${email}</div>
-        ${phone ? `<div class="text-sm text-gray-400 mb-2">${phone}</div>` : '<div class="mb-2"></div>'}
-        <div class="text-gray-200 whitespace-pre-wrap">${message}</div>
-        <div class="text-xs text-gray-500 mt-2">${date}</div>
+        <div class="font-semibold text-black mb-1"><strong>Name:</strong> ${name}</div>
+        <div class="text-sm text-black mb-1"><strong>Email:</strong> ${email}</div>
+        ${phone ? `<div class="text-sm text-black mb-2"><strong>Phone:</strong> ${phone}</div>` : '<div class="mb-2"></div>'}
+        <div class="text-black whitespace-pre-wrap mb-2"><strong>Message:</strong> ${message}</div>
+        <div class="text-xs text-black mt-2">${date}</div>
       `;
       
       box.appendChild(card);

@@ -445,77 +445,84 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ================= UPSERT FROM GOOGLE =================
-create or replace function public.upsert_booking_from_google(
-  p_google_event_id text,
-  p_calendar_id text,
-  p_client_email text,
-  p_first_name text,
-  p_last_name text,
-  p_mobile text,
-  p_service_code text,
-  p_price_cents int,
-  p_start timestamptz,
-  p_end timestamptz,
-  p_pickup text,
-  p_extended jsonb default '{}'::jsonb
-)
-returns uuid
-language plpgsql
-security definer
-as $$
-declare
-  v_client_id uuid;
-  v_booking_id uuid;
-begin
-  -- Upsert client
-  insert into client (email, first_name, last_name, mobile)
-  values (p_client_email, p_first_name, p_last_name, p_mobile)
-  on conflict (email) do update
-    set first_name = coalesce(excluded.first_name, client.first_name),
-        last_name  = coalesce(excluded.last_name,  client.last_name),
-        mobile     = coalesce(excluded.mobile,     client.mobile),
-        updated_at = now()
-  returning id into v_client_id;
+CREATE OR REPLACE FUNCTION public.upsert_booking_from_google(p_google_event_id text, p_calendar_id text, p_client_email text, p_first_name text, p_last_name text, p_mobile text, p_service_code text, p_price_cents integer, p_start timestamp with time zone, p_end timestamp with time zone, p_pickup text, p_extended jsonb, p_is_booking boolean, p_title text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_client_id UUID;
+  v_booking_id UUID;
+BEGIN
+  -- Upsert client (only if email is provided)
+  IF p_client_email IS NOT NULL THEN
+    INSERT INTO client (email, first_name, last_name, mobile)
+    VALUES (p_client_email, p_first_name, p_last_name, p_mobile)
+    ON CONFLICT (email) DO UPDATE
+      SET first_name = COALESCE(EXCLUDED.first_name, client.first_name),
+          last_name  = COALESCE(EXCLUDED.last_name,  client.last_name),
+          mobile     = COALESCE(EXCLUDED.mobile,     client.mobile),
+          updated_at = NOW()
+    RETURNING id INTO v_client_id;
+  END IF;
 
-  -- Upsert booking
-  insert into booking (
+  -- Upsert booking (NOW INCLUDING first_name, last_name, email, mobile)
+  INSERT INTO booking (
     client_id,
     google_event_id,
     google_calendar_id,
     source,
+    is_booking,
     service_code,
     price_cents,
     start_time,
     end_time,
     pickup_location,
-    extended
+    extended,
+    event_title,
+    first_name,
+    last_name,
+    email,
+    mobile
   )
-  values (
+  VALUES (
     v_client_id,
     p_google_event_id,
     p_calendar_id,
     'google',
+    COALESCE(p_is_booking, true),
     p_service_code,
     p_price_cents,
     p_start,
     p_end,
     p_pickup,
-    p_extended
+    COALESCE(p_extended, '{}'::jsonb),
+    p_title,
+    p_first_name,
+    p_last_name,
+    p_client_email,
+    p_mobile
   )
-  on conflict (google_event_id) do update
-    set client_id          = excluded.client_id,
-        google_calendar_id = excluded.google_calendar_id,
-        service_code        = excluded.service_code,
-        price_cents         = excluded.price_cents,
-        start_time          = excluded.start_time,
-        end_time            = excluded.end_time,
-        pickup_location     = excluded.pickup_location,
-        extended            = coalesce(booking.extended, '{}'::jsonb)
-                               || coalesce(excluded.extended, '{}'::jsonb),
-        updated_at          = now()
-  returning id into v_booking_id;
+  ON CONFLICT (google_event_id) DO UPDATE
+    SET client_id          = COALESCE(EXCLUDED.client_id, booking.client_id),
+        google_calendar_id = EXCLUDED.google_calendar_id,
+        is_booking         = COALESCE(EXCLUDED.is_booking, booking.is_booking),
+        service_code       = EXCLUDED.service_code,
+        price_cents        = EXCLUDED.price_cents,
+        start_time         = EXCLUDED.start_time,
+        end_time           = EXCLUDED.end_time,
+        pickup_location    = COALESCE(EXCLUDED.pickup_location, booking.pickup_location),
+        extended           = COALESCE(booking.extended, '{}'::jsonb) || COALESCE(EXCLUDED.extended, '{}'::jsonb),
+        event_title        = COALESCE(EXCLUDED.event_title, booking.event_title),
+        first_name         = COALESCE(EXCLUDED.first_name, booking.first_name),
+        last_name          = COALESCE(EXCLUDED.last_name, booking.last_name),
+        email              = COALESCE(EXCLUDED.email, booking.email),
+        mobile             = COALESCE(EXCLUDED.mobile, booking.mobile),
+        updated_at         = NOW()
+  RETURNING id INTO v_booking_id;
 
-  return v_booking_id;
-end;
-$$;
+  RETURN v_booking_id;
+END;
+$function$
+
 

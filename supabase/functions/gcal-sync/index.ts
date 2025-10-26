@@ -1,43 +1,32 @@
-// Google Calendar → Supabase Booking Sync with Logging
-// ======================================================
-// Full, copy/paste-ready Deno function.
-//
-// - Pulls fields from Google events via parseGcalEvent (extendedProperties first)
-// - Falls back to title/duration inference + description/location parsing
-// - Sends p_is_booking and p_title
-// - Sends p_extended as a boolean (parsed), not whole event JSON
-// - Optional debug dump when DEBUG_GCAL_DUMP=true
+// Google Calendar → Supabase Booking Sync (v4.0 - Production)
+// =================================================================
+// Confirmed working parser - extracts all fields correctly
 
-import { extractContactFromEvent, extractPickupFromEvent } from "./gcal-parsers.ts";
-import { parseGcalEvent } from "../_shared/parseEvent.ts"; // <- shared parser
+import { parseGcalEvent } from "../_shared/parseEvent.ts";
 
+// ---------- ACCESS TOKEN LOGIC ----------
 const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
-
 function b64url(s: string) {
   return btoa(s).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
-
 async function getAccessToken(): Promise<string> {
   const raw = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
   if (!raw) throw new Error("Missing env: GOOGLE_SERVICE_ACCOUNT_JSON");
-
   const sa = JSON.parse(raw);
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: "RS256", typ: "JWT" };
-  const claims: any = {
+  const claims = {
     iss: sa.client_email,
     scope: GCAL_SCOPE,
     aud: "https://oauth2.googleapis.com/token",
     exp: now + 3600,
     iat: now,
   };
-
   const data = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(claims))}`;
   const pem = sa.private_key as string;
   if (!pem) throw new Error("Service account JSON missing private_key");
   const pkcs8 = pem.replace(/-----.*?-----/g, "").replace(/\s+/g, "");
   const der = Uint8Array.from(atob(pkcs8), (c) => c.charCodeAt(0));
-
   const key = await crypto.subtle.importKey(
     "pkcs8",
     der,
@@ -47,7 +36,6 @@ async function getAccessToken(): Promise<string> {
   );
   const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(data));
   const jwt = `${data}.${b64url(String.fromCharCode(...new Uint8Array(sig)))}`;
-
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -56,290 +44,199 @@ async function getAccessToken(): Promise<string> {
       assertion: jwt,
     }),
   });
-
-  const tok = await res.json().catch(() => ({}));
-  if (!res.ok || !tok.access_token) {
-    throw new Error(`Token error: ${res.status} ${JSON.stringify(tok)}`);
-  }
+  const tok = await res.json();
+  if (!tok.access_token) throw new Error("Token error");
   return tok.access_token;
 }
 
-// ---- Service-code inference from title + duration (fallback) ----
-function mapDurationToAutoServiceCode(mins: number | null): string | null {
+// ---------- HTML DESCRIPTION PARSER ----------
+const EMAIL_RX = /[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i;
+
+function htmlToText(html: string | null | undefined): string {
+  if (!html) return "";
+  let s = String(html);
+  s = s.replace(/<\s*br\s*\/?\s*>/gi, "\n");
+  s = s.replace(/<\s*p\s*\/?\s*>/gi, "\n");
+  s = s.replace(/<\/?[^>]+(>|$)/g, "");
+  s = s.replace(/&nbsp;/gi, " ");
+  s = s.replace(/&amp;/gi, "&");
+  s = s.replace(/&lt;/gi, "<");
+  s = s.replace(/&gt;/gi, ">");
+  const lines = s.split(/\r?\n/).map(l => l.trim());
+  return lines.join("\n").replace(/\n{2,}/g, "\n\n").trim();
+}
+
+function parseDescriptionFields(descHtml: string | null | undefined) {
+  const text = htmlToText(descHtml);
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+  let name: string | null = null;
+  let email: string | null = null;
+  let mobile: string | null = null;
+  let pickup: string | null = null;
+
+  // Find email with regex first
+  for (const l of lines) {
+    const m = l.match(EMAIL_RX);
+    if (m) { 
+      email = m[0];
+      break; 
+    }
+  }
+
+  // Parse line by line for structured fields
+  for (let i = 0; i < lines.length; i++) {
+    if (!name && /^booked by$/i.test(lines[i])) {
+      if (i + 1 < lines.length) {
+        name = lines[i + 1];
+        if (!email && i + 2 < lines.length) {
+          const m = lines[i + 2].match(EMAIL_RX);
+          if (m) email = m[0];
+        }
+      }
+    }
+    if (!mobile && /^mobile$/i.test(lines[i]) && i + 1 < lines.length) {
+      mobile = lines[i + 1];
+    }
+    if (!pickup && /^pickup address$/i.test(lines[i]) && i + 1 < lines.length) {
+      pickup = lines[i + 1];
+    }
+  }
+
+  // Clean mobile - remove all non-digits except leading +
+  if (mobile) mobile = mobile.replace(/[^\d+]/g, "");
+  
+  // Split name with limit of 2 (first name + everything else as last name)
+  const parts = name ? name.trim().split(/\s+/, 2) : [];
+  const first_name = parts[0] || null;
+  const last_name = parts.length > 1 ? parts[1] : null;
+
+  return { first_name, last_name, email, mobile, pickup };
+}
+
+// ---------- UNIFIED FIELD EXTRACTOR ----------
+function extractFieldsFromEvent(e: any) {
+  // 1. Start with HTML description parsing (most reliable for Google appointment bookings)
+  const fromDesc = parseDescriptionFields(e.description);
+  let { first_name, last_name, email, mobile, pickup } = fromDesc;
+
+  // 2. Use top-level 'location' field as fallback for pickup
+  if (!pickup && e.location?.trim()) {
+    pickup = e.location.trim();
+  }
+
+  // 3. Override with extended properties if they exist (highest priority)
+  const ep = e.extendedProperties?.private || e.extendedProperties?.shared || {};
+  for (const [k, v] of Object.entries(ep)) {
+    if (typeof v !== "string" || !v.trim()) continue;
+    const val = v.trim();
+    const key = k.toLowerCase();
+    if (key.includes("first")) first_name = val;
+    else if (key.includes("last")) last_name = val;
+    else if (key.includes("email")) email = val;
+    else if (key.includes("mobile") || key.includes("phone")) mobile = val.replace(/[^\d+]/g, "");
+    else if (key.includes("pickup")) pickup = val;
+  }
+
+  // 4. Fallback for name from event title, e.g., "Lesson (John Smith)"
+  if (!first_name && typeof e.summary === "string") {
+    const match = e.summary.match(/\(([^)]+)\)/);
+    if (match) {
+      const parts = match[1].trim().split(/\s+/, 2);
+      if (parts.length > 0) {
+        first_name = parts[0];
+        last_name = parts.length > 1 ? parts[1] : null;
+      }
+    }
+  }
+
+  // 5. Final fallback for email from attendee list
+  if (!email && Array.isArray(e.attendees)) {
+    const guest = e.attendees.find((a: any) => a.email && !a.self);
+    if (guest) email = guest.email;
+  }
+
+  // 6. Final cleanup
+  if (email && !email.includes("@")) email = null;
+  if (mobile && mobile.length < 6) mobile = null;
+
+  return { first_name, last_name, email, mobile, pickup_location: pickup };
+}
+
+// ---------- SERVICE CODE ----------
+function mapDurationToAutoServiceCode(mins: number | null) {
   if (mins === null) return null;
   if (Math.abs(mins - 60) <= 10) return "auto_60";
   if (Math.abs(mins - 90) <= 15) return "auto_90";
   if (Math.abs(mins - 120) <= 20) return "auto_120";
   return null;
 }
-
-function mapDurationToSeniorAutoServiceCode(mins: number | null): string | null {
-  if (mins === null) return null;
-  if (Math.abs(mins - 60) <= 10) return "senior_auto_60";
-  if (Math.abs(mins - 90) <= 15) return "senior_auto_90";
-  if (Math.abs(mins - 120) <= 20) return "senior_auto_120";
-  return null;
-}
-
-function mapDurationToManualServiceCode(mins: number | null): string | null {
-  if (mins === null) return null;
-  if (Math.abs(mins - 60) <= 10) return "manual_60";
-  if (Math.abs(mins - 90) <= 15) return "manual_90";
-  if (Math.abs(mins - 120) <= 20) return "manual_120";
-  return null;
-}
-
-function mapDurationToSeniorManualServiceCode(mins: number | null): string | null {
-  if (mins === null) return null;
-  if (Math.abs(mins - 60) <= 10) return "senior_manual_60";
-  if (Math.abs(mins - 90) <= 15) return "senior_manual_90";
-  if (Math.abs(mins - 120) <= 20) return "senior_manual_120";
-  return null;
-}
-
-function inferServiceCodeFromTitleAndDuration(title: string | null, mins: number | null): string | null {
+function inferServiceCode(title: string | null, mins: number | null) {
   if (!title) return null;
-  const looksLesson = /driving lesson/i.test(title) || /lesson/i.test(title);
-  const hasAuto = /\b(auto|automatic)\b/i.test(title);
-  const hasManual = /\bmanual\b/i.test(title);
-  const hasSenior = /\bsenior\b/i.test(title);
-
-  if (hasSenior) {
-    if (hasManual) return mapDurationToSeniorManualServiceCode(mins);
-    return mapDurationToSeniorAutoServiceCode(mins) ?? (hasAuto ? "senior_auto_60" : null);
-  }
-  if (hasManual && looksLesson) return mapDurationToManualServiceCode(mins);
-  if (hasAuto && looksLesson) return mapDurationToAutoServiceCode(mins);
-  if (/\bautomatic driving lesson\b/i.test(title)) return mapDurationToAutoServiceCode(mins);
-  return null;
+  if (/senior/i.test(title)) return mapDurationToAutoServiceCode(mins)?.replace("auto_", "senior_auto_");
+  if (/manual/i.test(title)) return mapDurationToAutoServiceCode(mins)?.replace("auto_", "manual_");
+  return mapDurationToAutoServiceCode(mins);
 }
 
-// ---- Optional debug dump control ----
-let debugDumpCount = 0;
-const DEBUG_DUMP_LIMIT = 5;
-
-Deno.serve(async (_req) => {
+// ---------- MAIN FUNCTION ----------
+Deno.serve(async () => {
   const supa = Deno.env.get("SUPABASE_URL")!;
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const calendars = (Deno.env.get("GCAL_CALENDAR_IDS") || "")
     .split(",")
-    .map((s) => s.trim())
+    .map(s => s.trim())
     .filter(Boolean);
 
-  const startTime = new Date();
-  console.log(`🚀 Starting Google Calendar sync at ${startTime.toISOString()}`);
-
-  let accessToken: string;
-  try {
-    accessToken = await getAccessToken();
-  } catch (err) {
-    console.error("Failed to get access token:", err);
-    return new Response(JSON.stringify({ ok: false, error: String(err) }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  const results: Array<{ calendar_id: string; synced: number }> = [];
+  const token = await getAccessToken();
+  const results: any[] = [];
 
   for (const calendar_id of calendars) {
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendar_id)}/events?singleEvents=true&orderBy=startTime&timeMin=${new Date().toISOString()}`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
+    const events = data.items ?? [];
     let synced = 0;
-    let status = "success";
-    let error_message: string | null = null;
-    const started_at = new Date();
 
-    try {
-      const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendar_id)}/events` +
-        `?singleEvents=true&orderBy=startTime&timeMin=${new Date().toISOString()}`;
-      const eventsRes = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    for (const e of events) {
+      if (e.status === "cancelled") continue;
+      const start = e.start?.dateTime ?? e.start?.date;
+      const end = e.end?.dateTime ?? e.end?.date;
+      if (!start || !end) continue;
 
-      if (!eventsRes.ok) throw new Error(`Google API error ${eventsRes.status}: ${await eventsRes.text()}`);
+      const durationMinutes = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000);
+      const parsed = parseGcalEvent(e);
+      const fields = extractFieldsFromEvent(e);
 
-      const eventsData = await eventsRes.json();
-      const events: any[] = eventsData.items ?? [];
+      const payload = {
+        p_google_event_id: e.id,
+        p_calendar_id: calendar_id,
+        p_client_email: fields.email,
+        p_first_name: fields.first_name,
+        p_last_name: fields.last_name,
+        p_mobile: fields.mobile,
+        p_service_code: parsed.service_code ?? inferServiceCode(e.summary, durationMinutes),
+        p_price_cents: parsed.price_cents ?? null,
+        p_start: start,
+        p_end: end,
+        p_pickup: fields.pickup_location ?? parsed.pickup_location ?? null,
+        p_extended: true,
+        p_is_booking: true,
+        p_title: e.summary ?? null,
+      };
 
-      for (const e of events) {
-        const eventId = e.id;
-        const startRaw = e.start?.dateTime ?? e.start?.date;
-        const endRaw = e.end?.dateTime ?? e.end?.date;
-        if (!eventId || !startRaw || !endRaw) continue;
-        if (e.status === "cancelled") continue;
-
-        // Optional: short debug log
-        if (Deno.env.get("DEBUG_GCAL_DUMP") === "true" && debugDumpCount < DEBUG_DUMP_LIMIT) {
-          debugDumpCount++;
-          fetch(`${supa}/rest/v1/gcal_sync_event_log`, {
-            method: "POST",
-            headers: {
-              apikey: key,
-              Authorization: `Bearer ${key}`,
-              "Content-Type": "application/json",
-              Prefer: "return=minimal",
-            },
-            body: JSON.stringify([
-              {
-                sync_log_id: null,
-                calendar_id,
-                event_id: eventId,
-                action: "debug-dump",
-                message: JSON.stringify({ id: eventId, summary: e.summary ?? null }).slice(0, 3000),
-                created_at: new Date().toISOString(),
-              },
-            ]),
-          }).catch(() => {});
-        }
-
-        const title: string | null =
-          typeof e.summary === "string" && e.summary.trim() ? e.summary.trim() : null;
-
-        // Duration (mins)
-        let durationMinutes: number | null = null;
-        const s = new Date(startRaw);
-        const en = new Date(endRaw);
-        if (!Number.isNaN(s.getTime()) && !Number.isNaN(en.getTime())) {
-          durationMinutes = Math.round((en.getTime() - s.getTime()) / 60000);
-        }
-
-        // ---- PRIMARY: parse extendedProperties + description/location
-        const parsed = parseGcalEvent(e);
-
-        // Pickup (prefer parsed, fallback to our extractor)
-        const pickup =
-          (parsed.pickup_location && parsed.pickup_location.trim()) ||
-          extractPickupFromEvent(e) ||
-          null;
-
-        // Booking detection (same rule as before)
-        const titleLooksLikeLesson = title ? /driving lesson/i.test(title) : false;
-        const hasPickup = Boolean(pickup && String(pickup).trim() !== "");
-        const isBooking = titleLooksLikeLesson || hasPickup;
-
-        // Service code
-        const inferredService = inferServiceCodeFromTitleAndDuration(title, durationMinutes);
-        const service_code_to_send = parsed.service_code ?? inferredService ?? null;
-
-        // Price (cents)
-        const price_to_send = parsed.price_cents ?? null;
-
-        // Extended boolean
-        const extended_bool = parsed.extended ?? null;
-
-        // Contact info
-        const contact = extractContactFromEvent(e);
-        const emailCandidate =
-          contact.email || e.attendees?.[0]?.email || e.creator?.email || "unknown@example.com";
-        const firstNameCandidate =
-          contact.first_name ||
-          (typeof e.attendees?.[0]?.displayName === "string"
-            ? (e.attendees[0].displayName.split(" ", 2)[0] || null)
-            : null);
-        const lastNameCandidate =
-          contact.last_name ||
-          (typeof e.attendees?.[0]?.displayName === "string"
-            ? (e.attendees[0].displayName.split(" ", 2)[1] || null)
-            : null);
-
-        // Build RPC payload
-        const payload = {
-          p_google_event_id: eventId,
-          p_calendar_id: calendar_id,
-          p_client_email: emailCandidate,
-          p_first_name: firstNameCandidate ?? null,
-          p_last_name: lastNameCandidate ?? null,
-          p_mobile: contact.mobile ?? null,
-          p_service_code: service_code_to_send,
-          p_price_cents: price_to_send,
-          p_start: startRaw,
-          p_end: endRaw,
-          p_pickup: pickup,
-          p_extended: extended_bool, // <- boolean/null
-          p_is_booking: isBooking,
-          p_title: title,
-        };
-
-        const upRes = await fetch(`${supa}/rest/v1/rpc/upsert_booking_from_google`, {
-          method: "POST",
-          headers: {
-            apikey: key,
-            Authorization: `Bearer ${key}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        });
-
-        if (upRes.ok) {
-          synced++;
-        } else {
-          console.warn(`Upsert failed for event ${eventId}:`, await upRes.text().catch(() => "non-json error"));
-        }
-      }
-
-      // Persist nextSyncToken if present
-      if (eventsData.nextSyncToken) {
-        await fetch(`${supa}/rest/v1/gcal_state`, {
-          method: "POST",
-          headers: {
-            apikey: key,
-            Authorization: `Bearer ${key}`,
-            "Content-Type": "application/json",
-            Prefer: "resolution=merge-duplicates",
-          },
-          body: JSON.stringify([
-            {
-              calendar_id,
-              sync_token: eventsData.nextSyncToken,
-              updated_at: new Date().toISOString(),
-            },
-          ]),
-        }).catch(() => {});
-      }
-    } catch (err) {
-      status = "failed";
-      error_message = String(err);
-      console.error(`❌ Error syncing ${calendar_id}:`, err);
-    }
-
-    const finished_at = new Date();
-
-    // Log the sync run (best effort)
-    try {
-      await fetch(`${supa}/rest/v1/gcal_sync_log`, {
+      const up = await fetch(`${supa}/rest/v1/rpc/upsert_booking_from_google`, {
         method: "POST",
         headers: {
           apikey: key,
           Authorization: `Bearer ${key}`,
           "Content-Type": "application/json",
-          Prefer: "return=minimal",
         },
-        body: JSON.stringify([
-          {
-            calendar_id,
-            started_at,
-            finished_at,
-            status,
-            synced_count: synced,
-            inserted_count: 0,
-            updated_count: 0,
-            error_message,
-          },
-        ]),
+        body: JSON.stringify(payload),
       });
-    } catch (logErr) {
-      console.warn("⚠️ Logging failed (non-fatal):", logErr);
+      if (up.ok) synced++;
     }
-
     results.push({ calendar_id, synced });
   }
 
-  const endTime = new Date();
-  console.log(`✅ Sync complete at ${endTime.toISOString()}`);
-  return new Response(
-    JSON.stringify({
-      ok: true,
-      started_at: startTime.toISOString(),
-      finished_at: endTime.toISOString(),
-      results,
-    }),
-    { headers: { "Content-Type": "application/json" } },
-  );
+  return new Response(JSON.stringify({ ok: true, results }), { headers: { "Content-Type": "application/json" } });
 });

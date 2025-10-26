@@ -1,6 +1,6 @@
-// Google Calendar → Supabase Booking Sync (v4.0 - Production)
+// Google Calendar → Supabase Booking Sync (v4.1 - With Cancellation Handling)
 // =================================================================
-// Confirmed working parser - extracts all fields correctly
+// Extracts contact info from HTML descriptions and handles cancellations
 
 import { parseGcalEvent } from "../_shared/parseEvent.ts";
 
@@ -103,7 +103,7 @@ function parseDescriptionFields(descHtml: string | null | undefined) {
     }
   }
 
-  // Clean mobile - remove all non-digits except leading +
+  // Clean mobile
   if (mobile) mobile = mobile.replace(/[^\d+]/g, "");
   
   // Split name with limit of 2 (first name + everything else as last name)
@@ -191,18 +191,36 @@ Deno.serve(async () => {
   const results: any[] = [];
 
   for (const calendar_id of calendars) {
-    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendar_id)}/events?singleEvents=true&orderBy=startTime&timeMin=${new Date().toISOString()}`;
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendar_id)}/events?singleEvents=true&orderBy=startTime&timeMin=${new Date().toISOString()}&showDeleted=true`;
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     const data = await res.json();
     const events = data.items ?? [];
     let synced = 0;
+    let cancelled = 0;
 
     for (const e of events) {
-      if (e.status === "cancelled") continue;
       const start = e.start?.dateTime ?? e.start?.date;
       const end = e.end?.dateTime ?? e.end?.date;
       if (!start || !end) continue;
 
+      // Handle cancelled events
+      if (e.status === "cancelled") {
+        const cancelRes = await fetch(`${supa}/rest/v1/rpc/mark_booking_cancelled`, {
+          method: "POST",
+          headers: {
+            apikey: key,
+            Authorization: `Bearer ${key}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            p_google_event_id: e.id,
+          }),
+        });
+        if (cancelRes.ok) cancelled++;
+        continue;
+      }
+
+      // Process active events
       const durationMinutes = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000);
       const parsed = parseGcalEvent(e);
       const fields = extractFieldsFromEvent(e);
@@ -235,7 +253,7 @@ Deno.serve(async () => {
       });
       if (up.ok) synced++;
     }
-    results.push({ calendar_id, synced });
+    results.push({ calendar_id, synced, cancelled });
   }
 
   return new Response(JSON.stringify({ ok: true, results }), { headers: { "Content-Type": "application/json" } });

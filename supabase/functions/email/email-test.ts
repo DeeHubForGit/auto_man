@@ -1,26 +1,13 @@
-// supabase/functions/email/index.ts
-// Send an email via Resend using npm package
-// Env: RESEND_API_KEY
+// supabase/functions/email-test/index.ts
 import { Resend } from 'npm:resend';
 Deno.serve(async (req)=>{
-  // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
-      }
-    });
-  }
-  const { to, subject, html } = await req.json();
   try {
     const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
     const data = await resend.emails.send({
       from: 'Auto-Man Driving School <noreply@automandrivingschool.com.au>',
-      to,
-      subject,
-      html
+      to: 'darren@automandrivingschool.com.au',
+      subject: 'Test Email - Domain Verified!',
+      html: '<h1>Success!</h1><p>Your domain is verified and ready to send emails! 🎉</p>'
     });
     return new Response(JSON.stringify({
       ok: true,
@@ -32,10 +19,10 @@ Deno.serve(async (req)=>{
       }
     });
   } catch (error) {
-    console.error(error);
+    console.error('Email send error:', error);
     return new Response(JSON.stringify({
       ok: false,
-      error
+      error: error.message
     }), {
       headers: {
         'Content-Type': 'application/json',

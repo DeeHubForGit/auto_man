@@ -1,7 +1,9 @@
-// Google Calendar → Supabase Booking Sync (v4.3 - Clean Extended Field)
+// Google Calendar → Supabase Booking Sync (v4.6 - Simple Booking Detection + Logging)
 // =================================================================
-// Only syncs events that were updated in the last 24 hours
-// Stores full event object in extended field for debugging/audit
+// - Only syncs events updated in last 24 hours
+// - Stores full event object in extended field
+// - ALWAYS creates sync log entries
+// - Simple booking detection: "Driving Lesson" in title OR pickup exists
 
 import { parseGcalEvent } from "../_shared/parseEvent.ts";
 
@@ -164,6 +166,18 @@ function extractFieldsFromEvent(e: any) {
   return { first_name, last_name, email, mobile, pickup_location: pickup };
 }
 
+// ---------- BOOKING DETECTION ----------
+function isBookingEvent(e: any, fields: any): boolean {
+  const title = e.summary || "";
+  const pickup = fields.pickup_location;
+  
+  // Booking detection: title contains "Driving Lesson" OR pickup exists
+  const titleLooksLikeLesson = /driving lesson/i.test(title);
+  const hasPickup = Boolean(pickup && String(pickup).trim() !== "");
+  
+  return titleLooksLikeLesson || hasPickup;
+}
+
 // ---------- SERVICE CODE ----------
 function mapDurationToAutoServiceCode(mins: number | null) {
   if (mins === null) return null;
@@ -190,6 +204,7 @@ Deno.serve(async () => {
 
   const token = await getAccessToken();
   const results: any[] = [];
+  const startTime = new Date();
 
   for (const calendar_id of calendars) {
     // Fetch events updated in last 24 hours + future events only
@@ -244,7 +259,7 @@ Deno.serve(async () => {
         p_end: end,
         p_pickup: fields.pickup_location ?? parsed.pickup_location ?? null,
         p_extended: e,  // Store full event object for debugging/audit
-        p_is_booking: true,
+        p_is_booking: isBookingEvent(e, fields),  // Simple booking detection
         p_title: e.summary ?? null,
       };
 
@@ -261,6 +276,31 @@ Deno.serve(async () => {
     }
     results.push({ calendar_id, synced, cancelled });
   }
+
+  const finishedTime = new Date();
+  
+  // ALWAYS log the sync, even if 0 events were synced
+  const totalSynced = results.reduce((sum, r) => sum + r.synced, 0);
+  const totalCancelled = results.reduce((sum, r) => sum + r.cancelled, 0);
+  
+  await fetch(`${supa}/rest/v1/gcal_sync_log`, {
+    method: "POST",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      "Prefer": "return=minimal",
+    },
+    body: JSON.stringify({
+      calendar_id: calendars[0] || null,
+      status: "success",
+      started_at: startTime.toISOString(),
+      finished_at: finishedTime.toISOString(),
+      inserted_count: 0,  // We don't track inserts vs updates separately yet
+      updated_count: totalCancelled,
+      synced_count: totalSynced,
+    }),
+  });
 
   return new Response(JSON.stringify({ ok: true, results }), { headers: { "Content-Type": "application/json" } });
 });

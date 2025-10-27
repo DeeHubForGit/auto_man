@@ -55,7 +55,7 @@
   }
 </style>
 <section id="section-calendar" class="section-content bg-white border rounded-2xl shadow-sm p-5" style="background-color: white !important; color: #111827 !important;">
-  <div class="flex items-center justify-between mb-3">
+  <div class="flex items-center justify-between mb-1">
     <h2 class="text-xl font-semibold">Calendar</h2>
     <div class="space-x-2">
       <button id="prevWeek" class="calendar-nav-btn">Prev</button>
@@ -63,8 +63,7 @@
       <button id="nextWeek" class="calendar-nav-btn">Next</button>
     </div>
   </div>
-  <div class="text-sm text-gray-500 mb-2">Showing mirrored entries from `bookings` table.</div>
-  <div id="weekRange" class="text-sm text-gray-400 mb-2"></div>
+  <div id="weekRange" class="text-lg font-bold text-blue-600 mb-3"></div>
   <div id="calendar" class="overflow-auto max-h-[600px] relative">
     <div id="weekGrid" class="grid grid-cols-8 text-sm" style="grid-template-columns: 80px repeat(7, minmax(120px, 1fr));"></div>
   </div>
@@ -145,62 +144,45 @@
     
     if (!window.supabaseClient) {
       console.error('❌ Supabase client not initialized');
+      const calendar = document.getElementById('calendar');
+      if (calendar) {
+        calendar.innerHTML = '<div class="p-4 bg-red-50 text-red-800 rounded">❌ Supabase client not initialized. Check console for errors.</div>';
+      }
       return;
     }
-
-    // BYPASSING ADMIN RESTRICTIONS FOR TESTING
-    /*
-    // Log current user session
-    const { data: { session }, error: sessionError } = await window.supabaseClient.auth.getSession();
-    console.log('🔍 Current session:', { 
-      hasSession: !!session, 
-      userEmail: session?.user?.email,
-      sessionError 
-    });
-
-    if (!session) {
-      console.error('❌ No authenticated session found. Admin calendar requires authentication.');
-      return;
-    }
-    */
 
     const weekEnd = addDays(weekStart, 7);
     console.log('📅 Fetching bookings for week:', weekStart.toISOString(), 'to', weekEnd.toISOString());
     
-    // BYPASSING RLS POLICY TESTS FOR TESTING
-    /*
-    // First, let's test RLS policies by checking if we can access ANY bookings
-    console.log('🔍 Testing RLS policies...');
-    const { data: testBookings, error: testError } = await window.supabaseClient
-      .from('booking')
-      .select('id, email, start_time')
-      .limit(1);
+    // First, fetch all services to create a lookup map
+    const { data: services, error: servicesError } = await window.supabaseClient
+      .from('service')
+      .select('code, name');
     
-    if (testError) {
-      console.error('❌ RLS Policy Error - Cannot access booking table:', testError);
-      console.log('💡 This usually means:');
-      console.log('   1. You need admin permissions in the database');
-      console.log('   2. RLS policies need to be updated');
-      console.log('   3. Your email needs to be added to admin list');
-      console.log('📧 Current user email:', session.user.email);
-      return;
+    const serviceMap = {};
+    if (services && !servicesError) {
+      services.forEach(svc => {
+        serviceMap[svc.code] = svc.name;
+      });
     }
     
-    console.log('✅ RLS test passed. Found', testBookings?.length || 0, 'accessible booking(s)');
-    */
-    
-    // Direct query - bypassing authentication checks
-    console.log('🚀 BYPASSING AUTH - Attempting direct booking query...');
+    // Query bookings - exclude cancelled bookings
+    console.log('🚀 Fetching bookings...');
     const { data: bookings, error } = await window.supabaseClient
       .from('booking')
       .select('*')
       .gte('start_time', weekStart.toISOString())
       .lt('start_time', weekEnd.toISOString())
+      .neq('status', 'cancelled')
       .order('start_time');
 
     if (error) {
       console.error('❌ Error fetching bookings:', error);
       console.log('🔍 Error details:', JSON.stringify(error, null, 2));
+      const weekRange = document.getElementById('weekRange');
+      if (weekRange) {
+        weekRange.innerHTML = `<span class="text-red-600">⚠️ Error loading bookings: ${error.message}</span>`;
+      }
       return;
     }
 
@@ -208,42 +190,56 @@
 
     if (!bookings || bookings.length === 0) {
       console.log('⚠️ No bookings found for this week');
-      // Let's also check what date range we have in the database
-      const { data: dateRange } = await window.supabaseClient
-        .from('booking')
-        .select('start_time')
-        .order('start_time', { ascending: true })
-        .limit(1);
-      
-      const { data: dateRangeEnd } = await window.supabaseClient
-        .from('booking')
-        .select('start_time')
-        .order('start_time', { ascending: false })
-        .limit(1);
-        
-      console.log('🔍 Database date range:', {
-        earliest: dateRange?.[0]?.start_time,
-        latest: dateRangeEnd?.[0]?.start_time
-      });
+      const weekRange = document.getElementById('weekRange');
+      if (weekRange) {
+        const rangeText = `Week: ${weekStart.toLocaleDateString('en-AU')} - ${addDays(weekStart, 6).toLocaleDateString('en-AU')}`;
+        weekRange.innerHTML = `${rangeText} <span class="text-amber-600 ml-2">⚠️ No bookings found for this week</span>`;
+      }
       return;
     }
 
     bookings.forEach(booking => {
       const start = new Date(booking.start_time);
+      const end = new Date(booking.end_time);
       const dayOfWeek = start.getDay();
       const hour = start.getHours();
       const key = `${dayOfWeek}-${hour}`;
       const cell = dayCells[key];
       
+      console.log('📍 Placing booking:', { booking_id: booking.id, dayOfWeek, hour, key, hasCell: !!cell, is_booking: booking.is_booking });
+      
       if (cell) {
         const bookingDiv = document.createElement('div');
-        bookingDiv.className = 'booking-card text-xs bg-blue-100 border-l-2 border-blue-600 p-1 mb-1 rounded';
         const time = start.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
-        bookingDiv.innerHTML = `
-          <div class="booking-time">${time}</div>
-          <div class="booking-name">${booking.first_name || ''} ${booking.last_name || ''}</div>
-          <div class="booking-service">${booking.service_code || ''}</div>
-        `;
+        const endTime = end.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+        
+        // Use is_booking flag to determine display type
+        if (booking.is_booking) {
+          // This is a booking with client information - show service name
+          bookingDiv.className = 'booking-card text-xs bg-blue-100 border-l-2 border-blue-600 p-1 mb-1 rounded';
+          
+          const serviceName = serviceMap[booking.service_code] || 'Driving Lesson';
+          const clientName = [booking.first_name, booking.last_name].filter(Boolean).join(' ') || 'Unknown Client';
+          
+          bookingDiv.innerHTML = `
+            <div class="booking-time font-semibold">${time}</div>
+            <div class="booking-service text-gray-700">${serviceName}</div>
+            <div class="booking-name font-medium">${clientName}</div>
+            ${booking.pickup_location ? `<div class="text-gray-600">📍 ${booking.pickup_location}</div>` : ''}
+            ${booking.mobile ? `<div class="text-gray-600">📱 ${booking.mobile}</div>` : ''}
+          `;
+        } else {
+          // This is a regular calendar appointment - show title and times
+          bookingDiv.className = 'booking-card text-xs bg-gray-100 border-l-2 border-gray-400 p-1 mb-1 rounded';
+          
+          const eventTitle = booking.event_title || 'Appointment';
+          
+          bookingDiv.innerHTML = `
+            <div class="booking-time font-semibold text-gray-700">${time} - ${endTime}</div>
+            <div class="text-gray-600">${eventTitle}</div>
+          `;
+        }
+        
         cell.appendChild(bookingDiv);
       }
     });

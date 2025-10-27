@@ -29,19 +29,19 @@
         <div class="bg-white rounded-2xl border shadow-sm p-6 sticky top-24">
           <nav class="space-y-1">
             <a href="#calendar" onclick="showSection('calendar')" id="nav-calendar"
-               class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+               class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors border-l-4 border-transparent">
               <span class="font-medium">Calendar</span>
             </a>
             <a href="#progress" onclick="showSection('progress')" id="nav-progress"
-               class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+               class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors border-l-4 border-transparent">
               <span class="font-medium">Client Progress</span>
             </a>
             <a href="#messaging" onclick="showSection('messaging')" id="nav-messaging"
-               class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+               class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors border-l-4 border-transparent">
               <span class="font-medium">Test SMS & Email</span>
             </a>
             <a href="#contacts" onclick="showSection('contacts')" id="nav-contacts"
-               class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+               class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors border-l-4 border-transparent">
               <span class="font-medium">Contact Messages</span>
             </a>
           </nav>
@@ -68,36 +68,63 @@
     ];
 
     async function ensureAdmin() {
+      // Check authentication and admin access using is_admin flag from database
       const adminContent = document.getElementById('adminContent');
       const notAdmin = document.getElementById('notAdmin');
+      
       if (!window.supabaseClient) { 
         console.error('[admin] supabaseClient not available');
         notAdmin.classList.remove('hidden'); 
+        adminContent.style.display = 'none';
         return false; 
       }
+      
       const { data: { session } } = await window.supabaseClient.auth.getSession();
       const email = session?.user?.email || '';
-      const ok = ADMIN_EMAILS.includes(email);
+      
+      if (!email) {
+        console.log('[admin] No user logged in');
+        notAdmin.classList.remove('hidden');
+        adminContent.style.display = 'none';
+        return false;
+      }
+      
+      // Query the client table to check is_admin flag
+      const { data: client, error } = await window.supabaseClient
+        .from('client')
+        .select('is_admin')
+        .eq('email', email)
+        .single();
+      
+      const isAdmin = client?.is_admin === true;
       
       console.log('[admin] ensureAdmin check:', { 
         email, 
-        isAdmin: ok, 
-        allowedEmails: ADMIN_EMAILS,
-        hasSession: !!session 
+        isAdmin,
+        hasSession: !!session,
+        clientData: client
       });
       
-      // Show banner if not admin, but do not block the UI so you can test features
-      notAdmin.classList.toggle('hidden', ok);
-      adminContent.style.display = '';
-      return ok;
+      if (isAdmin) {
+        // User is admin - show admin dashboard
+        notAdmin.classList.add('hidden');
+        adminContent.style.display = '';
+        return true;
+      } else {
+        // User is not admin - redirect to portal
+        console.log('[admin] User is not admin, redirecting to portal');
+        window.location.href = '/portal.html';
+        return false;
+      }
     }
 
     // Section navigation like portal.html
     function showSection(section) {
       document.querySelectorAll('.section-content').forEach(el => el.classList.add('hidden'));
       document.querySelectorAll('.nav-item').forEach(item => {
-        item.classList.remove('bg-blue-50', 'text-blue-600');
-        item.classList.add('text-gray-700');
+        // Reset all items to default state
+        item.classList.remove('bg-blue-100', 'text-blue-800', 'border-blue-500');
+        item.classList.add('text-gray-700', 'border-transparent');
       });
       
       const targetSection = document.getElementById(`section-${section}`);
@@ -105,8 +132,9 @@
       
       const navItem = document.getElementById(`nav-${section}`);
       if (navItem) {
-        navItem.classList.add('bg-blue-50', 'text-blue-600');
-        navItem.classList.remove('text-gray-700');
+        // Apply active state with light blue bg, dark navy/blue text, and blue left border
+        navItem.classList.add('bg-blue-100', 'text-blue-800', 'border-blue-500');
+        navItem.classList.remove('text-gray-700', 'border-transparent');
       }
     }
 

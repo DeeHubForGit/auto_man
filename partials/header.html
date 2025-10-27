@@ -41,6 +41,7 @@
       -->
       <a href="index.html#contact" class="hover:text-blue-600">Contact</a>
       <a href="portal.html" id="portalBtn" class="hidden hover:text-blue-600">My Account</a>
+      <a href="admin.html" id="adminBtn" class="hidden hover:text-blue-600 font-semibold text-orange-600">Admin</a>
     </nav>
 
     <!-- Auth controls (middle cluster) -->
@@ -115,6 +116,9 @@
       <a href="portal.html" id="portalBtnMobile"
         class="hidden px-4 py-2 rounded border border-gray-300 text-gray-800 hover:bg-gray-50 text-center"
         onclick="window.closeMenu?window.closeMenu():null">My Account</a>
+      <a href="admin.html" id="adminBtnMobile"
+        class="hidden px-4 py-2 rounded border border-orange-600 text-orange-600 hover:bg-orange-50 text-center font-semibold"
+        onclick="window.closeMenu?window.closeMenu():null">Admin</a>
       <button id="logoutBtnMobile"
         class="hidden px-4 py-2 rounded border border-gray-300 text-gray-800 hover:bg-gray-50 text-center"
         onclick="window.closeMenu?window.closeMenu():null; headerLogout()">Sign Out</button>
@@ -151,14 +155,30 @@
         const portalBtn        = document.getElementById('portalBtn');
         const portalBtnHeader  = document.getElementById('portalBtnHeader');
         const logoutBtnHeader  = document.getElementById('logoutBtnHeader');
+        const adminBtn         = document.getElementById('adminBtn');
 
         const signupBtnMobile  = document.getElementById('signupBtnMobile');
         const loginBtnMobile   = document.getElementById('loginBtnMobile');
         const portalBtnMobile  = document.getElementById('portalBtnMobile');
         const logoutBtnMobile  = document.getElementById('logoutBtnMobile');
+        const adminBtnMobile   = document.getElementById('adminBtnMobile');
 
         const loggedIn = !!(session && session.user);
         console.log('[header] auth state:', loggedIn ? 'logged-in' : 'logged-out');
+
+        // Check if user is admin
+        let isAdmin = false;
+        if (loggedIn) {
+          const email = session.user.email;
+          const { data: client } = await window.supabaseClient
+            .from('client')
+            .select('is_admin')
+            .eq('email', email)
+            .single();
+          
+          isAdmin = client?.is_admin === true;
+          console.log('[header] is_admin:', isAdmin);
+        }
 
         // Desktop
         setVisible(signupBtn, !loggedIn);
@@ -166,12 +186,14 @@
         setVisible(portalBtn, loggedIn);
         setVisible(portalBtnHeader, loggedIn);
         setVisible(logoutBtnHeader, loggedIn);
+        setVisible(adminBtn, loggedIn && isAdmin);
 
         // Mobile
         setVisible(signupBtnMobile, !loggedIn);
         setVisible(loginBtnMobile,  !loggedIn);
         setVisible(portalBtnMobile, loggedIn);
         setVisible(logoutBtnMobile, loggedIn);
+        setVisible(adminBtnMobile, loggedIn && isAdmin);
 
         // Wire logout handlers only when visible
         const wireLogout = (btn) => {

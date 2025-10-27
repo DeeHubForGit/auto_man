@@ -122,6 +122,20 @@
       currentUser = session.user;
       window.currentUser = session.user; // Make available to partials
       
+      // Check if user is admin and redirect to admin page
+      const email = currentUser.email;
+      const { data: client } = await window.supabaseClient
+        .from('client')
+        .select('is_admin')
+        .eq('email', email)
+        .single();
+      
+      if (client?.is_admin === true) {
+        console.log('[portal] User is admin, redirecting to admin page');
+        window.location.href = 'admin.html';
+        return;
+      }
+      
       // Display user email
       const emailEl = document.getElementById('userEmail');
       if (emailEl) emailEl.textContent = currentUser.email;

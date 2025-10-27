@@ -1,3 +1,27 @@
+<!-- Portal Bookings Section -->
+<style>
+  /* Force light backgrounds and dark text for booking cards */
+  #upcoming-list .booking-card,
+  #past-list .booking-card,
+  #cancelled-list .booking-card {
+    background-color: #dbeafe !important; /* bg-blue-100 */
+    border: 1px solid #d1d5db !important; /* gray-300 */
+    color: #111827 !important; /* gray-900 */
+  }
+  
+  #upcoming-list .booking-card *,
+  #past-list .booking-card *,
+  #cancelled-list .booking-card * {
+    color: #111827 !important; /* gray-900 */
+  }
+  
+  #upcoming-list .booking-card svg,
+  #past-list .booking-card svg,
+  #cancelled-list .booking-card svg {
+    color: #4b5563 !important; /* gray-600 */
+  }
+</style>
+
 <div class="bg-white rounded-2xl border shadow-sm">
   <!-- Header -->
   <div class="px-6 py-4 border-b">
@@ -22,6 +46,13 @@
       >
         Past Bookings
       </button>
+      <button 
+        onclick="switchBookingTab('cancelled')" 
+        id="tab-cancelled"
+        class="booking-tab px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors"
+      >
+        Cancelled
+      </button>
     </div>
   </div>
 
@@ -41,6 +72,13 @@
     <!-- Past Bookings -->
     <div id="past-bookings" class="booking-content hidden">
       <div id="past-list" class="space-y-4" aria-live="polite" aria-busy="false">
+        <!-- Will be populated by JS -->
+      </div>
+    </div>
+
+    <!-- Cancelled Bookings -->
+    <div id="cancelled-bookings" class="booking-content hidden">
+      <div id="cancelled-list" class="space-y-4" aria-live="polite" aria-busy="false">
         <!-- Will be populated by JS -->
       </div>
     </div>

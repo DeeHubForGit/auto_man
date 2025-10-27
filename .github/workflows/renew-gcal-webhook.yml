@@ -1,0 +1,17 @@
+name: Renew Google Calendar Webhook
+
+on:
+  schedule:
+    # Run every Sunday at 2am UTC (1pm Melbourne time)
+    - cron: '0 2 * * 0'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  renew-webhook:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Renew Google Calendar Webhook
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            "https://ugxxxvhanwckgciaedna.functions.supabase.co/gcal-register-watch?token=${{ secrets.GCAL_CHANNEL_TOKEN }}"

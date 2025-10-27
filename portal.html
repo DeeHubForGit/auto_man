@@ -41,7 +41,7 @@
           <!-- Navigation Menu -->
           <nav class="space-y-1">
             <a href="#bookings" onclick="showSection('bookings')" id="nav-bookings"
-               class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+               class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg bg-blue-50 text-blue-600 transition-colors">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
@@ -62,7 +62,7 @@
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
-                <span class="font-medium">Log Out</span>
+                <span class="font-medium">Sign Out</span>
               </button>
             </div>
           </nav>
@@ -72,14 +72,14 @@
       <!-- Main Content Area -->
       <main class="flex-1 min-w-0">
         
-        <!-- Client Details Section -->
-        <div id="section-details" class="section-content">
-          <div data-include="partials/portal-details.html"></div>
+        <!-- Bookings Section -->
+        <div id="section-bookings" class="section-content">
+          <div data-include="partials/portal-bookings.html"></div>
         </div>
 
-        <!-- Bookings Section -->
-        <div id="section-bookings" class="section-content hidden">
-          <div data-include="partials/portal-bookings.html"></div>
+        <!-- Client Details Section -->
+        <div id="section-details" class="section-content hidden">
+          <div data-include="partials/portal-details.html"></div>
         </div>
 
       </main>

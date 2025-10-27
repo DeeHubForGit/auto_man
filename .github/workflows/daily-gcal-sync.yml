@@ -1,0 +1,21 @@
+name: Daily Google Calendar Sync
+
+on:
+  schedule:
+    # Run daily at 3am Melbourne time (5pm UTC previous day)
+    # Adjusted for Melbourne timezone (UTC+11 in summer, UTC+10 in winter)
+    - cron: '0 17 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  sync-calendar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync Google Calendar to Supabase
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            "https://ugxxxvhanwckgciaedna.functions.supabase.co/gcal-sync"
+      
+      - name: Log sync completion
+        run: echo "Calendar sync completed at $(date)"

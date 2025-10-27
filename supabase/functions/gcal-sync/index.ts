@@ -1,6 +1,7 @@
-// Google Calendar → Supabase Booking Sync (v4.1 - With Cancellation Handling)
+// Google Calendar → Supabase Booking Sync (v4.3 - Clean Extended Field)
 // =================================================================
-// Extracts contact info from HTML descriptions and handles cancellations
+// Only syncs events that were updated in the last 24 hours
+// Stores full event object in extended field for debugging/audit
 
 import { parseGcalEvent } from "../_shared/parseEvent.ts";
 
@@ -191,7 +192,12 @@ Deno.serve(async () => {
   const results: any[] = [];
 
   for (const calendar_id of calendars) {
-    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendar_id)}/events?singleEvents=true&orderBy=startTime&timeMin=${new Date().toISOString()}&showDeleted=true`;
+    // Fetch events updated in last 24 hours + future events only
+    const oneDayAgo = new Date();
+    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+    
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendar_id)}/events?singleEvents=true&timeMin=${new Date().toISOString()}&updatedMin=${oneDayAgo.toISOString()}&showDeleted=true`;
+    
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     const data = await res.json();
     const events = data.items ?? [];
@@ -237,7 +243,7 @@ Deno.serve(async () => {
         p_start: start,
         p_end: end,
         p_pickup: fields.pickup_location ?? parsed.pickup_location ?? null,
-        p_extended: true,
+        p_extended: e,  // Store full event object for debugging/audit
         p_is_booking: true,
         p_title: e.summary ?? null,
       };

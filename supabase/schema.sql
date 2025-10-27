@@ -445,10 +445,25 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ================= UPSERT FROM GOOGLE =================
-CREATE OR REPLACE FUNCTION public.upsert_booking_from_google(p_google_event_id text, p_calendar_id text, p_client_email text, p_first_name text, p_last_name text, p_mobile text, p_service_code text, p_price_cents integer, p_start timestamp with time zone, p_end timestamp with time zone, p_pickup text, p_extended jsonb, p_is_booking boolean, p_title text)
- RETURNS uuid
- LANGUAGE plpgsql
- SECURITY DEFINER
+CREATE OR REPLACE FUNCTION public.upsert_booking_from_google(
+  p_google_event_id text,
+  p_calendar_id text,
+  p_client_email text,
+  p_first_name text,
+  p_last_name text,
+  p_mobile text,
+  p_service_code text,
+  p_price_cents integer,
+  p_start timestamp with time zone,
+  p_end timestamp with time zone,
+  p_pickup text,
+  p_extended jsonb,
+  p_is_booking boolean,
+  p_title text
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
 AS $function$
 DECLARE
   v_client_id UUID;
@@ -512,7 +527,7 @@ BEGIN
         start_time         = EXCLUDED.start_time,
         end_time           = EXCLUDED.end_time,
         pickup_location    = COALESCE(EXCLUDED.pickup_location, booking.pickup_location),
-        extended           = COALESCE(booking.extended, '{}'::jsonb) || COALESCE(EXCLUDED.extended, '{}'::jsonb),
+        extended           = COALESCE(EXCLUDED.extended, '{}'::jsonb),  -- CHANGED: Replace instead of concatenate
         event_title        = COALESCE(EXCLUDED.event_title, booking.event_title),
         first_name         = COALESCE(EXCLUDED.first_name, booking.first_name),
         last_name          = COALESCE(EXCLUDED.last_name, booking.last_name),
@@ -523,6 +538,4 @@ BEGIN
 
   RETURN v_booking_id;
 END;
-$function$
-
-
+$function$;

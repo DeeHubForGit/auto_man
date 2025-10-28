@@ -1,10 +1,11 @@
-// Google Calendar → Supabase Booking Sync (v4.8 - SMS with safe error handling)
+// Google Calendar → Supabase Booking Sync (v4.9 - Improved SMS logging)
 // =================================================================
 // - Syncs ALL future events
 // - Stores full event object in extended field
 // - ALWAYS creates sync log entries
 // - Simple booking detection: "Driving Lesson" in title OR pickup exists
 // - SMS confirmation with robust error handling (won't break sync)
+// - IMPROVED: Better SMS logging shows booking ID and reason for skip
 
 import { parseGcalEvent } from "../_shared/parseEvent.ts";
 
@@ -353,15 +354,29 @@ Deno.serve(async () => {
           }
 
           if (row && row.booking_id) {
+            const bookingId = row.booking_id;
             const startTs = new Date(start).getTime();
             const isFuture = startTs > Date.now();
             const isConfirmed = (e.status ?? "confirmed") === "confirmed";
-            const needsSMS = row.inserted === true && row.sms_confirm_sent_at == null;
+            const wasInserted = row.inserted === true;
+            const hasSMS = row.sms_confirm_sent_at != null;
 
-            console.log(`[gcal-sync]   → SMS check: inserted=${row.inserted}, has_sms=${!!row.sms_confirm_sent_at}, future=${isFuture}, confirmed=${isConfirmed}`);
+            console.log(`[gcal-sync]   → SMS check for booking ${bookingId}: inserted=${wasInserted}, has_sms=${hasSMS}, future=${isFuture}, confirmed=${isConfirmed}`);
 
-            if (needsSMS && isFuture && isConfirmed) {
-              console.log(`[gcal-sync]   → Sending SMS for booking ${row.booking_id}...`);
+            const needsSMS = wasInserted && !hasSMS;
+
+            if (!needsSMS) {
+              const reason = !wasInserted ? "not_new_booking" : 
+                            hasSMS ? "already_sent" :
+                            !isFuture ? "past_event" :
+                            !isConfirmed ? "not_confirmed" : "unknown";
+              console.log(`[gcal-sync]   → SMS skipped for booking ${bookingId}: ${reason}`);
+            } else if (!isFuture) {
+              console.log(`[gcal-sync]   → SMS skipped for booking ${bookingId}: past_event`);
+            } else if (!isConfirmed) {
+              console.log(`[gcal-sync]   → SMS skipped for booking ${bookingId}: not_confirmed`);
+            } else {
+              console.log(`[gcal-sync]   → Sending SMS for booking ${bookingId}...`);
               
               const smsRes = await fetch(`${supa}/functions/v1/booking-sms`, {
                 method: "POST",
@@ -370,17 +385,17 @@ Deno.serve(async () => {
                   "authorization": `Bearer ${key}`,
                   "apikey": key
                 },
-                body: JSON.stringify({ booking_id: row.booking_id })
+                body: JSON.stringify({ booking_id: bookingId })
               });
 
               if (smsRes.ok) {
                 const smsData = await smsRes.json();
                 if (smsData?.ok === true) {
-                  console.log(`[gcal-sync]   ✓ SMS sent for booking ${row.booking_id}`);
+                  console.log(`[gcal-sync]   ✓ SMS sent for booking ${bookingId}`);
                   
                   // Update the sms_confirm_sent_at flag
                   await fetch(
-                    `${supa}/rest/v1/booking?id=eq.${encodeURIComponent(row.booking_id)}`,
+                    `${supa}/rest/v1/booking?id=eq.${encodeURIComponent(bookingId)}`,
                     {
                       method: "PATCH",
                       headers: {
@@ -393,14 +408,12 @@ Deno.serve(async () => {
                     }
                   );
                 } else {
-                  console.warn(`[gcal-sync]   ⚠ SMS response not ok:`, smsData);
+                  console.warn(`[gcal-sync]   ⚠ SMS response not ok for booking ${bookingId}:`, smsData);
                 }
               } else {
                 const smsError = await smsRes.text();
-                console.error(`[gcal-sync]   ✗ SMS failed (${smsRes.status}):`, smsError);
+                console.error(`[gcal-sync]   ✗ SMS failed for booking ${bookingId} (${smsRes.status}):`, smsError);
               }
-            } else {
-              console.log(`[gcal-sync]   → SMS not needed (already sent or not applicable)`);
             }
           } else {
             console.warn(`[gcal-sync]   ⚠ No booking_id in upsert response for SMS`);

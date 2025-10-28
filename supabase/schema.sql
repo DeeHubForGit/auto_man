@@ -471,8 +471,9 @@ AS $$
 DECLARE
   v_client_id UUID;
   v_booking_id UUID;
-  v_inserted BOOLEAN;
+  v_was_inserted BOOLEAN;
   v_sms_sent_at TIMESTAMPTZ;
+  v_xmax XID;
 BEGIN
   -- Upsert client (only if email is provided)
   IF p_client_email IS NOT NULL THEN
@@ -485,10 +486,6 @@ BEGIN
           updated_at = NOW()
     RETURNING id INTO v_client_id;
   END IF;
-
-  -- Check if booking already exists (to determine if this is an insert or update)
-  SELECT EXISTS(SELECT 1 FROM booking WHERE google_event_id = p_google_event_id) INTO v_inserted;
-  v_inserted := NOT v_inserted; -- TRUE if it doesn't exist (will be inserted), FALSE if exists (will be updated)
 
   -- Upsert booking
   INSERT INTO booking (
@@ -543,10 +540,9 @@ BEGIN
         email              = COALESCE(EXCLUDED.email, booking.email),
         mobile             = COALESCE(EXCLUDED.mobile, booking.mobile),
         updated_at         = NOW()
-  RETURNING booking.id, booking.sms_confirm_sent_at INTO v_booking_id, v_sms_sent_at;
-  -- ^^^^^^^ Added "booking." prefix to be explicit
+  RETURNING booking.id, booking.sms_confirm_sent_at, (xmax = 0) INTO v_booking_id, v_sms_sent_at, v_was_inserted;
+  -- ^^^^^^^ xmax = 0 means it was an INSERT, xmax > 0 means it was an UPDATE
 
   -- Return the result with all required fields
-  RETURN QUERY SELECT v_booking_id, v_inserted, v_sms_sent_at;
+  RETURN QUERY SELECT v_booking_id, v_was_inserted, v_sms_sent_at;
 END;
-$$;

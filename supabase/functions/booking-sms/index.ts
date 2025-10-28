@@ -1,4 +1,4 @@
-// Send one-time booking confirmation SMS.
+// Send one-time booking confirmation SMS with full audit logging
 // Usage (server-to-server or admin): POST /functions/v1/booking-sms
 // Body: { booking_id?: string, google_event_id?: string }
 // Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SMS_SENDER (optional)
@@ -79,7 +79,9 @@ serve(async (req) => {
       return json({ error: "Provide booking_id or google_event_id" }, 400);
     }
 
-    // 1) Load booking
+    console.log(`[booking-sms] Processing request for ${booking_id ? `booking_id=${booking_id}` : `google_event_id=${google_event_id}`}`);
+
+    // 1) Load booking with end_time
     const queryParam = booking_id
       ? `id=eq.${encodeURIComponent(booking_id)}`
       : `google_event_id=eq.${encodeURIComponent(google_event_id!)}`;
@@ -97,6 +99,7 @@ serve(async (req) => {
     );
 
     if (!getRes.ok) {
+      console.error(`[booking-sms] Failed to load booking: ${getRes.status}`);
       return json(
         { error: "Failed to load booking", details: getData || (await getRes.text()) },
         502,
@@ -104,7 +107,10 @@ serve(async (req) => {
     }
 
     const rows = (getData as unknown as any[]) || [];
-    if (rows.length === 0) return json({ error: "Booking not found" }, 404);
+    if (rows.length === 0) {
+      console.error(`[booking-sms] Booking not found`);
+      return json({ error: "Booking not found" }, 404);
+    }
 
     const b = rows[0] as {
       id: string;
@@ -112,6 +118,7 @@ serve(async (req) => {
       sms_confirm_sent_at: string | null;
       status: string | null;
       start_time: string;
+      end_time: string;
       mobile: string | null;
       first_name: string | null;
       last_name: string | null;
@@ -121,36 +128,47 @@ serve(async (req) => {
       client_id: string | null;
     };
 
+    console.log(`[booking-sms] Loaded booking ${b.id} for ${b.first_name} ${b.last_name}`);
+
     // 2) Idempotency and business rules
     if (b.sms_confirm_sent_at) {
+      console.log(`[booking-sms] SMS already sent at ${b.sms_confirm_sent_at}`);
       return json({ ok: true, skipped: "already_sent", booking_id: b.id });
     }
     if (!b.is_booking) {
+      console.log(`[booking-sms] Not a booking`);
       return json({ ok: true, skipped: "not_a_booking", booking_id: b.id });
     }
     if ((b.status || "confirmed") !== "confirmed") {
+      console.log(`[booking-sms] Status is ${b.status}, not confirmed`);
       return json({ ok: true, skipped: "not_confirmed", booking_id: b.id });
     }
 
     const start = new Date(b.start_time);
     if (!isFinite(start.getTime())) {
+      console.error(`[booking-sms] Invalid start_time: ${b.start_time}`);
       return json({ error: "Invalid start_time on booking" }, 400);
     }
     const now = new Date();
     // Optional: only send if event is in future
     if (start.getTime() <= now.getTime()) {
+      console.log(`[booking-sms] Event in the past: ${start.toISOString()}`);
       return json({ ok: true, skipped: "past_event", booking_id: b.id });
     }
 
     // Optional: Google "created" only guard. If you populate gcal_sequence, use it:
     if (b.gcal_sequence != null && b.gcal_sequence > 0) {
+      console.log(`[booking-sms] Not initial create, gcal_sequence=${b.gcal_sequence}`);
       return json({ ok: true, skipped: "not_initial_create", booking_id: b.id });
     }
 
     const e164 = toE164Au(b.mobile);
     if (!e164) {
+      console.error(`[booking-sms] Invalid mobile: ${b.mobile}`);
       return json({ error: "Invalid or missing AU mobile on booking" }, 400);
     }
+
+    console.log(`[booking-sms] Sending SMS to ${e164}`);
 
     // 3) Check if customer needs to complete intake form
     let needsIntake = false;
@@ -183,7 +201,7 @@ serve(async (req) => {
     // 4) Build friendly message with improved formatting
     const firstName = b.first_name || "there";
     
-    // Format date: "Sat 1st Nov at 10:00 am"
+    // Format date: "Sun 2nd Nov"
     const dayOfWeek = new Intl.DateTimeFormat("en-AU", {
       timeZone: "Australia/Melbourne",
       weekday: "short",
@@ -199,28 +217,42 @@ serve(async (req) => {
       month: "short",
     }).format(start);
     
-    const time = new Intl.DateTimeFormat("en-AU", {
+    const formattedDate = `${dayOfWeek} ${day}${getOrdinalSuffix(day)} ${month}`;
+    
+    // Format time range: "1:30 pm to 2:30 pm"
+    const end = new Date(b.end_time);
+    
+    const startTime = new Intl.DateTimeFormat("en-AU", {
       timeZone: "Australia/Melbourne",
       hour: "numeric",
       minute: "2-digit",
       hour12: true,
     }).format(start).toLowerCase();
     
-    const formattedDate = `${dayOfWeek} ${day}${getOrdinalSuffix(day)} ${month} at ${time}`;
+    const endTime = new Intl.DateTimeFormat("en-AU", {
+      timeZone: "Australia/Melbourne",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }).format(end).toLowerCase();
 
     // Build message parts
     let message = `Hi ${firstName},\n\n`;
-    message += `Your driving lesson is booked on ${formattedDate}.`;
+    message += `Your driving lesson is booked on ${formattedDate} from ${startTime} to ${endTime}.`;
     
     if (b.pickup_location) {
-      message += `\nPickup: ${b.pickup_location}.`;
+      message += `\nPickup: ${b.pickup_location}`;
     }
     
     if (needsIntake) {
-      message += `\n\nPlease sign up on the Auto-Man website and advise of your permit/licence and any relevant medical conditions before your first driving lesson:\nhttps://www.automandrivingschool.com.au/signup`;
+      message += `\n\nPlease sign up on the Auto-Man website and advise of your permit/licence number and any relevant medical conditions before your first driving lesson:\nhttps://www.automandrivingschool.com.au/signup`;
     }
     
     message += `\n\nThank you for booking with Auto-Man Driving School.`;
+    message += `\n\nCancellations require 24 hours notice.`;
+    message += `\n\nThis is a no-reply SMS. Contact 0403 632 313 if you have questions or changes.`;
+
+    console.log(`[booking-sms] Message preview: ${message.substring(0, 100)}...`);
 
     // 5) Send via existing sms function (server→server)
     const send = await fetchJson(SMS_FN_URL, {
@@ -233,14 +265,92 @@ serve(async (req) => {
       body: JSON.stringify({ to: e164, message }),
     });
 
+    console.log(`[booking-sms] SMS function response: ${send.res.status}, ok=${send.res.ok}`);
+
+    let providerMessageId: string | null = null;
+    let smsStatus: string = "pending";
+    let errorMessage: string | null = null;
+
     if (!send.res.ok || !(send.data as any)?.ok) {
+      console.error(`[booking-sms] SMS send failed:`, send.data);
+      smsStatus = "failed";
+      errorMessage = JSON.stringify(send.data ?? send.raw);
+      
+      // Log the failure to sms_log (fixed column names: body not message_body)
+      await fetchJson(
+        `${SUPABASE_URL}/rest/v1/sms_log`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "authorization": `Bearer ${SERVICE_KEY}`,
+            "apikey": SERVICE_KEY,
+            "prefer": "return=minimal",
+          },
+          body: JSON.stringify({
+            booking_id: b.id,
+            to_phone: e164,
+            body: message,  // ✅ Fixed: was message_body
+            status: smsStatus,
+            template: "booking_confirmation",
+            provider: "clicksend",
+            provider_message_id: null,
+            error_message: errorMessage,
+            sent_at: new Date().toISOString(),
+          }),
+        },
+      );
+      
       return json(
         { error: "SMS send failed", details: send.data ?? send.raw },
         502,
       );
     }
 
-    // 6) Mark sent (idempotency latch)
+    // Extract provider message ID from ClickSend response
+    const clicksendData = (send.data as any)?.clicksend;
+    if (clicksendData?.data?.messages && Array.isArray(clicksendData.data.messages) && clicksendData.data.messages.length > 0) {
+      providerMessageId = clicksendData.data.messages[0].message_id || null;
+      const msgStatus = clicksendData.data.messages[0].status;
+      smsStatus = msgStatus === "SUCCESS" ? "sent" : "pending";
+    }
+
+    console.log(`[booking-sms] Provider message ID: ${providerMessageId}, status: ${smsStatus}`);
+
+    // 6) Log to sms_log table (fixed column names: body not message_body)
+    const logRes = await fetchJson(
+      `${SUPABASE_URL}/rest/v1/sms_log`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "authorization": `Bearer ${SERVICE_KEY}`,
+          "apikey": SERVICE_KEY,
+          "prefer": "return=representation",
+        },
+        body: JSON.stringify({
+          booking_id: b.id,
+          to_phone: e164,
+          body: message,  // ✅ Fixed: was message_body
+          status: smsStatus,
+          template: "booking_confirmation",
+          provider: "clicksend",
+          provider_message_id: providerMessageId,
+          error_message: null,
+          sent_at: new Date().toISOString(),
+        }),
+      },
+    );
+
+    if (!logRes.res.ok) {
+      console.warn(`[booking-sms] Failed to log to sms_log: ${logRes.res.status}`);
+      const logError = await logRes.res.text();
+      console.warn(`[booking-sms] Log error details: ${logError}`);
+    } else {
+      console.log(`[booking-sms] Logged to sms_log successfully`);
+    }
+
+    // 7) Mark sent (idempotency latch)
     const { res: updRes, data: updData } = await fetchJson(
       `${SUPABASE_URL}/rest/v1/booking?id=eq.${encodeURIComponent(b.id)}`,
       {
@@ -256,17 +366,21 @@ serve(async (req) => {
     );
 
     if (!updRes.ok) {
+      console.error(`[booking-sms] Failed to update booking flag: ${updRes.status}`);
       return json(
         { error: "SMS sent but failed to update flag", details: updData ?? (await updRes.text()) },
         502,
       );
     }
 
+    console.log(`[booking-sms] Successfully sent SMS for booking ${b.id}`);
+
     return json({
       ok: true,
       booking_id: b.id,
       sent_to: e164,
-      clicksend: (send.data as any)?.data ?? null,
+      provider_message_id: providerMessageId,
+      clicksend: (send.data as any)?.clicksend ?? null,
       message_preview: message,
       needs_intake: needsIntake,
     });

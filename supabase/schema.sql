@@ -445,29 +445,34 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ================= UPSERT FROM GOOGLE =================
-CREATE OR REPLACE FUNCTION public.upsert_booking_from_google(
-  p_google_event_id text,
-  p_calendar_id text,
-  p_client_email text,
-  p_first_name text,
-  p_last_name text,
-  p_mobile text,
-  p_service_code text,
-  p_price_cents integer,
-  p_start timestamp with time zone,
-  p_end timestamp with time zone,
-  p_pickup text,
-  p_extended jsonb,
-  p_is_booking boolean,
-  p_title text
+CREATE OR REPLACE FUNCTION upsert_booking_from_google(
+  p_google_event_id TEXT,
+  p_calendar_id TEXT,
+  p_client_email TEXT,
+  p_first_name TEXT,
+  p_last_name TEXT,
+  p_mobile TEXT,
+  p_service_code TEXT,
+  p_price_cents INTEGER,
+  p_start TIMESTAMPTZ,
+  p_end TIMESTAMPTZ,
+  p_pickup TEXT,
+  p_extended JSONB,
+  p_is_booking BOOLEAN,
+  p_title TEXT
 )
-RETURNS uuid
+RETURNS TABLE (
+  booking_id UUID,
+  inserted BOOLEAN,
+  sms_confirm_sent_at TIMESTAMPTZ
+)
 LANGUAGE plpgsql
-SECURITY DEFINER
-AS $function$
+AS $$
 DECLARE
   v_client_id UUID;
   v_booking_id UUID;
+  v_inserted BOOLEAN;
+  v_sms_sent_at TIMESTAMPTZ;
 BEGIN
   -- Upsert client (only if email is provided)
   IF p_client_email IS NOT NULL THEN
@@ -481,7 +486,11 @@ BEGIN
     RETURNING id INTO v_client_id;
   END IF;
 
-  -- Upsert booking (NOW INCLUDING first_name, last_name, email, mobile)
+  -- Check if booking already exists (to determine if this is an insert or update)
+  SELECT EXISTS(SELECT 1 FROM booking WHERE google_event_id = p_google_event_id) INTO v_inserted;
+  v_inserted := NOT v_inserted; -- TRUE if it doesn't exist (will be inserted), FALSE if exists (will be updated)
+
+  -- Upsert booking
   INSERT INTO booking (
     client_id,
     google_event_id,
@@ -527,15 +536,17 @@ BEGIN
         start_time         = EXCLUDED.start_time,
         end_time           = EXCLUDED.end_time,
         pickup_location    = COALESCE(EXCLUDED.pickup_location, booking.pickup_location),
-        extended           = COALESCE(EXCLUDED.extended, '{}'::jsonb),  -- CHANGED: Replace instead of concatenate
+        extended           = COALESCE(EXCLUDED.extended, '{}'::jsonb),
         event_title        = COALESCE(EXCLUDED.event_title, booking.event_title),
         first_name         = COALESCE(EXCLUDED.first_name, booking.first_name),
         last_name          = COALESCE(EXCLUDED.last_name, booking.last_name),
         email              = COALESCE(EXCLUDED.email, booking.email),
         mobile             = COALESCE(EXCLUDED.mobile, booking.mobile),
         updated_at         = NOW()
-  RETURNING id INTO v_booking_id;
+  RETURNING booking.id, booking.sms_confirm_sent_at INTO v_booking_id, v_sms_sent_at;
+  -- ^^^^^^^ Added "booking." prefix to be explicit
 
-  RETURN v_booking_id;
+  -- Return the result with all required fields
+  RETURN QUERY SELECT v_booking_id, v_inserted, v_sms_sent_at;
 END;
-$function$;
+$$;

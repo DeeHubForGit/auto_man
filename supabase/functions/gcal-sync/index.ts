@@ -1,11 +1,15 @@
-// Google Calendar → Supabase Booking Sync (v4.6 - Simple Booking Detection + Logging)
+// Google Calendar → Supabase Booking Sync (v4.8 - SMS with safe error handling)
 // =================================================================
-// - Only syncs events updated in last 24 hours
+// - Syncs ALL future events
 // - Stores full event object in extended field
 // - ALWAYS creates sync log entries
 // - Simple booking detection: "Driving Lesson" in title OR pickup exists
+// - SMS confirmation with robust error handling (won't break sync)
 
 import { parseGcalEvent } from "../_shared/parseEvent.ts";
+
+// ---------- ENV FLAGS ----------
+const SMS_ENABLED = (Deno.env.get("SMS_ENABLED") || "false").toLowerCase() === "true";
 
 // ---------- ACCESS TOKEN LOGIC ----------
 const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
@@ -58,9 +62,12 @@ const EMAIL_RX = /[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i;
 function htmlToText(html: string | null | undefined): string {
   if (!html) return "";
   let s = String(html);
+  // Preserve line breaks
   s = s.replace(/<\s*br\s*\/?\s*>/gi, "\n");
   s = s.replace(/<\s*p\s*\/?\s*>/gi, "\n");
+  // Strip tags
   s = s.replace(/<\/?[^>]+(>|$)/g, "");
+  // Entities
   s = s.replace(/&nbsp;/gi, " ");
   s = s.replace(/&amp;/gi, "&");
   s = s.replace(/&lt;/gi, "<");
@@ -69,6 +76,14 @@ function htmlToText(html: string | null | undefined): string {
   return lines.join("\n").replace(/\n{2,}/g, "\n\n").trim();
 }
 
+/**
+ * Parse structured fields from the Google event description.
+ * Looks for:
+ *  - "Booked by" (then name & email on following lines)
+ *  - "Mobile" (next line)
+ *  - "Pickup Address" (next line)
+ * Also falls back to any email found anywhere in the text.
+ */
 function parseDescriptionFields(descHtml: string | null | undefined) {
   const text = htmlToText(descHtml);
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
@@ -78,7 +93,7 @@ function parseDescriptionFields(descHtml: string | null | undefined) {
   let mobile: string | null = null;
   let pickup: string | null = null;
 
-  // Find email with regex first
+  // 1. Find first email anywhere as a fallback
   for (const l of lines) {
     const m = l.match(EMAIL_RX);
     if (m) { 
@@ -87,8 +102,9 @@ function parseDescriptionFields(descHtml: string | null | undefined) {
     }
   }
 
-  // Parse line by line for structured fields
+  // 2. Structured fields by labels
   for (let i = 0; i < lines.length; i++) {
+    // "Booked by" → next line = name, next next line may contain email
     if (!name && /^booked by$/i.test(lines[i])) {
       if (i + 1 < lines.length) {
         name = lines[i + 1];
@@ -98,18 +114,20 @@ function parseDescriptionFields(descHtml: string | null | undefined) {
         }
       }
     }
+    // "Mobile" → next line
     if (!mobile && /^mobile$/i.test(lines[i]) && i + 1 < lines.length) {
       mobile = lines[i + 1];
     }
+    // "Pickup Address" → next line
     if (!pickup && /^pickup address$/i.test(lines[i]) && i + 1 < lines.length) {
       pickup = lines[i + 1];
     }
   }
 
-  // Clean mobile
+  // 3. Normalise mobile (digits only, keep +)
   if (mobile) mobile = mobile.replace(/[^\d+]/g, "");
   
-  // Split name with limit of 2 (first name + everything else as last name)
+  // 4. Split name into first/last
   const parts = name ? name.trim().split(/\s+/, 2) : [];
   const first_name = parts[0] || null;
   const last_name = parts.length > 1 ? parts[1] : null;
@@ -118,6 +136,14 @@ function parseDescriptionFields(descHtml: string | null | undefined) {
 }
 
 // ---------- UNIFIED FIELD EXTRACTOR ----------
+/**
+ * Pulls fields from:
+ *  - description (structured)
+ *  - location (pickup fallback)
+ *  - extendedProperties (private/shared)
+ *  - title suffix "(First Last)" as fallback for name
+ *  - attendees list (first non-self) as fallback for email
+ */
 function extractFieldsFromEvent(e: any) {
   // 1. Start with HTML description parsing (most reliable for Google appointment bookings)
   const fromDesc = parseDescriptionFields(e.description);
@@ -202,30 +228,51 @@ Deno.serve(async () => {
     .map(s => s.trim())
     .filter(Boolean);
 
+  console.log(`[gcal-sync] Starting sync for ${calendars.length} calendar(s), SMS_ENABLED=${SMS_ENABLED}`);
+
   const token = await getAccessToken();
   const results: any[] = [];
   const startTime = new Date();
 
   for (const calendar_id of calendars) {
-    // Fetch events updated in last 24 hours + future events only
-    const oneDayAgo = new Date();
-    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+    console.log(`[gcal-sync] Processing calendar: ${calendar_id}`);
     
-    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendar_id)}/events?singleEvents=true&timeMin=${new Date().toISOString()}&updatedMin=${oneDayAgo.toISOString()}&showDeleted=true`;
+    // Fetch all future events (removed updatedMin restriction)
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendar_id)}/events?singleEvents=true&timeMin=${new Date().toISOString()}&showDeleted=true`;
     
+    console.log(`[gcal-sync] Fetching events...`);
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    
+    if (!res.ok) {
+      console.error(`[gcal-sync] ERROR: Google Calendar API returned ${res.status}`);
+      const errorText = await res.text();
+      console.error(`[gcal-sync] Response: ${errorText}`);
+      continue;
+    }
+    
     const data = await res.json();
     const events = data.items ?? [];
+    console.log(`[gcal-sync] Fetched ${events.length} event(s)`);
+    
     let synced = 0;
     let cancelled = 0;
+    let skipped = 0;
 
     for (const e of events) {
       const start = e.start?.dateTime ?? e.start?.date;
       const end = e.end?.dateTime ?? e.end?.date;
-      if (!start || !end) continue;
+      
+      if (!start || !end) {
+        console.warn(`[gcal-sync] ⚠ Skipping event ${e.id} - missing start/end`);
+        skipped++;
+        continue;
+      }
+
+      console.log(`[gcal-sync] Processing: ${e.id} | "${e.summary}" | ${start}`);
 
       // Handle cancelled events
       if (e.status === "cancelled") {
+        console.log(`[gcal-sync]   → Marking as cancelled`);
         const cancelRes = await fetch(`${supa}/rest/v1/rpc/mark_booking_cancelled`, {
           method: "POST",
           headers: {
@@ -237,7 +284,12 @@ Deno.serve(async () => {
             p_google_event_id: e.id,
           }),
         });
-        if (cancelRes.ok) cancelled++;
+        if (cancelRes.ok) {
+          cancelled++;
+          console.log(`[gcal-sync]   ✓ Cancelled`);
+        } else {
+          console.error(`[gcal-sync]   ✗ Failed to cancel: ${cancelRes.status}`);
+        }
         continue;
       }
 
@@ -245,6 +297,9 @@ Deno.serve(async () => {
       const durationMinutes = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000);
       const parsed = parseGcalEvent(e);
       const fields = extractFieldsFromEvent(e);
+      const isBooking = isBookingEvent(e, fields);
+
+      console.log(`[gcal-sync]   → is_booking=${isBooking}, service=${parsed.service_code ?? inferServiceCode(e.summary, durationMinutes)}, pickup=${fields.pickup_location}`);
 
       const payload = {
         p_google_event_id: e.id,
@@ -259,7 +314,7 @@ Deno.serve(async () => {
         p_end: end,
         p_pickup: fields.pickup_location ?? parsed.pickup_location ?? null,
         p_extended: e,  // Store full event object for debugging/audit
-        p_is_booking: isBookingEvent(e, fields),  // Simple booking detection
+        p_is_booking: isBooking,  // Simple booking detection
         p_title: e.summary ?? null,
       };
 
@@ -272,9 +327,94 @@ Deno.serve(async () => {
         },
         body: JSON.stringify(payload),
       });
-      if (up.ok) synced++;
+      
+      if (!up.ok) {
+        skipped++;
+        const errorText = await up.text();
+        console.error(`[gcal-sync]   ✗ Failed to upsert: ${up.status}`);
+        console.error(`[gcal-sync]   Response: ${errorText}`);
+        continue; // Skip to next event - don't break the whole sync
+      }
+
+      synced++;
+      console.log(`[gcal-sync]   ✓ Upserted successfully`);
+
+      // ---------- SMS LOGIC (wrapped in try-catch to prevent breaking sync) ----------
+      try {
+        if (SMS_ENABLED && isBooking) {
+          const upData = await up.text();
+          let row: any = null;
+          
+          try {
+            const parsed = JSON.parse(upData);
+            row = Array.isArray(parsed) ? parsed[0] : parsed;
+          } catch (parseErr) {
+            console.warn(`[gcal-sync]   ⚠ Could not parse upsert response for SMS check:`, parseErr);
+          }
+
+          if (row && row.booking_id) {
+            const startTs = new Date(start).getTime();
+            const isFuture = startTs > Date.now();
+            const isConfirmed = (e.status ?? "confirmed") === "confirmed";
+            const needsSMS = row.inserted === true && row.sms_confirm_sent_at == null;
+
+            console.log(`[gcal-sync]   → SMS check: inserted=${row.inserted}, has_sms=${!!row.sms_confirm_sent_at}, future=${isFuture}, confirmed=${isConfirmed}`);
+
+            if (needsSMS && isFuture && isConfirmed) {
+              console.log(`[gcal-sync]   → Sending SMS for booking ${row.booking_id}...`);
+              
+              const smsRes = await fetch(`${supa}/functions/v1/booking-sms`, {
+                method: "POST",
+                headers: {
+                  "content-type": "application/json",
+                  "authorization": `Bearer ${key}`,
+                  "apikey": key
+                },
+                body: JSON.stringify({ booking_id: row.booking_id })
+              });
+
+              if (smsRes.ok) {
+                const smsData = await smsRes.json();
+                if (smsData?.ok === true) {
+                  console.log(`[gcal-sync]   ✓ SMS sent for booking ${row.booking_id}`);
+                  
+                  // Update the sms_confirm_sent_at flag
+                  await fetch(
+                    `${supa}/rest/v1/booking?id=eq.${encodeURIComponent(row.booking_id)}`,
+                    {
+                      method: "PATCH",
+                      headers: {
+                        "content-type": "application/json",
+                        "authorization": `Bearer ${key}`,
+                        "apikey": key,
+                        "prefer": "return=minimal"
+                      },
+                      body: JSON.stringify({ sms_confirm_sent_at: new Date().toISOString() })
+                    }
+                  );
+                } else {
+                  console.warn(`[gcal-sync]   ⚠ SMS response not ok:`, smsData);
+                }
+              } else {
+                const smsError = await smsRes.text();
+                console.error(`[gcal-sync]   ✗ SMS failed (${smsRes.status}):`, smsError);
+              }
+            } else {
+              console.log(`[gcal-sync]   → SMS not needed (already sent or not applicable)`);
+            }
+          } else {
+            console.warn(`[gcal-sync]   ⚠ No booking_id in upsert response for SMS`);
+          }
+        }
+      } catch (smsError) {
+        // Critical: SMS errors should NOT break the sync
+        console.error(`[gcal-sync]   ✗ SMS error (non-fatal):`, smsError);
+        console.error(`[gcal-sync]   ℹ Sync continues despite SMS failure`);
+      }
     }
-    results.push({ calendar_id, synced, cancelled });
+    
+    console.log(`[gcal-sync] Calendar complete: ${synced} synced, ${cancelled} cancelled, ${skipped} skipped`);
+    results.push({ calendar_id, synced, cancelled, skipped });
   }
 
   const finishedTime = new Date();
@@ -282,7 +422,11 @@ Deno.serve(async () => {
   // ALWAYS log the sync, even if 0 events were synced
   const totalSynced = results.reduce((sum, r) => sum + r.synced, 0);
   const totalCancelled = results.reduce((sum, r) => sum + r.cancelled, 0);
+  const totalSkipped = results.reduce((sum, r) => sum + (r.skipped || 0), 0);
   
+  console.log(`[gcal-sync] === SYNC COMPLETE ===`);
+  console.log(`[gcal-sync] Total: ${totalSynced} synced, ${totalCancelled} cancelled, ${totalSkipped} skipped`);
+
   await fetch(`${supa}/rest/v1/gcal_sync_log`, {
     method: "POST",
     headers: {

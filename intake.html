@@ -8,8 +8,10 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="assets/theme.css" rel="stylesheet">
   <script src="assets/config.js"></script>
+  <script src="assets/js/config.local.js"></script>
   <script src="assets/js/modal.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/js/supabaseClient.js"></script>
   <style>
     .wizard-step {
       display: none;
@@ -254,10 +256,13 @@
     </div>
 
     <!-- Skip Link (optional) -->
-    <div class="text-center mt-6">
-      <a href="portal.html" class="text-sm text-gray-600 hover:text-gray-900 underline">
+    <div class="text-center mt-6 space-y-2">
+      <a href="#" onclick="skipIntake(); return false;" class="text-sm text-gray-600 hover:text-gray-900 underline block">
         Skip for now (you can complete this later)
       </a>
+      <button onclick="resetFormOnly(); return false;" class="text-xs text-red-600 hover:text-red-800 underline">
+        [DEV] Clear Form & Cache (refresh page to test auto-load)
+      </button>
     </div>
   </div>
 
@@ -267,10 +272,86 @@
     const CACHE_KEY = 'onboarding_form_data';
     const STEP_KEY = 'onboarding_current_step';
 
-    // Initialize Supabase
-    const supabaseUrl = window.SUPABASE_URL || '';
-    const supabaseKey = window.SUPABASE_ANON_KEY || '';
-    const supabase = window.supabase?.createClient(supabaseUrl, supabaseKey);
+    // Wait for the SHARED Supabase client (from auth-scripts or supabaseClient.js)
+    async function waitForSupabaseClient(timeoutMs = 5000) {
+      const t0 = Date.now();
+      while (!window.supabaseClient && Date.now() - t0 < timeoutMs) {
+        await new Promise(r => setTimeout(r, 100));
+      }
+      if (!window.supabaseClient) {
+        console.error('[intake] ❌ window.supabaseClient not available after waiting');
+      }
+      return window.supabaseClient;
+    }
+
+    // Fetch booking data to pre-populate form if blank
+    async function fetchBookingData() {
+      const supabase = await waitForSupabaseClient();
+      if (!supabase) {
+        console.log('[intake] ❌ Supabase not initialized');
+        return null;
+      }
+      
+      try {
+        // Get current user
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+          console.log('[intake] ❌ No user logged in:', userError);
+          return null;
+        }
+        
+        console.log('[intake] ✅ User logged in:', user.email);
+
+        // Get client ID
+        const { data: client, error: clientError } = await supabase
+          .from('client')
+          .select('id')
+          .eq('email', user.email)
+          .single();
+        
+        if (clientError || !client?.id) {
+          console.log('[intake] ❌ Client not found:', clientError);
+          return null;
+        }
+        
+        console.log('[intake] ✅ Client ID:', client.id);
+
+        // Get the most recent booking for this client
+        const { data: bookings, error: bookingError } = await supabase
+          .from('booking')
+          .select('first_name, last_name, mobile')
+          .eq('client_id', client.id)
+          .order('start_time', { ascending: false })
+          .limit(1);
+
+        if (bookingError) {
+          console.log('[intake] ❌ Booking query error:', bookingError);
+          return null;
+        }
+        
+        console.log('[intake] 📋 Bookings found:', bookings);
+
+        if (bookings && bookings.length > 0) {
+          const booking = bookings[0];
+          console.log('[intake] 📋 Latest booking:', booking);
+          
+          const result = {
+            firstName: booking.first_name || '',
+            lastName: booking.last_name || '',
+            mobile: booking.mobile || ''
+          };
+          
+          console.log('[intake] ✅ Extracted data:', result);
+          return result;
+        } else {
+          console.log('[intake] ⚠️ No bookings found for this client');
+        }
+      } catch (err) {
+        console.error('[intake] ❌ Error fetching booking data:', err);
+      }
+      
+      return null;
+    }
 
     // Save form data to localStorage
     function saveToCache() {
@@ -392,6 +473,38 @@
       }
     }
 
+    function skipIntake() {
+      // Set a session flag to indicate user skipped intake
+      sessionStorage.setItem('intake_skipped', 'true');
+      // Redirect to portal
+      window.location.href = 'portal.html';
+    }
+
+    function resetFormOnly() {
+      // Clear localStorage cache
+      localStorage.removeItem(CACHE_KEY);
+      localStorage.removeItem(STEP_KEY);
+      
+      // Clear all form fields
+      document.getElementById('firstName').value = '';
+      document.getElementById('lastName').value = '';
+      document.getElementById('mobile').value = '';
+      document.getElementById('licenseNumber').value = '';
+      document.getElementById('medicalConditions').value = '';
+      document.getElementById('isBeginner').checked = false;
+      document.getElementById('isAnxious').checked = false;
+      document.getElementById('isSenior').checked = false;
+      document.getElementById('isOther').checked = false;
+      document.getElementById('otherDetails').value = '';
+      document.getElementById('otherDetails').disabled = true;
+      
+      // Go back to step 1
+      showStep(1);
+      
+      alert('Form and cache cleared! Refresh the page (F5) to test auto-loading from booking data.');
+      document.getElementById('firstName').focus();
+    }
+
     function toggleOtherText() {
       const checkbox = document.getElementById('isOther');
       const textbox = document.getElementById('otherDetails');
@@ -405,6 +518,7 @@
     }
 
     async function submitForm() {
+      const supabase = await waitForSupabaseClient();
       if (!supabase) {
         Modal.error('Unable to connect to database. Please try again later.');
         return;
@@ -415,17 +529,23 @@
         first_name: document.getElementById('firstName').value.trim(),
         last_name: document.getElementById('lastName').value.trim(),
         mobile: document.getElementById('mobile').value.trim(),
-        license_number: document.getElementById('licenseNumber').value.trim().toUpperCase(),
+        learner_permit_number: document.getElementById('licenseNumber').value.trim().toUpperCase(),
         medical_conditions: document.getElementById('medicalConditions').value.trim() || null,
         is_beginner: document.getElementById('isBeginner').checked,
-        is_anxious: document.getElementById('isAnxious').checked,
+        is_anxious_nervous: document.getElementById('isAnxious').checked,
         is_senior: document.getElementById('isSenior').checked,
-        other_notes: document.getElementById('isOther').checked ? document.getElementById('otherDetails').value.trim() : null,
-        profile_completed: true,
+        learning_needs_other: document.getElementById('isOther').checked ? document.getElementById('otherDetails').value.trim() : null,
+        intake_completed: true,
         updated_at: new Date().toISOString()
       };
 
       try {
+        // Check if Supabase is initialized
+        if (!supabase) {
+          Modal.error('Configuration error. Please contact support.', 'Setup Required');
+          return;
+        }
+
         // Get current user
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError || !user) {
@@ -434,12 +554,12 @@
           return;
         }
 
-        // Use upsert to handle both insert and update
+        // Use upsert to handle both insert and update (using email as the unique key)
         const { error } = await supabase
           .from('client')
           .upsert(
-            { ...formData, user_id: user.id },
-            { onConflict: 'user_id' }
+            { ...formData, email: user.email },
+            { onConflict: 'email' }
           );
 
         if (error) {
@@ -451,9 +571,11 @@
         // Clear cache on successful submission
         clearCache();
         
-        // Show success message
-        document.querySelectorAll('.wizard-step').forEach(el => el.classList.remove('active'));
-        document.getElementById('successMessage').classList.remove('hidden');
+        // Clear the skip flag since they completed it
+        sessionStorage.removeItem('intake_skipped');
+        
+        // Redirect to portal
+        window.location.href = 'portal.html';
         
       } catch (err) {
         console.error('Unexpected error:', err);
@@ -499,9 +621,44 @@
     });
 
     // Load cached data and focus first input on page load
-    window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('DOMContentLoaded', async () => {
+      console.log('[intake] 🚀 Page loaded, starting initialization...');
+      
       loadFromCache();
-      document.getElementById('firstName').focus();
+      
+      // If form is blank (no cached data), try to pre-populate from booking
+      const firstNameInput = document.getElementById('firstName');
+      const lastNameInput = document.getElementById('lastName');
+      const mobileInput = document.getElementById('mobile');
+      
+      const isFormBlank = !firstNameInput.value && !lastNameInput.value && !mobileInput.value;
+      
+      console.log('[intake] 📝 Form blank?', isFormBlank, {
+        firstName: firstNameInput.value,
+        lastName: lastNameInput.value,
+        mobile: mobileInput.value
+      });
+      
+      if (isFormBlank) {
+        console.log('[intake] 🔍 Attempting to fetch booking data...');
+        
+        // Wait a bit for auth to initialize properly
+        await new Promise(r => setTimeout(r, 500));
+        
+        const bookingData = await fetchBookingData();
+        if (bookingData) {
+          console.log('[intake] ✅ Populating form with:', bookingData);
+          if (bookingData.firstName) firstNameInput.value = bookingData.firstName;
+          if (bookingData.lastName) lastNameInput.value = bookingData.lastName;
+          if (bookingData.mobile) mobileInput.value = bookingData.mobile;
+        } else {
+          console.log('[intake] ⚠️ No booking data to populate (user may not be logged in)');
+        }
+      } else {
+        console.log('[intake] ℹ️ Form already has data, skipping booking fetch');
+      }
+      
+      firstNameInput.focus();
     });
   </script>
 </body>

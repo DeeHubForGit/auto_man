@@ -45,6 +45,17 @@ async function fetchJson(url: string, init: RequestInit) {
   }
 }
 
+// Format date with ordinal suffix (1st, 2nd, 3rd, etc.)
+function getOrdinalSuffix(day: number): string {
+  if (day > 3 && day < 21) return 'th';
+  switch (day % 10) {
+    case 1: return 'st';
+    case 2: return 'nd';
+    case 3: return 'rd';
+    default: return 'th';
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return json({ ok: true });
   if (req.method !== "POST") return json({ error: "Method Not Allowed" }, 405);
@@ -107,6 +118,7 @@ serve(async (req) => {
       pickup_location: string | null;
       service_code: string | null;
       gcal_sequence: number | null;
+      client_id: string | null;
     };
 
     // 2) Idempotency and business rules
@@ -140,25 +152,77 @@ serve(async (req) => {
       return json({ error: "Invalid or missing AU mobile on booking" }, 400);
     }
 
-    // 3) Build friendly message
-    const when = new Intl.DateTimeFormat("en-AU", {
+    // 3) Check if customer needs to complete intake form
+    let needsIntake = false;
+    if (b.client_id) {
+      const { res: clientRes, data: clientData } = await fetchJson(
+        `${SUPABASE_URL}/rest/v1/client?id=eq.${encodeURIComponent(b.client_id)}&select=intake_completed&limit=1`,
+        {
+          headers: {
+            "apikey": SERVICE_KEY,
+            "authorization": `Bearer ${SERVICE_KEY}`,
+            "content-type": "application/json",
+            "accept": "application/json",
+          },
+        },
+      );
+      
+      if (clientRes.ok) {
+        const clientRows = (clientData as unknown as any[]) || [];
+        // If client doesn't exist or intake_completed is false/null, they need intake
+        needsIntake = clientRows.length === 0 || clientRows[0]?.intake_completed !== true;
+      } else {
+        // If we can't check, assume they need intake (safe default)
+        needsIntake = true;
+      }
+    } else {
+      // No client_id means definitely needs intake
+      needsIntake = true;
+    }
+
+    // 4) Build friendly message with improved formatting
+    const firstName = b.first_name || "there";
+    
+    // Format date: "Sat 1st Nov at 10:00 am"
+    const dayOfWeek = new Intl.DateTimeFormat("en-AU", {
       timeZone: "Australia/Melbourne",
       weekday: "short",
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
     }).format(start);
+    
+    const day = parseInt(new Intl.DateTimeFormat("en-AU", {
+      timeZone: "Australia/Melbourne",
+      day: "numeric",
+    }).format(start));
+    
+    const month = new Intl.DateTimeFormat("en-AU", {
+      timeZone: "Australia/Melbourne",
+      month: "short",
+    }).format(start);
+    
+    const time = new Intl.DateTimeFormat("en-AU", {
+      timeZone: "Australia/Melbourne",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }).format(start).toLowerCase();
+    
+    const formattedDate = `${dayOfWeek} ${day}${getOrdinalSuffix(day)} ${month} at ${time}`;
 
-    const name = [b.first_name, b.last_name].filter(Boolean).join(" ").trim();
-    const pickup = b.pickup_location ? ` Pickup: ${b.pickup_location}.` : "";
-    const svc = b.service_code ? ` (${b.service_code.replace(/_/g, " ")})` : "";
+    // Build message parts
+    let message = `Hi ${firstName},\n\n`;
+    message += `Your driving lesson is booked on ${formattedDate}.`;
+    
+    if (b.pickup_location) {
+      message += `\nPickup: ${b.pickup_location}.`;
+    }
+    
+    if (needsIntake) {
+      message += `\n\nPlease sign up on the Auto-Man website and advise of your permit/licence and any relevant medical conditions before your first driving lesson:\nhttps://www.automandrivingschool.com.au/signup`;
+    }
+    
+    message += `\n\nThank you for booking with Auto-Man Driving School.`;
 
-    const message =
-      `Thanks for booking Auto-Man${name ? ", " + name : ""}. ` +
-      `Your lesson${svc} is ${when}.` + pickup + ` `;
-
-    // 4) Send via existing sms function (server→server)
+    // 5) Send via existing sms function (server→server)
     const send = await fetchJson(SMS_FN_URL, {
       method: "POST",
       headers: {
@@ -176,7 +240,7 @@ serve(async (req) => {
       );
     }
 
-    // 5) Mark sent (idempotency latch)
+    // 6) Mark sent (idempotency latch)
     const { res: updRes, data: updData } = await fetchJson(
       `${SUPABASE_URL}/rest/v1/booking?id=eq.${encodeURIComponent(b.id)}`,
       {
@@ -204,6 +268,7 @@ serve(async (req) => {
       sent_to: e164,
       clicksend: (send.data as any)?.data ?? null,
       message_preview: message,
+      needs_intake: needsIntake,
     });
   } catch (err) {
     console.error("[booking-sms] error:", err);

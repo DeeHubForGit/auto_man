@@ -1,0 +1,263 @@
+// Google Calendar → Booking reminder SMS sender
+// -----------------------------------------------------------
+// Finds bookings starting ~X hours from now and sends a short reminder.
+// Safe to run on a frequent schedule; uses sms_reminder_sent_at for idempotency.
+//
+// Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, (optional) SMS_SENDER
+// Optional Env: REMINDER_HOURS (default 24), REMINDER_WINDOW_MINUTES (default 10)
+// POST body can override: { hours?: number, window_minutes?: number, dry_run?: boolean, limit?: number }
+
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+
+type Json = Record<string, unknown>;
+
+function json(body: Json, init: number | ResponseInit = 200) {
+  const initObj = typeof init === "number" ? { status: init } as ResponseInit : init;
+  return new Response(JSON.stringify(body), {
+    ...initObj,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "POST,OPTIONS",
+      "access-control-allow-headers": "authorization, x-client-info, apikey, content-type",
+      ...(initObj.headers || {}),
+    },
+  });
+}
+
+async function fetchJson(url: string, init: RequestInit) {
+  const res = await fetch(url, init);
+  const text = await res.text();
+  try {
+    return { res, data: JSON.parse(text) as Json, raw: text };
+  } catch {
+    return { res, data: null as unknown as Json, raw: text };
+  }
+}
+
+function digits(v: string | null | undefined) {
+  return (v || "").replace(/\D+/g, "");
+}
+function toE164Au(mobile: string | null | undefined): string | null {
+  const d = digits(mobile);
+  if (/^04\d{8}$/.test(d)) return `+61${d.slice(1)}`;
+  if (/^614\d{8}$/.test(d)) return `+${d}`;
+  if (/^\+614\d{8}$/.test(mobile || "")) return mobile!;
+  return null;
+}
+function getOrdinalSuffix(day: number): string {
+  if (day > 3 && day < 21) return "th";
+  switch (day % 10) {
+    case 1: return "st";
+    case 2: return "nd";
+    case 3: return "rd";
+    default: return "th";
+  }
+}
+function fmtTimeAU(dt: Date) {
+  return new Intl.DateTimeFormat("en-AU", {
+    timeZone: "Australia/Melbourne",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(dt).toLowerCase();
+}
+function fmtShortDateAU(dt: Date) {
+  const wd = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Melbourne", weekday: "short" }).format(dt);
+  const d  = parseInt(new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Melbourne", day: "numeric" }).format(dt));
+  const m  = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Melbourne", month: "short" }).format(dt);
+  return `${wd} ${d}${getOrdinalSuffix(d)} ${m}`;
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return json({ ok: true });
+  if (req.method !== "POST") return json({ error: "Method Not Allowed" }, 405);
+
+  try {
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    if (!SUPABASE_URL || !SERVICE_KEY) return json({ error: "Server not configured" }, 500);
+
+    // Defaults can be set via env, and overridden per-run via request body
+    const envHours  = Number(Deno.env.get("REMINDER_HOURS") || 24);
+    const envWindow = Number(Deno.env.get("REMINDER_WINDOW_MINUTES") || 10);
+
+    const body = await req.json().catch(() => ({})) as {
+      hours?: number;
+      window_minutes?: number;
+      dry_run?: boolean;
+      limit?: number;
+    };
+
+    const HOURS = Number.isFinite(body.hours) ? Number(body.hours) : envHours;
+    const WINDOW_MIN = Number.isFinite(body.window_minutes) ? Number(body.window_minutes) : envWindow;
+    const DRY_RUN = !!body.dry_run;
+    const LIMIT = Math.max(1, Math.min(200, Number.isFinite(body.limit) ? Number(body.limit) : 100));
+
+    // Target time window = (now + HOURS) ± WINDOW/2 minutes
+    const now = new Date();
+    const center = new Date(now.getTime() + HOURS * 3600_000);
+    const half = Math.max(1, Math.floor(WINDOW_MIN / 2)) * 60_000;
+
+    const startGte = new Date(center.getTime() - half).toISOString();
+    const startLt  = new Date(center.getTime() + half).toISOString();
+
+    // Pull candidate bookings
+    const q = new URLSearchParams({
+      select: "*",
+      limit: String(LIMIT),
+      order: "start_time.asc",
+      and: `(${[
+        "is_booking.is.true",
+        "sms_reminder_sent_at.is.null",
+        "start_time.gte." + startGte,
+        "start_time.lt." + startLt,
+      ].join(",")})`
+    });
+
+    // Keep status guard (confirmed or null) outside the AND for clarity
+    // PostgREST equivalent: or=(status.is.null,status.eq.confirmed)
+    q.append("or", "(status.is.null,status.eq.confirmed)");
+
+    const { res: listRes, data: listData } = await fetchJson(
+      `${SUPABASE_URL}/rest/v1/booking?${q.toString()}`,
+      { headers: { apikey: SERVICE_KEY, authorization: `Bearer ${SERVICE_KEY}` } }
+    );
+
+    if (!listRes.ok) {
+      return json({ error: "Failed to list bookings", details: listData ?? (await listRes.text()) }, 502);
+    }
+
+    const bookings = (listData as any[]) ?? [];
+    const results: any[] = [];
+
+    for (const b of bookings) {
+      try {
+        const start = new Date(b.start_time);
+        const end   = new Date(b.end_time);
+        if (!isFinite(start.getTime()) || !isFinite(end.getTime())) {
+          results.push({ id: b.id, skipped: "bad_dates" });
+          continue;
+        }
+
+        // Basic sanity (future only)
+        if (start.getTime() <= now.getTime()) {
+          results.push({ id: b.id, skipped: "past" });
+          continue;
+        }
+
+        // Mobile validation
+        const e164 = toE164Au(b.mobile);
+        if (!e164) {
+          results.push({ id: b.id, skipped: "invalid_mobile" });
+          continue;
+        }
+
+        // Compose concise reminder
+        // Example: "Reminder: your lesson is Sat 2nd Nov, 1:30 pm. Pickup: 324 Test St. 24h cancellation applies. — Auto-Man"
+        const firstName = (b.first_name || "there").trim();
+        const whenDate  = fmtShortDateAU(start);
+        const whenTime  = fmtTimeAU(start);
+
+        let msg = `Hi ${firstName}, reminder: your driving lesson is ${whenDate} at ${whenTime}.`;
+        if (b.pickup_location) msg += ` Pickup: ${b.pickup_location}`;
+        msg += `\n\n24-hour cancellation policy applies.\n— Auto-Man Driving School`;
+
+        // Optionally, include a very short portal link (skip if not ready)
+        // msg += `\nManage: https://www.automandrivingschool.com.au/account`;
+
+        if (DRY_RUN) {
+          results.push({ id: b.id, dry_run: true, to: e164, message_preview: msg.slice(0, 120) + "…" });
+          continue;
+        }
+
+        // Send via your existing /functions/v1/sms
+        const { res: sendRes, data: sendData } = await fetchJson(
+          `${SUPABASE_URL}/functions/v1/sms`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              "authorization": `Bearer ${SERVICE_KEY}`,
+              "apikey": SERVICE_KEY,
+            },
+            body: JSON.stringify({ to: e164, message: msg }),
+          }
+        );
+
+        let status = "pending";
+        let provider_message_id: string | null = null;
+        if (!sendRes.ok || !(sendData as any)?.ok) {
+          status = "failed";
+        } else {
+          const cs = (sendData as any)?.clicksend;
+          if (cs?.data?.messages?.length) {
+            provider_message_id = cs.data.messages[0]?.message_id ?? null;
+            status = cs.data.messages[0]?.status === "SUCCESS" ? "sent" : "pending";
+          } else {
+            status = "sent";
+          }
+        }
+
+        // Log to sms_log
+        await fetchJson(`${SUPABASE_URL}/rest/v1/sms_log`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "authorization": `Bearer ${SERVICE_KEY}`,
+            "apikey": SERVICE_KEY,
+            "prefer": "return=minimal",
+          },
+          body: JSON.stringify({
+            booking_id: b.id,
+            to_phone: e164,
+            body: msg,
+            status,
+            template: "booking_reminder",
+            provider: "clicksend",
+            provider_message_id,
+            error_message: status === "failed" ? JSON.stringify(sendData) : null,
+            sent_at: new Date().toISOString(),
+          }),
+        });
+
+        if (status === "failed") {
+          results.push({ id: b.id, error: "send_failed", send: sendData });
+          continue;
+        }
+
+        // Latch to prevent duplicates
+        await fetchJson(
+          `${SUPABASE_URL}/rest/v1/booking?id=eq.${encodeURIComponent(b.id)}`,
+          {
+            method: "PATCH",
+            headers: {
+              "content-type": "application/json",
+              "authorization": `Bearer ${SERVICE_KEY}`,
+              "apikey": SERVICE_KEY,
+              "prefer": "return=minimal",
+            },
+            body: JSON.stringify({ sms_reminder_sent_at: new Date().toISOString() }),
+          }
+        );
+
+        results.push({ id: b.id, ok: true, to: e164, status, provider_message_id });
+      } catch (innerErr) {
+        results.push({ id: (b && b.id) || null, error: String(innerErr) });
+      }
+    }
+
+    return json({
+      ok: true,
+      hours: HOURS,
+      window_minutes: WINDOW_MIN,
+      dry_run: DRY_RUN,
+      examined: bookings.length,
+      sent: results.filter(r => r.ok).length,
+      results,
+    });
+  } catch (err) {
+    console.error("[booking-reminder] error:", err);
+    return json({ error: "Unexpected error", details: String(err) }, 500);
+  }
+});

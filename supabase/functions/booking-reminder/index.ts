@@ -5,14 +5,15 @@
 //
 // Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, (optional) SMS_SENDER
 // Optional Env: REMINDER_HOURS (default 24), REMINDER_WINDOW_MINUTES (default 10)
-// POST body can override: { hours?: number, window_minutes?: number, dry_run?: boolean, limit?: number }
+// POST body can override:
+//   { booking_id?: string, hours?: number, window_minutes?: number, dry_run?: boolean, limit?: number }
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 type Json = Record<string, unknown>;
 
 function json(body: Json, init: number | ResponseInit = 200) {
-  const initObj = typeof init === "number" ? { status: init } as ResponseInit : init;
+  const initObj = typeof init === "number" ? ({ status: init } as ResponseInit) : init;
   return new Response(JSON.stringify(body), {
     ...initObj,
     headers: {
@@ -60,12 +61,25 @@ function fmtTimeAU(dt: Date) {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
-  }).format(dt).toLowerCase();
+  })
+    .format(dt)
+    .toLowerCase();
 }
 function fmtShortDateAU(dt: Date) {
-  const wd = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Melbourne", weekday: "short" }).format(dt);
-  const d  = parseInt(new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Melbourne", day: "numeric" }).format(dt));
-  const m  = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Melbourne", month: "short" }).format(dt);
+  const wd = new Intl.DateTimeFormat("en-AU", {
+    timeZone: "Australia/Melbourne",
+    weekday: "short",
+  }).format(dt);
+  const d = parseInt(
+    new Intl.DateTimeFormat("en-AU", {
+      timeZone: "Australia/Melbourne",
+      day: "numeric",
+    }).format(dt),
+  );
+  const m = new Intl.DateTimeFormat("en-AU", {
+    timeZone: "Australia/Melbourne",
+    month: "short",
+  }).format(dt);
   return `${wd} ${d}${getOrdinalSuffix(d)} ${m}`;
 }
 
@@ -75,14 +89,16 @@ serve(async (req) => {
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-    const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     if (!SUPABASE_URL || !SERVICE_KEY) return json({ error: "Server not configured" }, 500);
 
-    // Defaults can be set via env, and overridden per-run via request body
-    const envHours  = Number(Deno.env.get("REMINDER_HOURS") || 24);
+    // Defaults from env, overridable via body.
+    const envHours = Number(Deno.env.get("REMINDER_HOURS") || 24);
     const envWindow = Number(Deno.env.get("REMINDER_WINDOW_MINUTES") || 10);
 
-    const body = await req.json().catch(() => ({})) as {
+    // 🔹 Accept booking_id to force a single-target reminder.
+    const body = (await req.json().catch(() => ({}))) as {
+      booking_id?: string;              // <— single-booking override (optional)
       hours?: number;
       window_minutes?: number;
       dry_run?: boolean;
@@ -94,103 +110,138 @@ serve(async (req) => {
     const DRY_RUN = !!body.dry_run;
     const LIMIT = Math.max(1, Math.min(200, Number.isFinite(body.limit) ? Number(body.limit) : 100));
 
-    // Target time window = (now + HOURS) ± WINDOW/2 minutes
     const now = new Date();
-    const center = new Date(now.getTime() + HOURS * 3600_000);
-    const half = Math.max(1, Math.floor(WINDOW_MIN / 2)) * 60_000;
 
-    const startGte = new Date(center.getTime() - half).toISOString();
-    const startLt  = new Date(center.getTime() + half).toISOString();
+    // ---------- Load bookings ----------
+    let bookings: any[] = [];
 
-    // Pull candidate bookings
-    const q = new URLSearchParams({
-      select: "*",
-      limit: String(LIMIT),
-      order: "start_time.asc",
-      and: `(${[
-        "is_booking.is.true",
-        "sms_reminder_sent_at.is.null",
-        "start_time.gte." + startGte,
-        "start_time.lt." + startLt,
-      ].join(",")})`
-    });
+    if (body.booking_id) {
+      // 🔹 Single-booking path: load exactly this booking.
+      const one = await fetchJson(
+        `${SUPABASE_URL}/rest/v1/booking?select=*&id=eq.${encodeURIComponent(body.booking_id)}&limit=1`,
+        { headers: { apikey: SERVICE_KEY, authorization: `Bearer ${SERVICE_KEY}`, accept: "application/json" } },
+      );
 
-    // Keep status guard (confirmed or null) outside the AND for clarity
-    // PostgREST equivalent: or=(status.is.null,status.eq.confirmed)
-    q.append("or", "(status.is.null,status.eq.confirmed)");
+      if (!one.res.ok) {
+        return json({ error: "Failed to load booking", details: one.data ?? (await one.res.text()) }, 502);
+      }
 
-    const { res: listRes, data: listData } = await fetchJson(
-      `${SUPABASE_URL}/rest/v1/booking?${q.toString()}`,
-      { headers: { apikey: SERVICE_KEY, authorization: `Bearer ${SERVICE_KEY}` } }
-    );
+      const rows = (one.data as any[]) ?? [];
+      if (rows.length) bookings = rows;
+    } else {
+      // 🔹 Window scan (original behaviour).
+      // Target time window = (now + HOURS) ± WINDOW/2 minutes
+      const center = new Date(now.getTime() + HOURS * 3600_000);
+      const half = Math.max(1, Math.floor(WINDOW_MIN / 2)) * 60_000;
+      const startGte = new Date(center.getTime() - half).toISOString();
+      const startLt = new Date(center.getTime() + half).toISOString();
 
-    if (!listRes.ok) {
-      return json({ error: "Failed to list bookings", details: listData ?? (await listRes.text()) }, 502);
+      // Pull candidate bookings
+      const q = new URLSearchParams({
+        select: "*",
+        limit: String(LIMIT),
+        order: "start_time.asc",
+        and: `(${[
+          "is_booking.is.true",
+          "sms_reminder_sent_at.is.null",
+          "start_time.gte." + startGte,
+          "start_time.lt." + startLt,
+        ].join(",")})`,
+      });
+
+      // Keep status guard (confirmed or null) outside the AND for clarity
+      // PostgREST equivalent: or=(status.is.null,status.eq.confirmed)
+      q.append("or", "(status.is.null,status.eq.confirmed)");
+
+      const list = await fetchJson(`${SUPABASE_URL}/rest/v1/booking?${q.toString()}`, {
+        headers: { apikey: SERVICE_KEY, authorization: `Bearer ${SERVICE_KEY}` },
+      });
+
+      if (!list.res.ok) {
+        return json({ error: "Failed to list bookings", details: list.data ?? (await list.res.text()) }, 502);
+      }
+
+      bookings = ((list.data as any[]) ?? []);
     }
 
-    const bookings = (listData as any[]) ?? [];
     const results: any[] = [];
 
     for (const b of bookings) {
       try {
+        // Guard rails (these were encoded in the window query; we repeat for single-id path)
+        if (b.is_booking === false) {
+          results.push({ id: b.id, skipped: "not_a_booking" });
+          continue;
+        }
+        if (b.sms_reminder_sent_at) {
+          results.push({ id: b.id, skipped: "already_sent" });
+          continue;
+        }
+        if (b.status && b.status !== "confirmed") {
+          results.push({ id: b.id, skipped: `status_${b.status}` });
+          continue;
+        }
+
         const start = new Date(b.start_time);
-        const end   = new Date(b.end_time);
+        const end = new Date(b.end_time);
         if (!isFinite(start.getTime()) || !isFinite(end.getTime())) {
           results.push({ id: b.id, skipped: "bad_dates" });
           continue;
         }
-
-        // Basic sanity (future only)
         if (start.getTime() <= now.getTime()) {
           results.push({ id: b.id, skipped: "past" });
           continue;
         }
 
-        // Mobile validation
         const e164 = toE164Au(b.mobile);
         if (!e164) {
           results.push({ id: b.id, skipped: "invalid_mobile" });
           continue;
         }
 
-        // Compose concise reminder
-        // Example: "Reminder: your lesson is Sat 2nd Nov, 1:30 pm. Pickup: 324 Test St. 24h cancellation applies. — Auto-Man"
+        // -----------------------------------------------------
+        // Compose friendly reminder message (requested copy)
+        // Example:
+        // Hi Jane,
+        // This is a friendly reminder that your driving lesson is on Sun 2nd Nov
+        // from 1:30 pm to 2:30 pm.
+        // Pickup: 123 Test Street, Belmont
+        //
+        // 24-hour cancellation policy applies.
+        // Auto-Man Driving School
+        // -----------------------------------------------------
         const firstName = (b.first_name || "there").trim();
         const whenDate  = fmtShortDateAU(start);
-        const whenTime  = fmtTimeAU(start);
+        const whenStart = fmtTimeAU(start);
+        const whenEnd   = fmtTimeAU(end);
 
-        let msg = `Hi ${firstName}, reminder: your driving lesson is ${whenDate} at ${whenTime}.`;
-        if (b.pickup_location) msg += ` Pickup: ${b.pickup_location}`;
-        msg += `\n\n24-hour cancellation policy applies.\n— Auto-Man Driving School`;
-
-        // Optionally, include a very short portal link (skip if not ready)
-        // msg += `\nManage: https://www.automandrivingschool.com.au/account`;
+        let msg = `Hi ${firstName},\nThis is a friendly reminder that your driving lesson is on ${whenDate} from ${whenStart} to ${whenEnd}.`;
+        if (b.pickup_location) msg += `\nPickup: ${b.pickup_location}`;
+        msg += `\n\n24-hour cancellation policy applies.\nAuto-Man Driving School`;
 
         if (DRY_RUN) {
-          results.push({ id: b.id, dry_run: true, to: e164, message_preview: msg.slice(0, 120) + "…" });
+          results.push({ id: b.id, dry_run: true, to: e164, message_preview: msg.slice(0, 160) + "…" });
           continue;
         }
 
-        // Send via your existing /functions/v1/sms
-        const { res: sendRes, data: sendData } = await fetchJson(
-          `${SUPABASE_URL}/functions/v1/sms`,
-          {
-            method: "POST",
-            headers: {
-              "content-type": "application/json",
-              "authorization": `Bearer ${SERVICE_KEY}`,
-              "apikey": SERVICE_KEY,
-            },
-            body: JSON.stringify({ to: e164, message: msg }),
-          }
-        );
+        // Send via existing sms function
+        const send = await fetchJson(`${SUPABASE_URL}/functions/v1/sms`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${SERVICE_KEY}`,
+            apikey: SERVICE_KEY,
+          },
+          body: JSON.stringify({ to: e164, message: msg }),
+        });
 
         let status = "pending";
         let provider_message_id: string | null = null;
-        if (!sendRes.ok || !(sendData as any)?.ok) {
+
+        if (!send.res.ok || !(send.data as any)?.ok) {
           status = "failed";
         } else {
-          const cs = (sendData as any)?.clicksend;
+          const cs = (send.data as any)?.clicksend;
           if (cs?.data?.messages?.length) {
             provider_message_id = cs.data.messages[0]?.message_id ?? null;
             status = cs.data.messages[0]?.status === "SUCCESS" ? "sent" : "pending";
@@ -204,9 +255,9 @@ serve(async (req) => {
           method: "POST",
           headers: {
             "content-type": "application/json",
-            "authorization": `Bearer ${SERVICE_KEY}`,
-            "apikey": SERVICE_KEY,
-            "prefer": "return=minimal",
+            authorization: `Bearer ${SERVICE_KEY}`,
+            apikey: SERVICE_KEY,
+            prefer: "return=minimal",
           },
           body: JSON.stringify({
             booking_id: b.id,
@@ -216,30 +267,27 @@ serve(async (req) => {
             template: "booking_reminder",
             provider: "clicksend",
             provider_message_id,
-            error_message: status === "failed" ? JSON.stringify(sendData) : null,
+            error_message: status === "failed" ? JSON.stringify(send.data) : null,
             sent_at: new Date().toISOString(),
           }),
         });
 
         if (status === "failed") {
-          results.push({ id: b.id, error: "send_failed", send: sendData });
+          results.push({ id: b.id, error: "send_failed", send: send.data });
           continue;
         }
 
         // Latch to prevent duplicates
-        await fetchJson(
-          `${SUPABASE_URL}/rest/v1/booking?id=eq.${encodeURIComponent(b.id)}`,
-          {
-            method: "PATCH",
-            headers: {
-              "content-type": "application/json",
-              "authorization": `Bearer ${SERVICE_KEY}`,
-              "apikey": SERVICE_KEY,
-              "prefer": "return=minimal",
-            },
-            body: JSON.stringify({ sms_reminder_sent_at: new Date().toISOString() }),
-          }
-        );
+        await fetchJson(`${SUPABASE_URL}/rest/v1/booking?id=eq.${encodeURIComponent(b.id)}`, {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${SERVICE_KEY}`,
+            apikey: SERVICE_KEY,
+            prefer: "return=minimal",
+          },
+          body: JSON.stringify({ sms_reminder_sent_at: new Date().toISOString() }),
+        });
 
         results.push({ id: b.id, ok: true, to: e164, status, provider_message_id });
       } catch (innerErr) {
@@ -253,7 +301,7 @@ serve(async (req) => {
       window_minutes: WINDOW_MIN,
       dry_run: DRY_RUN,
       examined: bookings.length,
-      sent: results.filter(r => r.ok).length,
+      sent: results.filter((r) => r.ok).length,
       results,
     });
   } catch (err) {

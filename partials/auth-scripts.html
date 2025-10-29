@@ -64,7 +64,6 @@ if (!window.__authBootstrapped) {
     const session = data?.session || null;
     const user = session?.user || null;
 
-    console.log('[auth] restored session:', Boolean(session));
     return { session, user };
   })();
 }

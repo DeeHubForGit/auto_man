@@ -40,19 +40,18 @@
       <a href="index.html#pricing" class="hover:text-blue-600">Lesson Packages</a>
       -->
       <a href="index.html#contact" class="hover:text-blue-600">Contact</a>
-      <a href="portal.html" id="portalBtn" class="hidden hover:text-blue-600">My Account</a>
       <a href="admin.html" id="adminBtn" class="hidden hover:text-blue-600 font-semibold text-orange-600">Admin</a>
     </nav>
 
     <!-- Auth controls (middle cluster) -->
     <div class="hidden md:flex items-center gap-3">
-      <!-- Sign Up as text link -->
-      <a href="signup.html" id="signupBtn" class="md:inline-block text-sm text-gray-700 hover:text-blue-600 transition-colors">Sign Up</a>
-      <!-- Login as button (this position is reused by Sign Out when logged in) -->
-      <a href="login.html" id="loginBtn" class="md:inline-block text-blue-600 border border-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors">Login</a>
-      <!-- Sign Out button (desktop) appears in the same cluster position as Login -->
+      <!-- Sign Up as text link - hidden by default -->
+      <a href="signup.html" id="signupBtn" class="hidden md:inline-block text-sm text-gray-700 hover:text-blue-600 transition-colors">Sign Up</a>
+      <!-- Login as button - hidden by default -->
+      <a href="login.html" id="loginBtn" class="hidden md:inline-block text-blue-600 border border-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors">Login</a>
+      <!-- Sign Out button (desktop) - hidden by default -->
       <button id="logoutBtnHeader" onclick="headerLogout()" class="hidden md:hidden md:inline-block border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">Sign Out</button>
-      <!-- My Account -->
+      <!-- My Account - hidden by default -->
       <a href="portal.html" id="portalBtnHeader" class="hidden md:hidden md:inline-block hover:text-blue-600 transition-colors">My Account</a>
     </div>
 
@@ -134,19 +133,51 @@
     </nav>
   </div>
 
-  <!-- tiny helpers -->
-  <script>
-    // ---------- Auth state (await authReady + bind once) ----------
+</header>
+
+<!-- Header auth script - moved outside to ensure execution -->
+<script>
+  (function() {
+    // Wait for everything to be ready before initializing
+    function waitForReady() {
+      // Check if all dependencies are ready
+      if (document.readyState === 'loading' || !window.supabaseClient) {
+        setTimeout(waitForReady, 100);
+        return;
+      }
+      
+      init();
+    }
+    
+    function init() {
+  // ---------- Auth state (await authReady + bind once) ----------
     function setVisible(el, show) {
       if (!el) return;
-      el.classList.toggle('hidden', !show);
-      el.classList.toggle('md:hidden', !show); // override md:inline-block at desktop
-      el.setAttribute('aria-hidden', show ? 'false' : 'true');
-      el.style.display = show ? '' : 'none';
+      if (show) {
+        // Remove hidden class and restore display
+        el.classList.remove('hidden');
+        el.classList.remove('md:hidden');
+        // Restore the inline-block display for desktop elements
+        if (el.classList.contains('md:inline-block')) {
+          el.style.display = ''; // Let CSS handle it
+        } else {
+          el.style.display = ''; // Let CSS handle it
+        }
+        el.setAttribute('aria-hidden', 'false');
+      } else {
+        // Hide the element
+        el.classList.add('hidden');
+        el.classList.add('md:hidden');
+        el.style.display = 'none';
+        el.setAttribute('aria-hidden', 'true');
+      }
     }
 
     async function updateHeaderAuth() {
-      if (!window.supabaseClient) return;
+      if (!window.supabaseClient) {
+        console.warn('[header] supabaseClient not available');
+        return;
+      }
       try {
         const { data: { session } } = await window.supabaseClient.auth.getSession();
 
@@ -164,7 +195,6 @@
         const adminBtnMobile   = document.getElementById('adminBtnMobile');
 
         const loggedIn = !!(session && session.user);
-        console.log('[header] auth state:', loggedIn ? 'logged-in' : 'logged-out');
 
         // Check if user is admin
         let isAdmin = false;
@@ -177,7 +207,6 @@
             .single();
           
           isAdmin = client?.is_admin === true;
-          console.log('[header] is_admin:', isAdmin);
         }
 
         // Desktop
@@ -209,9 +238,12 @@
           wireLogout(logoutBtnMobile);
         }
       } catch (err) {
-        console.error('Error checking auth state:', err);
+        console.error('[header] ❌ Error checking auth state:', err);
       }
     }
+    
+    // Make updateHeaderAuth globally accessible for debugging
+    window.updateHeaderAuth = updateHeaderAuth;
 
     // Bind exactly once and wait for authReady before first render
     (async function initHeaderAuthOnce() {
@@ -221,11 +253,11 @@
       // Wait for the auth bootstrap to finish its getSession() call
       if (window.authReady) {
         try { await window.authReady; } catch(e) { console.warn('[header] authReady error:', e); }
-      } else {
-        console.warn('[header] authReady not found — continuing anyway');
       }
 
-      const run = () => window.supabaseClient && updateHeaderAuth();
+      const run = () => {
+        return window.supabaseClient && updateHeaderAuth();
+      };
 
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', run, { once: true });
@@ -236,16 +268,23 @@
       // Subscribe once to future auth changes
       if (window.supabaseClient && !window.__headerAuthSub) {
         window.__headerAuthSub = window.supabaseClient.auth.onAuthStateChange((_event, _session) => {
-          console.log('[header] onAuthStateChange');
           run();
         });
       }
 
       // If your include loader fires a custom event after partials load, re-check
       window.addEventListener('partialsLoaded', () => {
-        console.log('[header] partialsLoaded -> updateHeaderAuth');
         run();
       });
+
+      // Fallback: also try after a short delay to catch any missed timing issues
+      setTimeout(() => {
+        if (window.supabaseClient) {
+          run();
+        } else {
+          console.warn('[header] supabaseClient still not available after 1s');
+        }
+      }, 1000);
     })();
 
     // Global logout (if other code calls it)
@@ -271,14 +310,12 @@
       mobileMenu.classList.remove('hidden');
       document.body.classList.add('overflow-hidden');
       if (menuToggleBtn) menuToggleBtn.setAttribute('aria-expanded', 'true');
-      console.log('[header] mobile menu opened');
     }
     function closeMenu() {
       if (!mobileMenu) return;
       mobileMenu.classList.add('hidden');
       document.body.classList.remove('overflow-hidden');
       if (menuToggleBtn) menuToggleBtn.setAttribute('aria-expanded', 'false');
-      console.log('[header] mobile menu closed');
     }
     window.closeMenu = closeMenu;   // because links call closeMenu() inline
     function toggleMenu() {
@@ -333,6 +370,9 @@
         }
       });
     })();
-  </script>
-
-</header>
+    } // End of init()
+    
+    // Start waiting for dependencies
+    waitForReady();
+  })(); // End of wrapper IIFE
+</script>

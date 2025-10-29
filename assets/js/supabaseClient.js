@@ -20,9 +20,8 @@
         storageKey: 'sb-automansite-auth',
       },
     });
-    window.supabaseClient.auth.getSession().then(({ data }) => {
-      console.log('[supabaseClient] restored session:', !!data?.session);
-    });
+    // Silently restore session
+    window.supabaseClient.auth.getSession();
   } catch (e) {
     console.error('[supabaseClient] init failed:', e);
   }

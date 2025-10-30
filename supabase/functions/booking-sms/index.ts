@@ -250,18 +250,23 @@ serve(async (req) => {
     let message = `Hi ${firstName},\n\n`;
     message += `Your driving lesson is booked on ${formattedDate} from ${startTime} to ${endTime}.`;
     
-    if (b.pickup_location) {
-      message += `\nPickup: ${b.pickup_location}`;
+    // Remove any commas so the full address will be shown when the user clicks on the SMS
+    const pickup = b.pickup_location
+      ? b.pickup_location.replace(/,/g, '').trim()
+      : null;
+
+    if (pickup) {
+      message += `\nPickup: ${pickup}`;
     }
     
     if (needsIntake) {
-      message += `\n\nPlease sign up on the Auto-Man website and advise of your permit/licence number and any relevant medical conditions before your first driving lesson:\nhttps://www.automandrivingschool.com.au/signup`;
+      message += `\n\nPlease sign up on the Auto-Man website and advise of your permit/licence number before your first driving lesson:\nhttps://www.automandrivingschool.com.au/signup`;
     }
     
     // Standardised footer
+    message += `\n\nThank you for booking with Auto-Man Driving School (0403 632 313)`;
     message += `\n\nCancellations require 24 hours notice.`;
-    message += `\nThis is a no-reply SMS. Contact 0403 632 313 if you have questions or changes.`;
-    message += `\nAuto-Man Driving School`;
+    message += `\nThis is a no-reply SMS.`;
 
     console.log(`[booking-sms] Message preview: ${message.substring(0, 100)}...`);
 

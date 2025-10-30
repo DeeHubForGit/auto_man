@@ -33,7 +33,10 @@
             <p id="emailError" class="text-xs text-red-400 mt-1 hidden"></p>
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1" for="loginPassword">Password</label>
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-sm font-medium" for="loginPassword">Password</label>
+              <a href="forgot-password.html" class="text-xs text-blue-600 hover:underline">Forgot password?</a>
+            </div>
             <div class="relative">
               <input id="loginPassword" type="password" class="w-full border rounded-lg px-3 py-2 pr-16 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" required />
               <button type="button" id="toggleLoginPwd" class="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 text-sm border rounded bg-white text-gray-800 hover:bg-gray-100 font-medium">Show</button>

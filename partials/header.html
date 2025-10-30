@@ -1,4 +1,10 @@
-<!-- partials/header.html -->
+<!-- header.html -->
+<style>
+  /* Anti-flicker + reserve space so content below never jumps */
+  html.loading * { transition: none !important; }
+  header { min-height: 70px; }
+</style>
+
 <header class="bg-white shadow-sm sticky top-0 z-50">
   <div class="container mx-auto px-4 py-3 flex items-center justify-between">
     <!-- Left: logo + title grouped -->
@@ -36,9 +42,7 @@
       <a href="about.html" class="hover:text-blue-600">About Us</a>
       <a href="service-areas.html" class="hover:text-blue-600">Service Areas</a>
       <a href="faq.html" class="hover:text-blue-600">FAQs</a>
-      <!-- 
-      <a href="index.html#pricing" class="hover:text-blue-600">Lesson Packages</a>
-      -->
+      <!-- <a href="index.html#pricing" class="hover:text-blue-600">Lesson Packages</a> -->
       <a href="index.html#contact" class="hover:text-blue-600">Contact</a>
       <a href="admin.html" id="adminBtn" class="hidden hover:text-blue-600 font-semibold text-orange-600">Admin</a>
     </nav>
@@ -135,8 +139,14 @@
 
 </header>
 
-<!-- Header auth script - moved outside to ensure execution -->
+<!-- Header auth + menu scripts (original logic, plus anti-flicker boot) -->
 <script>
+  // Anti-flicker: disable transitions on first paint
+  document.documentElement.classList.add('loading');
+  addEventListener('DOMContentLoaded', () =>
+    requestAnimationFrame(() => document.documentElement.classList.remove('loading'))
+  );
+
   (function() {
     // Wait for everything to be ready before initializing
     function waitForReady() {
@@ -145,233 +155,214 @@
         setTimeout(waitForReady, 100);
         return;
       }
-      
       init();
     }
-    
+
     function init() {
-  // ---------- Auth state (await authReady + bind once) ----------
-    function setVisible(el, show) {
-      if (!el) return;
-      if (show) {
-        // Remove hidden class and restore display
-        el.classList.remove('hidden');
-        el.classList.remove('md:hidden');
-        // Restore the inline-block display for desktop elements
-        if (el.classList.contains('md:inline-block')) {
-          el.style.display = ''; // Let CSS handle it
+      // ---------- Auth state (await authReady + bind once) ----------
+      function setVisible(el, show) {
+        if (!el) return;
+        if (show) {
+          // Remove hidden class and restore display
+          el.classList.remove('hidden');
+          el.classList.remove('md:hidden');
+          el.style.display = '';
+          el.setAttribute('aria-hidden', 'false');
         } else {
-          el.style.display = ''; // Let CSS handle it
+          // Hide the element
+          el.classList.add('hidden');
+          el.classList.add('md:hidden');
+          el.style.display = 'none';
+          el.setAttribute('aria-hidden', 'true');
         }
-        el.setAttribute('aria-hidden', 'false');
-      } else {
-        // Hide the element
-        el.classList.add('hidden');
-        el.classList.add('md:hidden');
-        el.style.display = 'none';
-        el.setAttribute('aria-hidden', 'true');
       }
-    }
 
-    async function updateHeaderAuth() {
-      if (!window.supabaseClient) {
-        console.warn('[header] supabaseClient not available');
-        return;
-      }
-      try {
-        const { data: { session } } = await window.supabaseClient.auth.getSession();
-
-        const signupBtn        = document.getElementById('signupBtn');
-        const loginBtn         = document.getElementById('loginBtn');
-        const portalBtn        = document.getElementById('portalBtn');
-        const portalBtnHeader  = document.getElementById('portalBtnHeader');
-        const logoutBtnHeader  = document.getElementById('logoutBtnHeader');
-        const adminBtn         = document.getElementById('adminBtn');
-
-        const signupBtnMobile  = document.getElementById('signupBtnMobile');
-        const loginBtnMobile   = document.getElementById('loginBtnMobile');
-        const portalBtnMobile  = document.getElementById('portalBtnMobile');
-        const logoutBtnMobile  = document.getElementById('logoutBtnMobile');
-        const adminBtnMobile   = document.getElementById('adminBtnMobile');
-
-        const loggedIn = !!(session && session.user);
-
-        // Check if user is admin
-        let isAdmin = false;
-        if (loggedIn) {
-          const email = session.user.email;
-          const { data: client } = await window.supabaseClient
-            .from('client')
-            .select('is_admin')
-            .eq('email', email)
-            .single();
-          
-          isAdmin = client?.is_admin === true;
+      async function updateHeaderAuth() {
+        if (!window.supabaseClient) {
+          console.warn('[header] supabaseClient not available');
+          return;
         }
+        try {
+          const { data: { session } } = await window.supabaseClient.auth.getSession();
 
-        // Desktop
-        setVisible(signupBtn, !loggedIn);
-        setVisible(loginBtn,  !loggedIn);
-        setVisible(portalBtn, loggedIn);
-        setVisible(portalBtnHeader, loggedIn);
-        setVisible(logoutBtnHeader, loggedIn);
-        setVisible(adminBtn, loggedIn && isAdmin);
+          const signupBtn        = document.getElementById('signupBtn');
+          const loginBtn         = document.getElementById('loginBtn');
+          const portalBtn        = document.getElementById('portalBtn');
+          const portalBtnHeader  = document.getElementById('portalBtnHeader');
+          const logoutBtnHeader  = document.getElementById('logoutBtnHeader');
+          const adminBtn         = document.getElementById('adminBtn');
 
-        // Mobile
-        setVisible(signupBtnMobile, !loggedIn);
-        setVisible(loginBtnMobile,  !loggedIn);
-        setVisible(portalBtnMobile, loggedIn);
-        setVisible(logoutBtnMobile, loggedIn);
-        setVisible(adminBtnMobile, loggedIn && isAdmin);
+          const signupBtnMobile  = document.getElementById('signupBtnMobile');
+          const loginBtnMobile   = document.getElementById('loginBtnMobile');
+          const portalBtnMobile  = document.getElementById('portalBtnMobile');
+          const logoutBtnMobile  = document.getElementById('logoutBtnMobile');
+          const adminBtnMobile   = document.getElementById('adminBtnMobile');
 
-        // Wire logout handlers only when visible
-        const wireLogout = (btn) => {
-          if (!btn) return;
-          btn.onclick = async () => {
-            try { await window.supabaseClient.auth.signOut(); }
-            catch (e) { console.warn('[header] signOut error (ignored):', e); }
-            finally { window.location.href = 'index.html'; }
-          };
-        };
-        if (loggedIn) {
-          wireLogout(logoutBtnHeader);
-          wireLogout(logoutBtnMobile);
-        }
-      } catch (err) {
-        console.error('[header] ❌ Error checking auth state:', err);
-      }
-    }
-    
-    // Make updateHeaderAuth globally accessible for debugging
-    window.updateHeaderAuth = updateHeaderAuth;
+          const loggedIn = !!(session && session.user);
 
-    // Bind exactly once and wait for authReady before first render
-    (async function initHeaderAuthOnce() {
-      if (window.__headerAuthBound) return;
-      window.__headerAuthBound = true;
-
-      // Wait for the auth bootstrap to finish its getSession() call
-      if (window.authReady) {
-        try { await window.authReady; } catch(e) { console.warn('[header] authReady error:', e); }
-      }
-
-      const run = () => {
-        return window.supabaseClient && updateHeaderAuth();
-      };
-
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', run, { once: true });
-      } else {
-        run();
-      }
-
-      // Subscribe once to future auth changes
-      if (window.supabaseClient && !window.__headerAuthSub) {
-        window.__headerAuthSub = window.supabaseClient.auth.onAuthStateChange((_event, _session) => {
-          run();
-        });
-      }
-
-      // If your include loader fires a custom event after partials load, re-check
-      window.addEventListener('partialsLoaded', () => {
-        run();
-      });
-
-      // Fallback: also try after a short delay to catch any missed timing issues
-      setTimeout(() => {
-        if (window.supabaseClient) {
-          run();
-        } else {
-          console.warn('[header] supabaseClient still not available after 1s');
-        }
-      }, 1000);
-    })();
-
-    // Global logout (if other code calls it)
-    async function headerLogout(){
-      try {
-        if (window.supabaseClient) {
-          try { await window.supabaseClient.auth.signOut(); } catch(e) { console.warn('[header] signOut error (ignored):', e); }
-        }
-      } finally {
-        window.location.href = 'index.html';
-      }
-    }
-    window.headerLogout = headerLogout;
-
-    // ---------- Menu logic (single source of truth) ----------
-    const menuToggleBtn = document.getElementById('menuToggleBtn'); // ☰ button
-    const mobileMenu    = document.getElementById('mobileMenu');
-    const servicesBtn   = document.getElementById('mobileServicesBtn');
-    const servicesSub   = document.getElementById('mobileServicesSubmenu');
-
-    function openMenu() {
-      if (!mobileMenu) return;
-      mobileMenu.classList.remove('hidden');
-      document.body.classList.add('overflow-hidden');
-      if (menuToggleBtn) menuToggleBtn.setAttribute('aria-expanded', 'true');
-    }
-    function closeMenu() {
-      if (!mobileMenu) return;
-      mobileMenu.classList.add('hidden');
-      document.body.classList.remove('overflow-hidden');
-      if (menuToggleBtn) menuToggleBtn.setAttribute('aria-expanded', 'false');
-    }
-    window.closeMenu = closeMenu;   // because links call closeMenu() inline
-    function toggleMenu() {
-      if (!mobileMenu) return;
-      mobileMenu.classList.contains('hidden') ? openMenu() : closeMenu();
-    }
-    window.toggleMenu = toggleMenu; // if HTML uses onclick
-
-    function toggleSubmenu(ev) {
-      if (!servicesBtn || !servicesSub) return;
-      // Prevent outside click handler from closing immediately on iOS
-      if (ev && ev.stopPropagation) ev.stopPropagation();
-      if (ev && ev.preventDefault) ev.preventDefault();
-      else if (window.event) window.event.cancelBubble = true;
-      const caret = servicesBtn.querySelector('[data-caret]');
-      const nowHidden = servicesSub.classList.toggle('hidden');
-      servicesBtn.setAttribute('aria-expanded', nowHidden ? 'false' : 'true');
-      if (caret) caret.classList.toggle('rotate-180', !nowHidden);
-      return false;
-    }
-    window.toggleSubmenu = toggleSubmenu;
-
-    // Close on Esc or outside click
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && mobileMenu && !mobileMenu.classList.contains('hidden')) closeMenu();
-    });
-    document.addEventListener('click', (e) => {
-      if (!mobileMenu || mobileMenu.classList.contains('hidden')) return;
-      const clickInside = mobileMenu.contains(e.target) || (menuToggleBtn && menuToggleBtn.contains(e.target));
-      if (!clickInside) closeMenu();
-    });
-
-    // ---------- Desktop services dropdown (click support for touch) ----------
-    (function () {
-      const trigger = document.getElementById('nav-services');
-      const menu    = document.getElementById('nav-services-menu');
-      if (!trigger || !menu) return;
-      trigger.addEventListener('click', function (e) {
-        if (window.innerWidth >= 768) {
-          const hidden = menu.classList.contains('hidden');
-          if (hidden) {
-            e.preventDefault();
-            menu.classList.remove('hidden');
-            const closer = (evt) => {
-              if (!menu.contains(evt.target) && evt.target !== trigger) {
-                menu.classList.add('hidden');
-                document.removeEventListener('click', closer);
-              }
-            };
-            document.addEventListener('click', closer);
+          // Check if user is admin
+          let isAdmin = false;
+          if (loggedIn) {
+            const email = session.user.email;
+            const { data: client } = await window.supabaseClient
+              .from('client')
+              .select('is_admin')
+              .eq('email', email)
+              .single();
+            isAdmin = client?.is_admin === true;
           }
+
+          // Desktop
+          setVisible(signupBtn, !loggedIn);
+          setVisible(loginBtn,  !loggedIn);
+          setVisible(portalBtn, loggedIn);
+          setVisible(portalBtnHeader, loggedIn);
+          setVisible(logoutBtnHeader, loggedIn);
+          setVisible(adminBtn, loggedIn && isAdmin);
+
+          // Mobile
+          setVisible(signupBtnMobile, !loggedIn);
+          setVisible(loginBtnMobile,  !loggedIn);
+          setVisible(portalBtnMobile, loggedIn);
+          setVisible(logoutBtnMobile, loggedIn);
+          setVisible(adminBtnMobile, loggedIn && isAdmin);
+
+          // Wire logout handlers only when visible
+          const wireLogout = (btn) => {
+            if (!btn) return;
+            btn.onclick = async () => {
+              try { await window.supabaseClient.auth.signOut(); }
+              catch (e) { console.warn('[header] signOut error (ignored):', e); }
+              finally { window.location.href = 'index.html'; }
+            };
+          };
+          if (loggedIn) {
+            wireLogout(logoutBtnHeader);
+            wireLogout(logoutBtnMobile);
+          }
+        } catch (err) {
+          console.error('[header] ❌ Error checking auth state:', err);
         }
+      }
+
+      // Make updateHeaderAuth globally accessible for debugging
+      window.updateHeaderAuth = updateHeaderAuth;
+
+      // Bind exactly once and wait for authReady before first render
+      (async function initHeaderAuthOnce() {
+        if (window.__headerAuthBound) return;
+        window.__headerAuthBound = true;
+
+        // Wait for the auth bootstrap to finish its getSession() call
+        if (window.authReady) {
+          try { await window.authReady; } catch(e) { console.warn('[header] authReady error:', e); }
+        }
+
+        const run = () => window.supabaseClient && updateHeaderAuth();
+
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', run, { once: true });
+        } else {
+          run();
+        }
+        // Subscribe once to future auth changes
+        if (window.supabaseClient && !window.__headerAuthSub) {
+          window.__headerAuthSub = window.supabaseClient.auth.onAuthStateChange((_event, _session) => run());
+        }
+        // If your include loader fires a custom event after partials load, re-check
+        window.addEventListener('partialsLoaded', () => run());
+        // Fallback: also try after a short delay to catch any missed timing issues
+        setTimeout(() => {
+          if (window.supabaseClient) run();
+          else console.warn('[header] supabaseClient still not available after 1s');
+        }, 1000);
+      })();
+
+      // Global logout (if other code calls it)
+      async function headerLogout(){
+        try {
+          if (window.supabaseClient) {
+            try { await window.supabaseClient.auth.signOut(); } catch(e) { console.warn('[header] signOut error (ignored):', e); }
+          }
+        } finally {
+          window.location.href = 'index.html';
+        }
+      }
+      window.headerLogout = headerLogout;
+
+      // ---------- Menu logic (single source of truth) ----------
+      const mobileMenu  = document.getElementById('mobileMenu');
+      const menuToggleBtn = document.getElementById('menuToggleBtn');
+      const servicesBtn = document.getElementById('mobileServicesBtn');
+      const servicesSub = document.getElementById('mobileServicesSubmenu');
+
+      function openMenu() {
+        if (!mobileMenu) return;
+        mobileMenu.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+        if (menuToggleBtn) menuToggleBtn.setAttribute('aria-expanded', 'true');
+      }
+      function closeMenu() {
+        if (!mobileMenu) return;
+        mobileMenu.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+        if (menuToggleBtn) menuToggleBtn.setAttribute('aria-expanded', 'false');
+      }
+      window.closeMenu = closeMenu;   // because links call closeMenu()
+      function toggleMenu() {
+        if (!mobileMenu) return;
+        mobileMenu.classList.contains('hidden') ? openMenu() : closeMenu();
+      }
+      window.toggleMenu = toggleMenu; // if HTML uses onclick
+
+      function toggleSubmenu(ev) {
+        if (!servicesBtn || !servicesSub) return;
+        // Prevent outside click handler from closing immediately on iOS
+        if (ev && ev.stopPropagation) ev.stopPropagation();
+        if (ev && ev.preventDefault) ev.preventDefault();
+        else if (window.event) window.event.cancelBubble = true;
+        const caret = servicesBtn.querySelector('[data-caret]');
+        const nowHidden = servicesSub.classList.toggle('hidden');
+        servicesBtn.setAttribute('aria-expanded', nowHidden ? 'false' : 'true');
+        if (caret) caret.classList.toggle('rotate-180', !nowHidden);
+        return false;
+      }
+      window.toggleSubmenu = toggleSubmenu;
+
+      // Close on Esc or outside click
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && mobileMenu && !mobileMenu.classList.contains('hidden')) closeMenu();
       });
-    })();
+      document.addEventListener('click', (e) => {
+        if (!mobileMenu || mobileMenu.classList.contains('hidden')) return;
+        const clickInside = mobileMenu.contains(e.target) || (menuToggleBtn && menuToggleBtn.contains(e.target));
+        if (!clickInside) closeMenu();
+      });
+
+      // ---------- Desktop services dropdown (click support for touch) ----------
+      (function () {
+        const trigger = document.getElementById('nav-services');
+        const menu    = document.getElementById('nav-services-menu');
+        if (!trigger || !menu) return;
+        trigger.addEventListener('click', function (e) {
+          if (window.innerWidth >= 768) {
+            const hidden = menu.classList.contains('hidden');
+            if (hidden) {
+              e.preventDefault();
+              menu.classList.remove('hidden');
+              const closer = (evt) => {
+                if (!menu.contains(evt.target) && evt.target !== trigger) {
+                  menu.classList.add('hidden');
+                  document.removeEventListener('click', closer);
+                }
+              };
+              document.addEventListener('click', closer);
+            }
+          }
+        });
+      })();
     } // End of init()
-    
+
     // Start waiting for dependencies
     waitForReady();
   })(); // End of wrapper IIFE

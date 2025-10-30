@@ -28,8 +28,10 @@
 <body class="bg-gray-50 text-gray-900">
   <!-- Auth scripts -->
   <div data-include="partials/auth-scripts.html"></div>
-  <!-- Shared Header -->
-  <div data-include="partials/header.html"></div>
+  <!-- Shared Header - permanent container prevents layout shift -->
+  <div id="header-container" style="min-height: 70px;">
+    <div data-include="partials/header.html"></div>
+  </div>
 
   <!-- Hero Section -->
   <section class="bg-gradient-to-br from-blue-600 to-blue-800 text-white py-20">

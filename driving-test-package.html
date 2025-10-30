@@ -37,8 +37,10 @@
 <body>
   <!-- Auth scripts -->
   <div data-include="partials/auth-scripts.html"></div>
-  <!-- Shared Header -->
-  <div data-include="partials/header.html"></div>
+  <!-- Shared Header - permanent container prevents layout shift -->
+  <div id="header-container" style="min-height: 70px;">
+    <div data-include="partials/header.html"></div>
+  </div>
   <div class="wrap">
     <!-- Hero Section -->
     <div class="hero-service">

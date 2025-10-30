@@ -12,9 +12,12 @@
   <script src="assets/include.js" defer></script>
 </head>
 <body class="bg-gray-50 text-gray-900">
-  <!-- Auth scripts before header -->
+  <!-- Auth scripts -->
   <div data-include="partials/auth-scripts.html"></div>
-  <div data-include="partials/header.html"></div>
+  <!-- Shared Header - permanent container prevents layout shift -->
+  <div id="header-container" style="min-height: 70px;">
+    <div data-include="partials/header.html"></div>
+  </div>
 
   <main class="container mx-auto px-4 py-8">
     <h1 class="text-3xl font-extrabold mb-6">Admin Dashboard</h1>

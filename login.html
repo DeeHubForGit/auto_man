@@ -16,7 +16,10 @@
 <body class="bg-gray-50 text-gray-900">
   <!-- Auth scripts (global Supabase client) MUST load before header -->
   <div data-include="partials/auth-scripts.html"></div>
-  <div data-include="partials/header.html"></div>
+  <!-- Shared Header - permanent container prevents layout shift -->
+  <div id="header-container" style="min-height: 70px;">
+    <div data-include="partials/header.html"></div>
+  </div>
 
   <main class="py-16">
     <div class="container mx-auto px-4">

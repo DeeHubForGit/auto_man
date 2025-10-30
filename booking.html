@@ -34,8 +34,10 @@
 <body class="bg-slate-900 text-white">
   <!-- Auth scripts (global Supabase client) MUST load before header -->
   <div data-include="partials/auth-scripts.html"></div>
-  <!-- Header -->
-  <div data-include="partials/header.html"></div>
+  <!-- Shared Header - permanent container prevents layout shift -->
+  <div id="header-container" style="min-height: 70px;">
+    <div data-include="partials/header.html"></div>
+  </div>
   
   <!-- Main Content -->
   <main class="min-h-screen pt-8 pb-16">

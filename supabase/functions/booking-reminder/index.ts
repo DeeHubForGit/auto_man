@@ -5,6 +5,7 @@
 //
 // Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, (optional) SMS_SENDER
 // Optional Env: REMINDER_HOURS (default 24), REMINDER_WINDOW_MINUTES (default 10)
+// Optional Env: SMS_ENABLED ("true"/"false") to hard-disable sends during testing
 // POST body can override:
 //   { booking_id?: string, hours?: number, window_minutes?: number, dry_run?: boolean, limit?: number }
 
@@ -83,6 +84,12 @@ function fmtShortDateAU(dt: Date) {
   return `${wd} ${d}${getOrdinalSuffix(d)} ${m}`;
 }
 
+// Simple feature flag reader (defaults OFF if unset/garbage → safer during testing)
+function smsEnabled(): boolean {
+  const v = (Deno.env.get("SMS_ENABLED") || "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return json({ ok: true });
   if (req.method !== "POST") return json({ error: "Method Not Allowed" }, 405);
@@ -96,9 +103,9 @@ serve(async (req) => {
     const envHours = Number(Deno.env.get("REMINDER_HOURS") || 24);
     const envWindow = Number(Deno.env.get("REMINDER_WINDOW_MINUTES") || 10);
 
-    // 🔹 Accept booking_id to force a single-target reminder.
+    // Accept booking_id to force a single-target reminder.
     const body = (await req.json().catch(() => ({}))) as {
-      booking_id?: string;              // <— single-booking override (optional)
+      booking_id?: string;
       hours?: number;
       window_minutes?: number;
       dry_run?: boolean;
@@ -116,7 +123,7 @@ serve(async (req) => {
     let bookings: any[] = [];
 
     if (body.booking_id) {
-      // 🔹 Single-booking path: load exactly this booking.
+      // Single-booking path: load exactly this booking.
       const one = await fetchJson(
         `${SUPABASE_URL}/rest/v1/booking?select=*&id=eq.${encodeURIComponent(body.booking_id)}&limit=1`,
         { headers: { apikey: SERVICE_KEY, authorization: `Bearer ${SERVICE_KEY}`, accept: "application/json" } },
@@ -129,7 +136,7 @@ serve(async (req) => {
       const rows = (one.data as any[]) ?? [];
       if (rows.length) bookings = rows;
     } else {
-      // 🔹 Window scan (original behaviour).
+      // Window scan (original behaviour).
       // Target time window = (now + HOURS) ± WINDOW/2 minutes
       const center = new Date(now.getTime() + HOURS * 3600_000);
       const half = Math.max(1, Math.floor(WINDOW_MIN / 2)) * 60_000;
@@ -150,7 +157,6 @@ serve(async (req) => {
       });
 
       // Keep status guard (confirmed or null) outside the AND for clarity
-      // PostgREST equivalent: or=(status.is.null,status.eq.confirmed)
       q.append("or", "(status.is.null,status.eq.confirmed)");
 
       const list = await fetchJson(`${SUPABASE_URL}/rest/v1/booking?${q.toString()}`, {
@@ -199,28 +205,71 @@ serve(async (req) => {
           continue;
         }
 
+        // -------- Intake nudge: only if intake not completed --------
+        let addIntakeNudge = false;
+
+        if (b.client_id) {
+          const cl = await fetchJson(
+            `${SUPABASE_URL}/rest/v1/client?id=eq.${encodeURIComponent(b.client_id)}&select=intake_completed&limit=1`,
+            {
+              headers: {
+                apikey: SERVICE_KEY,
+                authorization: `Bearer ${SERVICE_KEY}`,
+                accept: "application/json",
+              },
+            },
+          );
+
+          const intakeCompleted =
+            cl.res.ok &&
+            Array.isArray(cl.data) &&
+            (cl.data as any[]).length > 0 &&
+            (cl.data as any[])[0]?.intake_completed === true;
+
+          addIntakeNudge = !intakeCompleted;
+        }
+
         // -----------------------------------------------------
-        // Compose friendly reminder message (requested copy)
-        // Example:
-        // Hi Jane,
-        // This is a friendly reminder that your driving lesson is on Sun 2nd Nov
-        // from 1:30 pm to 2:30 pm.
-        // Pickup: 123 Test Street, Belmont
-        //
-        // 24-hour cancellation policy applies.
-        // Auto-Man Driving School
+        // Compose friendly reminder message (standardised copy)
         // -----------------------------------------------------
         const firstName = (b.first_name || "there").trim();
-        const whenDate  = fmtShortDateAU(start);
+        const whenDate = fmtShortDateAU(start);
         const whenStart = fmtTimeAU(start);
-        const whenEnd   = fmtTimeAU(end);
+        const whenEnd = fmtTimeAU(end);
 
-        let msg = `Hi ${firstName},\nThis is a friendly reminder that your driving lesson is on ${whenDate} from ${whenStart} to ${whenEnd}.`;
-        if (b.pickup_location) msg += `\nPickup: ${b.pickup_location}`;
-        msg += `\n\n24-hour cancellation policy applies.\nAuto-Man Driving School`;
+        // Normalise pickup for better auto-linking in SMS
+        const pickupRaw = (b.pickup_location || "").trim();
 
-        if (DRY_RUN) {
-          results.push({ id: b.id, dry_run: true, to: e164, message_preview: msg.slice(0, 160) + "…" });
+        // Remove commas (some phones split links at commas)
+        const pickupNoComma = pickupRaw ? pickupRaw.replace(/,/g, "") : "";
+
+        // If no AU state is present, append " VIC" (your default)
+        const hasState = /\b(ACT|NSW|NT|QLD|SA|TAS|VIC|WA)\b/i.test(pickupNoComma);
+        const pickupDisplay = pickupNoComma && !hasState ? `${pickupNoComma} VIC` : pickupNoComma;
+        
+        let msg = `Hi ${firstName},\n\n`;
+        msg += `This is a friendly reminder that your driving lesson is on ${whenDate} from ${whenStart} to ${whenEnd}.`;
+        if (pickupDisplay) {
+          msg += `\nPickup: ${pickupDisplay}`;
+        }
+
+        if (addIntakeNudge) {
+          msg += `\n\nPlease sign up on the Auto-Man website and advise of your permit/licence number before your driving lesson:\nhttps://www.automandrivingschool.com.au/signup`;
+        }
+        
+        // Standardised footer
+        msg += `\n\nThank you for booking with Auto-Man Driving School (0403 632 313)`;
+        msg += `\n\nCancellations require 24 hours notice.`;
+        msg += `\nThis is a no-reply SMS.`;
+
+        // Respect global SMS_ENABLED and per-request dry_run
+        if (DRY_RUN || !smsEnabled()) {
+          results.push({
+            id: b.id,
+            dry_run: true,
+            to: e164,
+            message_preview: msg.slice(0, 160) + "…",
+          });
           continue;
         }
 

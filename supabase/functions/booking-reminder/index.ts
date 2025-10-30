@@ -160,7 +160,7 @@ serve(async (req) => {
       q.append("or", "(status.is.null,status.eq.confirmed)");
 
       const list = await fetchJson(`${SUPABASE_URL}/rest/v1/booking?${q.toString()}`, {
-        headers: { apikey: SERVICE_KEY, authorization: `Bearer ${SERVICE_KEY}` },
+        headers: { apikey: SERVICE_KEY, authorization: `Bearer ${SERVICE_KEY}`, accept: "application/json" },
       });
 
       if (!list.res.ok) {
@@ -241,12 +241,8 @@ serve(async (req) => {
         const pickupRaw = (b.pickup_location || "").trim();
 
         // Remove commas (some phones split links at commas)
-        const pickupNoComma = pickupRaw ? pickupRaw.replace(/,/g, "") : "";
+        const pickupDisplay = pickupRaw ? pickupRaw.replace(/,/g, "") : "";
 
-        // If no AU state is present, append " VIC" (your default)
-        const hasState = /\b(ACT|NSW|NT|QLD|SA|TAS|VIC|WA)\b/i.test(pickupNoComma);
-        const pickupDisplay = pickupNoComma && !hasState ? `${pickupNoComma} VIC` : pickupNoComma;
-        
         let msg = `Hi ${firstName},\n\n`;
         msg += `This is a friendly reminder that your driving lesson is on ${whenDate} from ${whenStart} to ${whenEnd}.`;
         if (pickupDisplay) {
@@ -266,7 +262,8 @@ serve(async (req) => {
         if (DRY_RUN || !smsEnabled()) {
           results.push({
             id: b.id,
-            dry_run: true,
+            ok: true,
+            status: "dry_run",
             to: e164,
             message_preview: msg.slice(0, 160) + "…",
           });

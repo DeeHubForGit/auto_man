@@ -56,6 +56,12 @@ function getOrdinalSuffix(day: number): string {
   }
 }
 
+// Simple feature flag reader (defaults OFF to protect against accidental sends)
+function smsEnabled(): boolean {
+  const v = (Deno.env.get("SMS_ENABLED") || "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return json({ ok: true });
   if (req.method !== "POST") return json({ error: "Method Not Allowed" }, 405);
@@ -79,7 +85,11 @@ serve(async (req) => {
       return json({ error: "Provide booking_id or google_event_id" }, 400);
     }
 
-    console.log(`[booking-sms] Processing request for ${booking_id ? `booking_id=${booking_id}` : `google_event_id=${google_event_id}`}`);
+    console.log(
+      `[booking-sms] Processing request for ${
+        booking_id ? `booking_id=${booking_id}` : `google_event_id=${google_event_id}`
+      }`
+    );
 
     // 1) Load booking with end_time
     const queryParam = booking_id
@@ -248,71 +258,84 @@ serve(async (req) => {
       message += `\n\nPlease sign up on the Auto-Man website and advise of your permit/licence number and any relevant medical conditions before your first driving lesson:\nhttps://www.automandrivingschool.com.au/signup`;
     }
     
-    message += `\n\nThank you for booking with Auto-Man Driving School.`;
+    // Standardised footer
     message += `\n\nCancellations require 24 hours notice.`;
-    message += `\n\nThis is a no-reply SMS. Contact 0403 632 313 if you have questions or changes.`;
+    message += `\nThis is a no-reply SMS. Contact 0403 632 313 if you have questions or changes.`;
+    message += `\nAuto-Man Driving School`;
 
     console.log(`[booking-sms] Message preview: ${message.substring(0, 100)}...`);
 
     // 5) Send via existing sms function (server→server)
-    const send = await fetchJson(SMS_FN_URL, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "authorization": `Bearer ${SERVICE_KEY}`,
-        "apikey": SERVICE_KEY,
-      },
-      body: JSON.stringify({ to: e164, message }),
-    });
-
-    console.log(`[booking-sms] SMS function response: ${send.res.status}, ok=${send.res.ok}`);
-
     let providerMessageId: string | null = null;
     let smsStatus: string = "pending";
     let errorMessage: string | null = null;
+    let send: { res: Response; data: any; raw: string } | null = null; // <-- declared for safe return use
 
-    if (!send.res.ok || !(send.data as any)?.ok) {
-      console.error(`[booking-sms] SMS send failed:`, send.data);
-      smsStatus = "failed";
-      errorMessage = JSON.stringify(send.data ?? send.raw);
-      
-      // Log the failure to sms_log (fixed column names: body not message_body)
-      await fetchJson(
-        `${SUPABASE_URL}/rest/v1/sms_log`,
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "authorization": `Bearer ${SERVICE_KEY}`,
-            "apikey": SERVICE_KEY,
-            "prefer": "return=minimal",
-          },
-          body: JSON.stringify({
-            booking_id: b.id,
-            to_phone: e164,
-            body: message,  // ✅ Fixed: was message_body
-            status: smsStatus,
-            template: "booking_confirmation",
-            provider: "clicksend",
-            provider_message_id: null,
-            error_message: errorMessage,
-            sent_at: new Date().toISOString(),
-          }),
+    if (smsEnabled()) {
+      send = await fetchJson(SMS_FN_URL, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "authorization": `Bearer ${SERVICE_KEY}`,
+          "apikey": SERVICE_KEY,
         },
-      );
-      
-      return json(
-        { error: "SMS send failed", details: send.data ?? send.raw },
-        502,
-      );
-    }
+        body: JSON.stringify({ to: e164, message }),
+      });
 
-    // Extract provider message ID from ClickSend response
-    const clicksendData = (send.data as any)?.clicksend;
-    if (clicksendData?.data?.messages && Array.isArray(clicksendData.data.messages) && clicksendData.data.messages.length > 0) {
-      providerMessageId = clicksendData.data.messages[0].message_id || null;
-      const msgStatus = clicksendData.data.messages[0].status;
-      smsStatus = msgStatus === "SUCCESS" ? "sent" : "pending";
+      console.log(`[booking-sms] SMS function response: ${send.res.status}, ok=${send.res.ok}`);
+
+      if (!send.res.ok || !(send.data as any)?.ok) {
+        console.error(`[booking-sms] SMS send failed:`, send.data);
+        smsStatus = "failed";
+        errorMessage = JSON.stringify(send.data ?? send.raw);
+        
+        // Log the failure to sms_log (fixed column names: body not message_body)
+        await fetchJson(
+          `${SUPABASE_URL}/rest/v1/sms_log`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              "authorization": `Bearer ${SERVICE_KEY}`,
+              "apikey": SERVICE_KEY,
+              "prefer": "return=minimal",
+            },
+            body: JSON.stringify({
+              booking_id: b.id,
+              to_phone: e164,
+              body: message,
+              status: smsStatus,
+              template: "booking_confirmation",
+              provider: "clicksend",
+              provider_message_id: null,
+              error_message: errorMessage,
+              sent_at: new Date().toISOString(),
+            }),
+          },
+        );
+        
+        return json(
+          { error: "SMS send failed", details: send.data ?? send.raw },
+          502,
+        );
+      }
+
+      // Extract provider message ID from ClickSend response
+      const clicksendData = (send.data as any)?.clicksend;
+      if (
+        clicksendData?.data?.messages &&
+        Array.isArray(clicksendData.data.messages) &&
+        clicksendData.data.messages.length > 0
+      ) {
+        providerMessageId = clicksendData.data.messages[0].message_id || null;
+        const msgStatus = clicksendData.data.messages[0].status;
+        smsStatus = msgStatus === "SUCCESS" ? "sent" : "pending";
+      } else {
+        smsStatus = "sent";
+      }
+    } else {
+      smsStatus = "dry_run";
+      console.log("[booking-sms] SMS_DISABLED via SMS_ENABLED env. Skipping external send.");
     }
 
     console.log(`[booking-sms] Provider message ID: ${providerMessageId}, status: ${smsStatus}`);
@@ -331,58 +354,60 @@ serve(async (req) => {
         body: JSON.stringify({
           booking_id: b.id,
           to_phone: e164,
-          body: message,  // ✅ Fixed: was message_body
+          body: message,
           status: smsStatus,
           template: "booking_confirmation",
           provider: "clicksend",
           provider_message_id: providerMessageId,
-          error_message: null,
+          error_message: errorMessage,
           sent_at: new Date().toISOString(),
         }),
       },
     );
 
     if (!logRes.res.ok) {
-      console.warn(`[booking-sms] Failed to log to sms_log: ${logRes.res.status}`);
       const logError = await logRes.res.text();
+      console.warn(`[booking-sms] Failed to log to sms_log: ${logRes.res.status}`);
       console.warn(`[booking-sms] Log error details: ${logError}`);
     } else {
       console.log(`[booking-sms] Logged to sms_log successfully`);
     }
 
-    // 7) Mark sent (idempotency latch)
-    const { res: updRes, data: updData } = await fetchJson(
-      `${SUPABASE_URL}/rest/v1/booking?id=eq.${encodeURIComponent(b.id)}`,
-      {
-        method: "PATCH",
-        headers: {
-          "content-type": "application/json",
-          "authorization": `Bearer ${SERVICE_KEY}`,
-          "apikey": SERVICE_KEY,
-          "prefer": "return=representation",
+    // 7) Mark sent (idempotency latch) — only when actually sent/pending
+    if (smsStatus === "sent" || smsStatus === "pending") {
+      const { res: updRes, data: updData } = await fetchJson(
+        `${SUPABASE_URL}/rest/v1/booking?id=eq.${encodeURIComponent(b.id)}`,
+        {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            "authorization": `Bearer ${SERVICE_KEY}`,
+            "apikey": SERVICE_KEY,
+            "prefer": "return=representation",
+          },
+          body: JSON.stringify({ sms_confirm_sent_at: new Date().toISOString() }),
         },
-        body: JSON.stringify({ sms_confirm_sent_at: new Date().toISOString() }),
-      },
-    );
-
-    if (!updRes.ok) {
-      console.error(`[booking-sms] Failed to update booking flag: ${updRes.status}`);
-      return json(
-        { error: "SMS sent but failed to update flag", details: updData ?? (await updRes.text()) },
-        502,
       );
+
+      if (!updRes.ok) {
+        return json(
+          { error: "SMS sent but failed to update flag", details: updData ?? (await updRes.text()) },
+          502,
+        );
+      }
     }
 
-    console.log(`[booking-sms] Successfully sent SMS for booking ${b.id}`);
+    console.log(`[booking-sms] Successfully completed for booking ${b.id} with status=${smsStatus}`);
 
     return json({
       ok: true,
       booking_id: b.id,
       sent_to: e164,
       provider_message_id: providerMessageId,
-      clicksend: (send.data as any)?.clicksend ?? null,
+      clicksend: smsEnabled() ? (send?.data as any)?.clicksend ?? null : null,
       message_preview: message,
       needs_intake: needsIntake,
+      status: smsStatus,
     });
   } catch (err) {
     console.error("[booking-sms] error:", err);

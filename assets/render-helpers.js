@@ -173,10 +173,13 @@ function renderLessonPricing(containerId = 'lesson-pricing-grid') {
 
   if (!Array.isArray(lessons) || !lessons.length) return;
 
-  const bookingUrl = (lesson) =>
-    lesson?.bookingId
-      ? `booking.html?service=${encodeURIComponent(lesson.bookingId)}`
-      : 'booking.html';
+  // Build booking URL - if googleCalendarUrl exists, embed it in google-booking.html
+  const bookingUrl = (lesson) => {
+    if (lesson?.googleCalendarUrl) {
+      return `google-booking.html?bookingUrl=${encodeURIComponent(lesson.googleCalendarUrl)}`;
+    }
+    return 'booking.html';
+  };
 
   container.innerHTML = lessons
     .map(

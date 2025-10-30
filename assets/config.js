@@ -196,16 +196,17 @@ const SITE_CONFIG = {
     }
   ],
   
-  // Individual lesson pricing (by duration)
+  // Individual lesson pricing (by duration) - used on service pages
+  // googleCalendarUrl is the direct Google Calendar link that gets embedded in google-booking.html
   LESSON_PRICING: [
-    { duration: '1 hour',   durationShort: '1hr',   price: 85,  bookingId: 5 },
-    { duration: '1.5 hour', durationShort: '1.5hr', price: 125, bookingId: 6 },
-    { duration: '2 hour',   durationShort: '2hr',   price: 165, bookingId: 7 }
+    { duration: '1 hour',   durationShort: '1hr',   price: 85,  googleCalendarUrl: 'https://calendar.app.google/3ehp4B9MRcF83CEE9' },
+    { duration: '1.5 hour', durationShort: '1.5hr', price: 125, googleCalendarUrl: 'https://calendar.app.google/tTykRfbx3w9izTY86' },
+    { duration: '2 hour',   durationShort: '2hr',   price: 165, googleCalendarUrl: 'https://calendar.app.google/QtGWGiyNpcqq9C1z8' }
   ],
   
-  // Discounted pricing (e.g. senior)
+  // Discounted pricing (e.g. senior) - used on senior-drivers.html
   LESSON_PRICING_DISCOUNTED: [
-    { duration: '1 hour', durationShort: '1hr', price: 75, bookingId: 8, note: 'Incl pensioner discount' }
+    { duration: '1 hour', durationShort: '1hr', price: 75, googleCalendarUrl: 'https://calendar.app.google/vvE6utyXe4aa7BQb9', note: 'Incl pensioner discount' }
   ],
 
   // Lesson packages

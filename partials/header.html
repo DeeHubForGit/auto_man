@@ -146,7 +146,36 @@ addEventListener('DOMContentLoaded', () =>
 );
 
 // Global logout function - resilient with direct API fallback
-window.headerLogout = async function headerLogout() {
+window.headerLogout = function headerLogout() {
+  // Wait for Modal to be available
+  if (window.Modal && window.Modal.confirm) {
+    window.Modal.confirm(
+      'Are you sure you want to log out?',
+      window.performLogout,
+      null,
+      'Log Out'
+    );
+  } else {
+    // Modal not loaded yet, wait a bit and try again
+    setTimeout(function() {
+      if (window.Modal && window.Modal.confirm) {
+        window.Modal.confirm(
+          'Are you sure you want to log out?',
+          window.performLogout,
+          null,
+          'Log Out'
+        );
+      } else {
+        // Fallback: just logout without confirmation
+        console.warn('[logout] Modal not available, logging out without confirmation');
+        window.performLogout();
+      }
+    }, 100);
+  }
+};
+
+// Actual logout implementation - make it global so Modal callback can access it
+window.performLogout = async function performLogout() {
   const url = window.SUPABASE_URL || window.supabaseUrl || (window.supabaseClient && window.supabaseClient.rest && window.supabaseClient.rest.url?.replace('/rest/v1','').replace(/^\/+|\/+$/g,''));
   const key = window.SUPABASE_ANON_KEY || window.supabaseAnonKey;
 

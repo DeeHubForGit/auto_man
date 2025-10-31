@@ -281,25 +281,22 @@
       window.location.hash = section;
     }
 
-    // Logout handler
+    // Logout handler - uses the resilient headerLogout function
     async function handleLogout() {
       Modal.confirm(
         'Are you sure you want to log out?',
-        async function() {
-          await window.supabaseClient.auth.signOut();
-          window.location.href = 'index.html';
+        function() {
+          // Use the resilient headerLogout from header.html
+          if (window.headerLogout) {
+            window.headerLogout();
+          } else {
+            // Fallback if header hasn't loaded yet
+            window.location.href = 'index.html';
+          }
         },
         null,
         'Log Out'
       );
-    }
-
-    // Fallback: ensure headerLogout exists for header button inline onclick
-    if (!window.headerLogout) {
-      window.headerLogout = async function(){
-        try { if (window.supabaseClient) await window.supabaseClient.auth.signOut(); } catch(e) { /* ignore */ }
-        window.location.href = 'index.html';
-      };
     }
 
     // Handle browser back/forward

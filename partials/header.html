@@ -145,35 +145,45 @@ addEventListener('DOMContentLoaded', () =>
   requestAnimationFrame(() => document.documentElement.classList.remove('loading'))
 );
 
-// Global logout function
+// Global logout function - resilient with direct API fallback
 window.headerLogout = async function headerLogout() {
-  let timedOut = false, err = null;
-  
-  if (window.supabaseClient) {
-    try {
+  const url = window.SUPABASE_URL || window.supabaseUrl || (window.supabaseClient && window.supabaseClient.rest && window.supabaseClient.rest.url?.replace('/rest/v1','').replace(/^\/+|\/+$/g,''));
+  const key = window.SUPABASE_ANON_KEY || window.supabaseAnonKey;
+
+  try {
+    const { data: { session } } = await window.supabaseClient.auth.getSession().catch(() => ({data:{}}));
+
+    // Try server logout (2s max). If this stalls we still continue.
+    if (session?.access_token && url && key) {
+      await Promise.race([
+        fetch(`${url}/auth/v1/logout`, {
+          method: 'POST',
+          headers: { apikey: key, Authorization: `Bearer ${session.access_token}` },
+          keepalive: true  // improves chances during navigation
+        }),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('signOut timeout')), 2000))
+      ]).catch(err => console.warn('[logout] server logout issue:', err?.message || err));
+    } else {
+      // Fallback to SDK with a 2s cap
       await Promise.race([
         window.supabaseClient.auth.signOut({ scope: 'global' }),
-        new Promise((_, rej) => setTimeout(() => { 
-          timedOut = true; 
-          rej(new Error('signOut timeout')); 
-        }, 500))
-      ]);
-    } catch (e) { 
-      err = e; 
+        new Promise((_, rej) => setTimeout(() => rej(new Error('SDK signOut timeout')), 2000))
+      ]).catch(err => console.warn('[logout] SDK logout issue:', err?.message || err));
     }
-  }
-  
-  // Force clear all Supabase auth data from localStorage
-  try {
-    Object.keys(localStorage).forEach(k => {
-      if (k.startsWith('sb-') || k.includes('supabase')) {
-        localStorage.removeItem(k);
-      }
-    });
-  } catch {}
+  } finally {
+    // Local cleanup (always)
+    try {
+      Object.keys(localStorage).forEach(k => {
+        if (k.startsWith('sb-') || k.includes('supabase')) localStorage.removeItem(k);
+      });
+    } catch {}
 
-  console.debug('[logout]', { timedOut, err: err && String(err) });
-  window.location.href = 'index.html';
+    // Optional: notify other tabs
+    try { localStorage.setItem('sb-signout', String(Date.now())); } catch {}
+
+    // Go home
+    window.location.href = 'index.html';
+  }
 };
 
 (function() {
@@ -244,50 +254,22 @@ window.headerLogout = async function headerLogout() {
         // Desktop
         setVisible(signupBtn, !loggedIn);
         setVisible(loginBtn,  !loggedIn);
-        setVisible(portalBtn, loggedIn);
-        setVisible(portalBtnHeader, loggedIn);
+        setVisible(portalBtn, loggedIn && !isAdmin); // Hide for admins
+        setVisible(portalBtnHeader, loggedIn && !isAdmin); // Hide for admins
         setVisible(logoutBtnHeader, loggedIn);
         setVisible(adminBtn, loggedIn && isAdmin);
 
         // Mobile
         setVisible(signupBtnMobile, !loggedIn);
         setVisible(loginBtnMobile,  !loggedIn);
-        setVisible(portalBtnMobile, loggedIn);
+        setVisible(portalBtnMobile, loggedIn && !isAdmin); // Hide for admins
         setVisible(logoutBtnMobile, loggedIn);
         setVisible(adminBtnMobile, loggedIn && isAdmin);
 
-        // Wire logout handlers only when visible
+        // Wire logout handlers - use the global headerLogout function
         const wireLogout = (btn) => {
           if (!btn) return;
-          btn.onclick = async () => {
-            let timedOut = false, err = null;
-            
-            if (window.supabaseClient) {
-              try {
-                await Promise.race([
-                  window.supabaseClient.auth.signOut({ scope: 'global' }),
-                  new Promise((_, rej) => setTimeout(() => { 
-                    timedOut = true; 
-                    rej(new Error('signOut timeout')); 
-                  }, 500))
-                ]);
-              } catch (e) { 
-                err = e; 
-              }
-            }
-            
-            // Force clear all Supabase auth data from localStorage
-            try {
-              Object.keys(localStorage).forEach(k => {
-                if (k.startsWith('sb-') || k.includes('supabase')) {
-                  localStorage.removeItem(k);
-                }
-              });
-            } catch {}
-
-            console.debug('[logout]', { timedOut, err: err && String(err) });
-            window.location.href = 'index.html';
-          };
+          btn.onclick = () => window.headerLogout();
         };
         if (loggedIn) {
           wireLogout(logoutBtnHeader);

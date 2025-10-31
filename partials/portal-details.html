@@ -60,7 +60,6 @@
             name="mobile"
             placeholder="04XX XXX XXX"
             inputmode="tel"
-            pattern="^(?:0\s*4\s*\d(?:[\s-]*\d){7}|\+\s*61\s*4\s*\d(?:[\s-]*\d){7})$"
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             required
           />
@@ -107,7 +106,6 @@
             id="emergencyContactPhone" 
             name="emergency_contact_phone"
             inputmode="tel"
-            pattern="^(?:(?:\d\s*){8}|(?:0\s*\d(?:[\s-]*\d){8})|(?:\+\s*61\s*\d(?:[\s-]*\d){8}))$"
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
           <p id="emergencyContactPhoneError" class="text-xs text-red-500 mt-1 hidden"></p>
@@ -233,15 +231,63 @@
 
   // Phone validators (centralised)
   function normaliseDigits(v){ return (v||'').replace(/\D+/g,''); }
+  
   function isValidAuMobile(v){
-    const d = normaliseDigits(v);
-    return /^04\d{8}$/.test(d) || /^614\d{8}$/.test(d);
+    if (!v) return false;
+    const cleaned = v.trim();
+    const digits = normaliseDigits(cleaned);
+    
+    // Must be exactly 10 digits starting with 04, or 11 digits starting with 614
+    if (!/^(04\d{8}|614\d{8})$/.test(digits)) return false;
+    
+    // Ensure no invalid characters (only digits, spaces, +, -, parentheses)
+    if (!/^[\d\s+\-()]+$/.test(cleaned)) return false;
+    
+    // If starts with +, must be +61
+    if (cleaned.startsWith('+') && !cleaned.startsWith('+61')) return false;
+    
+    return true;
   }
+  
   function isValidAuPhone(v){
-    const d = normaliseDigits(v);
-    // Accept 8-digit local, 0 + 9 digits (national), or +61 + 9 digits (international format)
-    return /^\d{8}$/.test(d) || /^0\d{9}$/.test(d) || /^61\d{9}$/.test(d);
+    if (!v) return false;
+    const cleaned = v.trim();
+    const digits = normaliseDigits(cleaned);
+    
+    // Accept: 8-digit local, 10-digit national (0X), or 11-digit international (61X)
+    if (!/^(\d{8}|0\d{9}|61\d{9})$/.test(digits)) return false;
+    
+    // Ensure no invalid characters (only digits, spaces, +, -, parentheses)
+    if (!/^[\d\s+\-()]+$/.test(cleaned)) return false;
+    
+    // If starts with +, must be +61
+    if (cleaned.startsWith('+') && !cleaned.startsWith('+61')) return false;
+    
+    return true;
   }
+
+  // Sanitize phone inputs - strict formatting
+  function sanitizePhoneInput(input) {
+    input.addEventListener('input', function() {
+      let val = this.value;
+      
+      // Remove any characters that aren't digits, spaces, +, -, or parentheses
+      val = val.replace(/[^\d\s+\-()]/g, '');
+      
+      // Only allow + at the start
+      const hasPlus = val.startsWith('+');
+      val = val.replace(/\+/g, '');
+      if (hasPlus) val = '+' + val;
+      
+      // Remove trailing special characters (spaces, hyphens, parentheses, +)
+      val = val.replace(/[\s\-()]+$/, '');
+      
+      this.value = val;
+    });
+  }
+  
+  sanitizePhoneInput(document.getElementById('mobile'));
+  sanitizePhoneInput(document.getElementById('emergencyContactPhone'));
 
   // Per-field validation on blur
   document.getElementById('mobile').addEventListener('blur', function(){
@@ -327,9 +373,21 @@
 
     if (!first) { showError('firstName', 'firstNameError', 'First name is required'); hasError = true; }
     if (!last)  { showError('lastName', 'lastNameError', 'Last name is required');   hasError = true; }
-    if (!mobile) { showError('mobile', 'mobileError', 'Mobile number is required'); hasError = true; }
-    else if (!isValidAuMobile(mobile)) { showError('mobile', 'mobileError', 'Enter a valid AU mobile (e.g. 04XX XXX XXX)'); hasError = true; }
-    if (ePhone && !isValidAuPhone(ePhone)) { showError('emergencyContactPhone', 'emergencyContactPhoneError', 'Enter a valid AU phone number'); hasError = true; }
+    
+    // Mobile validation - must be valid
+    if (!mobile) { 
+      showError('mobile', 'mobileError', 'Mobile number is required'); 
+      hasError = true; 
+    } else if (!isValidAuMobile(mobile)) { 
+      showError('mobile', 'mobileError', 'Enter a valid AU mobile (e.g. 04XX XXX XXX)'); 
+      hasError = true; 
+    }
+    
+    // Emergency phone validation - must be valid if provided
+    if (ePhone && !isValidAuPhone(ePhone)) { 
+      showError('emergencyContactPhone', 'emergencyContactPhoneError', 'Enter a valid AU phone number'); 
+      hasError = true; 
+    }
 
     return !hasError;
   }
@@ -338,23 +396,31 @@
   // Handle form submission
   document.getElementById('clientDetailsForm').addEventListener('submit', async function(e) {
     e.preventDefault();
+    console.log('[portal-details] Form submit triggered');
 
     // Validate all fields; block save if invalid
-    if (!validateClientDetailsForm()) return;
+    if (!validateClientDetailsForm()) {
+      console.log('[portal-details] Validation failed - blocking save');
+      return;
+    }
+    console.log('[portal-details] Validation passed - proceeding with save');
 
     if (!window.supabaseClient || !window.currentUser) {
       Modal.error('Not authenticated. Please log in again.');
       return;
     }
 
-    // Collect form data
+    // Collect form data - normalize phone numbers to digits only
+    const mobileRaw = document.getElementById('mobile').value.trim();
+    const emergencyPhoneRaw = document.getElementById('emergencyContactPhone').value.trim();
+    
     const formData = {
       first_name: document.getElementById('firstName').value.trim(),
       last_name: document.getElementById('lastName').value.trim(),
-      mobile: document.getElementById('mobile').value.trim(),
+      mobile: normaliseDigits(mobileRaw), // Strip formatting, save digits only
       learner_permit_number: document.getElementById('learnerPermitNumber').value.trim() || null,
       emergency_contact_name: document.getElementById('emergencyContactName').value.trim() || null,
-      emergency_contact_phone: document.getElementById('emergencyContactPhone').value.trim() || null,
+      emergency_contact_phone: emergencyPhoneRaw ? normaliseDigits(emergencyPhoneRaw) : null, // Strip formatting
       medical_conditions: document.getElementById('medicalConditions').value.trim() || null,
       is_anxious_nervous: document.getElementById('isAnxiousNervous').checked,
       is_beginner: document.getElementById('isBeginner').checked,

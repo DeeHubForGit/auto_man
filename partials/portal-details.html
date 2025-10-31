@@ -267,7 +267,7 @@
   }
 
   // Sanitize phone inputs - strict formatting
-  function sanitizePhoneInput(input) {
+  function sanitizePhoneInput(input, errorId, validator) {
     input.addEventListener('input', function() {
       let val = this.value;
       
@@ -283,11 +283,16 @@
       val = val.replace(/[\s\-()]+$/, '');
       
       this.value = val;
+      
+      // Clear error if value becomes valid
+      if (val && validator(val)) {
+        clearError(input.id, errorId);
+      }
     });
   }
   
-  sanitizePhoneInput(document.getElementById('mobile'));
-  sanitizePhoneInput(document.getElementById('emergencyContactPhone'));
+  sanitizePhoneInput(document.getElementById('mobile'), 'mobileError', isValidAuMobile);
+  sanitizePhoneInput(document.getElementById('emergencyContactPhone'), 'emergencyContactPhoneError', isValidAuPhone);
 
   // Per-field validation on blur
   document.getElementById('mobile').addEventListener('blur', function(){
@@ -396,14 +401,11 @@
   // Handle form submission
   document.getElementById('clientDetailsForm').addEventListener('submit', async function(e) {
     e.preventDefault();
-    console.log('[portal-details] Form submit triggered');
 
     // Validate all fields; block save if invalid
     if (!validateClientDetailsForm()) {
-      console.log('[portal-details] Validation failed - blocking save');
       return;
     }
-    console.log('[portal-details] Validation passed - proceeding with save');
 
     if (!window.supabaseClient || !window.currentUser) {
       Modal.error('Not authenticated. Please log in again.');

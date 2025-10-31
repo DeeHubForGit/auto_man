@@ -1,5 +1,9 @@
 // Site-wide configuration
 const SITE_CONFIG = {
+  // Supabase configuration (ANON_KEY is safe to expose - RLS protects your data)
+  SUPABASE_URL: 'https://ugxxxvhanwckgciaedna.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVneHh4dmhhbndja2djaWFlZG5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg2MTczMzIsImV4cCI6MjA3NDE5MzMzMn0.NmfWAs0ySO6RKf0sLWmuXZ6R_RhtDoObC-5NWWbCFtM',
+  
   OWNER_NAME: 'Darren',
   PHONE_NUMBER: '0403 632 313',
   PHONE_NUMBER_LINK: '0403632313', // For tel: links (no spaces)
@@ -274,6 +278,10 @@ const SITE_CONFIG = {
 
 // Make config available globally
 window.SITE_CONFIG = SITE_CONFIG;
+
+// Also expose Supabase config as global variables for compatibility
+window.SUPABASE_URL = SITE_CONFIG.SUPABASE_URL;
+window.SUPABASE_ANON_KEY = SITE_CONFIG.SUPABASE_ANON_KEY;
 
 // Helper functions for accessing config data
 window.SITE_CONFIG.getServiceOverview = function(id) {

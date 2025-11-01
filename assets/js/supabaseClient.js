@@ -21,8 +21,22 @@
         storageKey: 'sb-automansite-auth',
       },
     });
-    // Silently restore session
-    window.supabaseClient.auth.getSession();
+    
+    // Silently restore session, handle refresh token errors gracefully
+    window.supabaseClient.auth.getSession().catch(function(err) {
+      // Ignore refresh token errors - user just needs to log in again
+      if (err?.code === 'refresh_token_not_found' || err?.message?.includes('Refresh Token')) {
+        console.log('[supabaseClient] Session expired, user needs to log in');
+        // Clear invalid session data
+        try {
+          Object.keys(localStorage).forEach(function(k) {
+            if (k.startsWith('sb-') || k.includes('supabase')) localStorage.removeItem(k);
+          });
+        } catch (e) {}
+      } else {
+        console.warn('[supabaseClient] getSession error:', err);
+      }
+    });
   } catch (e) {
     console.error('[supabaseClient] init failed:', e);
   }

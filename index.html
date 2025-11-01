@@ -31,16 +31,24 @@
   <section id="top" class="relative bg-gradient-to-br from-blue-50 to-blue-100 overflow-hidden">
     <!-- Background Image -->
     <div class="absolute inset-0 z-0">
-      <img src="images/auto-man-car.jpg" alt="Auto-Man Driving School car" class="w-full h-full object-cover opacity-75" />
+      <img src="images/auto-man-car2.jpg" alt="Auto-Man Driving School car" class="w-full h-full object-cover opacity-85" />
       <div class="absolute inset-0 bg-gradient-to-r from-blue-900/50 to-blue-700/30"></div>
     </div>
     
     <!-- Content -->
-    <div class="container mx-auto px-4 py-32 relative z-10">
+    <div class="container mx-auto px-4 py-12 relative z-10 min-h-[650px] flex flex-col">
+      <!-- Heading at top -->
       <div class="max-w-2xl">
         <h1 class="text-4xl md:text-6xl font-extrabold leading-tight text-white">Driving Lessons Geelong</h1>
-        <p class="mt-6 text-xl text-white/90">Friendly, patient instructors in <strong>Geelong</strong> and surrounding suburbs. Flexible lesson packages and test-day support.</p>
-        <div class="mt-8 flex gap-4 flex-wrap">
+      </div>
+      
+      <!-- Spacer to push content down -->
+      <div class="flex-grow"></div>
+      
+      <!-- Description and CTA at very bottom -->
+      <div class="max-w-2xl pb-8">
+        <p class="text-xl text-white/90 mb-6">Friendly, patient instructors in <strong>Geelong</strong> and surrounding suburbs. Flexible lesson packages and test-day support.</p>
+        <div class="flex gap-4 flex-wrap">
           <a href="booking.html" class="bg-gradient-to-r from-sky-400 to-blue-500 text-white px-8 py-4 rounded-lg shadow-lg hover:from-sky-500 hover:to-blue-600 font-bold text-lg border-2 border-sky-300">Book Now</a>
           <!--
           <a href="#pricing" class="bg-blue-500 text-white px-8 py-4 rounded-lg shadow-lg hover:bg-blue-600 font-semibold text-lg">View packages</a>
@@ -58,7 +66,10 @@
         <!-- Service overviews will be dynamically loaded from config -->
       </div>
       <div class="mt-12 text-center">
-        <a href="booking.html" class="bg-blue-500 text-white px-8 py-3 rounded-lg shadow-lg hover:bg-blue-600 transition-colors duration-200">Book Now</a>
+        <a href="booking.html"
+          class="bg-gradient-to-r from-sky-400 to-blue-500 text-white px-8 py-4 rounded-lg shadow-lg hover:from-sky-500 hover:to-blue-600 font-bold text-lg border-2 border-sky-300 transition-transform transform hover:-translate-y-1">
+          Book Now
+        </a>
       </div>
     </div>
   </section>

@@ -275,3 +275,37 @@ a.hover\:bg-purple-50:hover {
 html {
   scroll-behavior: smooth;
 }
+
+/* --- Admin Sidebar Navigation: higher-contrast hover/active --- */
+.nav-item{
+  color: var(--text-gray) !important;
+  background: var(--card);                 /* #101828 */
+  border-left: 4px solid transparent;
+  border-radius: 12px;
+  transition: background-color .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+
+/* MUCH brighter hover so it doesn't look disabled */
+.nav-item:hover{
+  background: rgba(59,130,246,0.30) !important;   /* brand @ 30% */
+  color: #f3f4f6 !important;
+  border-left-color: var(--brand) !important;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.4);
+}
+
+/* Clear active state (matches the 'Calendar' look in your screenshot) */
+.nav-item.is-active{
+  background: linear-gradient(180deg, rgba(59,130,246,0.85) 0%, rgba(37,99,235,0.85) 100%) !important;
+  color: #fff !important;
+  border-left-color: #93c5fd !important;          /* lighter blue accent */
+  box-shadow:
+    inset 0 0 0 1px rgba(147,197,253,0.65),
+    0 6px 16px rgba(17,24,39,0.35);
+}
+
+/* Keyboard focus – visible on dark UI */
+.nav-item:focus-visible{
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(147,197,253,0.7);
+}
+

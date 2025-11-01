@@ -124,23 +124,22 @@
 
     // Section navigation like portal.html
     function showSection(section) {
+      // Hide all sections
       document.querySelectorAll('.section-content').forEach(el => el.classList.add('hidden'));
+
+      // Reset sidebar items
       document.querySelectorAll('.nav-item').forEach(item => {
-        // Reset all items to default state
-        item.classList.remove('bg-blue-100', 'text-blue-800', 'border-blue-500');
-        item.classList.add('text-gray-700', 'border-transparent');
+        item.classList.remove('is-active');
       });
-      
+
+      // Show selected section and highlight active link
       const targetSection = document.getElementById(`section-${section}`);
       if (targetSection) targetSection.classList.remove('hidden');
-      
+
       const navItem = document.getElementById(`nav-${section}`);
-      if (navItem) {
-        // Apply active state with light blue bg, dark navy/blue text, and blue left border
-        navItem.classList.add('bg-blue-100', 'text-blue-800', 'border-blue-500');
-        navItem.classList.remove('text-gray-700', 'border-transparent');
-      }
+      if (navItem) navItem.classList.add('is-active');
     }
+
 
     // Wire up
     document.addEventListener('DOMContentLoaded', async function(){

@@ -1,5 +1,15 @@
-<!-- Keys (gitignored, optional - falls back to config.js) -->
-<script src="assets/js/config.local.js" onerror="console.log('[auth] config.local.js not found, using config.js')"></script>
+<!-- Conditionally load config.local.js if it exists (dev only, gitignored) -->
+<script>
+(function() {
+  // Try to load config.local.js silently - if it 404s, that's fine (production)
+  const script = document.createElement('script');
+  script.src = 'assets/js/config.local.js';
+  script.onerror = function() {
+    // Silently fail - config.js is already loaded
+  };
+  document.head.appendChild(script);
+})();
+</script>
 
 <!-- Supabase library (UMD) -->
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>

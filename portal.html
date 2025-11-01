@@ -311,7 +311,7 @@
     function initializePortalScripts() {
       console.log('Initializing portal scripts...');
       
-      // Initialize form validation
+      // Initialize form validation (only if on My Details section)
       const form = document.getElementById('clientDetailsForm');
       if (form) {
         console.log('Setting up form validation');
@@ -320,9 +320,8 @@
         setTimeout(() => {
           loadFormDataFromCache();
         }, 1000);
-      } else {
-        console.error('clientDetailsForm not found');
       }
+      // Note: Form won't exist on My Bookings page - this is normal
 
       // Initialize bookings after partial loads
       initBookingsAfterPartial();

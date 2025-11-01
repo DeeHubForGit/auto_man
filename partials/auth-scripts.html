@@ -1,5 +1,5 @@
-<!-- Keys (gitignored) -->
-<script src="assets/js/config.local.js"></script>
+<!-- Keys (gitignored, optional - falls back to config.js) -->
+<script src="assets/js/config.local.js" onerror="console.log('[auth] config.local.js not found, using config.js')"></script>
 
 <!-- Supabase library (UMD) -->
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>

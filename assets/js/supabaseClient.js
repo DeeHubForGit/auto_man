@@ -6,7 +6,8 @@
   var url = window.SUPABASE_URL || window.SITE_CONFIG?.SUPABASE_URL;
   var key = window.SUPABASE_ANON_KEY || window.SITE_CONFIG?.SUPABASE_ANON_KEY;
   if (!url || !key || !window.supabase) {
-    console.error('[supabaseClient] Missing SUPABASE_URL/ANON_KEY or supabase lib. Check config.local.js');
+    console.error('[supabaseClient] Missing SUPABASE_URL/ANON_KEY or supabase lib. Check config.js and ensure SITE_CONFIG is loaded.');
+    console.error('[supabaseClient] URL:', url, 'KEY:', key ? 'present' : 'missing', 'supabase lib:', !!window.supabase);
     return;
   }
 
@@ -15,7 +16,7 @@
       auth: {
         persistSession: true,
         autoRefreshToken: true,
-        detectSessionInUrl: false,
+        detectSessionInUrl: true,
         storage: window.localStorage,
         storageKey: 'sb-automansite-auth',
       },

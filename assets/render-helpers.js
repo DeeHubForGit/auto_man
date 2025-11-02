@@ -19,10 +19,10 @@ function renderServices(containerId = 'services-container') {
     if (service.costDescription) {
       // Add alternative pricing if available
       const altText = service.priceAlt 
-        ? `<br><span class="text-sm text-blue-600">${service.priceAlt}</span>` 
+        ? `<br><span class="text-sm text-blue-dark">${service.priceAlt}</span>` 
         : '';
       
-      priceDisplay = `<p class="text-base font-semibold text-blue-600 mt-2">${service.costDescription}${altText}</p>`;
+      priceDisplay = `<p class="text-base font-semibold text-blue-dark mt-2">${service.costDescription}${altText}</p>`;
     } else if (service.costNote) {
       priceDisplay = `<p class="text-sm font-semibold text-gray-500 mt-2">${service.costNote}</p>`;
     }

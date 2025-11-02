@@ -3,13 +3,19 @@
   <div class="bg-white rounded-xl shadow p-6 text-center">
     <div class="text-3xl mb-3">📞</div>
     <h3 class="font-semibold mb-2">Call</h3>
-    <p class="text-lg"><a class="text-blue-500 hover:text-blue-600 font-bold" href="tel:{{PHONE_LINK}}">{{PHONE}}</a></p>
+    <p class="text-lg">
+      <a href="tel:{{PHONE_LINK}}" class="text-blue-dark font-bold">{{PHONE}}</a>
+    </p>
   </div>
+
   <div class="bg-white rounded-xl shadow p-6 text-center">
     <div class="text-3xl mb-3">📧</div>
     <h3 class="font-semibold mb-2">Email</h3>
-    <p class="text-lg"><a class="text-blue-500 hover:text-blue-600 font-bold" href="mailto:{{EMAIL}}">{{EMAIL}}</a></p>
+    <p class="text-lg">
+      <a href="mailto:{{EMAIL}}" class="text-blue-dark font-bold">{{EMAIL}}</a>
+    </p>
   </div>
+
   <div class="bg-white rounded-xl shadow p-6 text-center">
     <div class="text-3xl mb-3">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#1877f2" class="w-12 h-12 mx-auto">
@@ -18,10 +24,7 @@
     </div>
     <h3 class="font-semibold mb-2">Facebook</h3>
     <p class="text-lg">
-      <a class="text-blue-500 hover:text-blue-600 font-bold"
-        href="{{FACEBOOK_URL}}"
-        target="_blank"
-        rel="noopener">{{FACEBOOK}}</a>
+      <a href="{{FACEBOOK_URL}}" target="_blank" rel="noopener" class="text-blue-dark font-bold">{{FACEBOOK}}</a>
     </p>
   </div>
 </div>

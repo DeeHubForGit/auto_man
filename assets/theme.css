@@ -309,3 +309,205 @@ html {
   box-shadow: 0 0 0 2px rgba(147,197,253,0.7);
 }
 
+/* ============================================================= */
+/* GLOBAL BUTTON SYSTEM (scoped)                                 */
+/* ============================================================= */
+
+.btn {
+  /* base layout */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+
+  /* typography + size */
+  font-size: 0.875rem;            /* text-sm */
+  line-height: 1.25rem;
+  font-weight: 500;
+  padding: 0.5rem 1rem;           /* px-4 py-2 */
+  border-radius: 0.5rem;
+
+  /* behavior */
+  cursor: pointer;
+  text-decoration: none !important;
+  transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+
+/* Size variant */
+.btn-lg {
+  padding: 0.5rem 1.5rem;         /* px-6 py-2 */
+}
+
+/* Focus & disabled */
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(59,130,246,.5), 0 0 0 4px rgba(255,255,255,.1);
+}
+.btn:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ============================================================= */
+/* Variants                                                      */
+/* ============================================================= */
+
+/* Primary (blue) */
+.btn-primary {
+  background-color: #3b82f6 !important;   /* brand blue */
+  color: #fff !important;
+  border: none !important;
+}
+.btn-primary:hover {
+  background-color: #2563eb !important;   /* darker blue */
+  color: #fff !important;
+}
+
+/* Secondary (neutral, dark-theme friendly) */
+.btn-secondary {
+  background-color: #111827 !important;   /* slate-900 */
+  color: #e5e7eb !important;              /* light gray */
+  border: 1px solid #374151 !important;   /* gray-700 */
+}
+.btn-secondary:hover {
+  background-color: #0f172a !important;   /* darker slate */
+  border-color: #4b5563 !important;       /* gray-600 */
+  color: #f3f4f6 !important;
+}
+
+/* ============================================================= */
+/* GLOBAL BUTTON HOVER GLOW EFFECT (dark theme friendly)          */
+/* ============================================================= */
+
+.btn-primary {
+  background-color: #3b82f6 !important;
+  color: #fff !important;
+  border: none !important;
+  box-shadow: 0 2px 6px rgba(59,130,246,0.35); /* subtle depth */
+}
+
+.btn-primary:hover {
+  background-color: #60a5fa !important;  /* lighter blue tint */
+  box-shadow:
+    inset 0 0 6px rgba(255,255,255,0.25),   /* inner light */
+    0 0 10px rgba(59,130,246,0.55);         /* outer blue glow */
+  color: #fff !important;
+  transform: translateY(-1px);
+}
+
+/* Optional: give secondary buttons a lighter hover tint too */
+.btn-secondary:hover {
+  background-color: #1e293b !important;   /* slate-800 */
+  box-shadow:
+    inset 0 0 5px rgba(255,255,255,0.15),
+    0 0 8px rgba(59,130,246,0.4);
+  transform: translateY(-1px);
+}
+
+/* ============================================================= */
+/* CTA variant for high-priority actions (Book Now)               */
+/* Extends .btn + .btn-primary with a subtle gradient + glow      */
+/* ============================================================= */
+
+.btn-cta {
+  /* start from primary look */
+  background: linear-gradient(90deg, #38bdf8 0%, #3b82f6 100%) !important; /* sky-400 → brand blue */
+  border: 1px solid #7dd3fc !important;  /* sky-300 edge for pop */
+  box-shadow:
+    inset 0 0 6px rgba(255,255,255,0.22),
+    0 4px 16px rgba(59,130,246,0.45);
+  font-weight: 700;                       /* bolder label for CTA */
+}
+
+.btn-cta:hover {
+  background: linear-gradient(90deg, #38c5ff 0%, #2563eb 100%) !important; /* lighten → darken */
+  box-shadow:
+    inset 0 0 8px rgba(255,255,255,0.28),
+    0 6px 22px rgba(59,130,246,0.55);
+  transform: translateY(-1px);
+}
+
+/* ============================================================= */
+/* Larger CTA variant (for homepage + service CTAs)               */
+/* ============================================================= */
+.btn-cta-lg {
+  font-size: 1.125rem;          /* text-lg */
+  font-weight: 700;
+  padding: 0.9rem 2.25rem;      /* visually balanced, taller look */
+  border-radius: 0.75rem;       /* slightly more rounded */
+  box-shadow:
+    inset 0 0 6px rgba(255,255,255,0.22),
+    0 6px 22px rgba(59,130,246,0.45);
+}
+
+.btn-cta-lg:hover {
+  box-shadow:
+    inset 0 0 8px rgba(255,255,255,0.25),
+    0 8px 28px rgba(59,130,246,0.55);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+  .btn-cta-lg {
+    font-size: 1rem;
+    padding: 0.75rem 1.75rem;
+  }
+}
+
+/* ============================================================= */
+/* Text color for blue on dark backgrounds                        */
+/* ============================================================= */
+
+/* Brighter, high-contrast blue suitable for dark surfaces */
+.text-blue-dark {
+  color: #60a5fa !important; /* tailwind sky-400 — softer & brighter */
+}
+
+/* Slightly stronger hover variant for links */
+.text-blue-dark:hover {
+  color: #93c5fd !important; /* sky-300 for highlight */
+}
+
+/* ============================================================= */
+/* Text color: white default, brand sky-blue hover (balanced tone)*/
+/* ============================================================= */
+
+.text-light-hover-blue {
+  color: rgb(249 250 251) !important;   /* text-gray-50 */
+  font-weight: 400;
+  transition: color 0.2s ease, font-weight 0.2s ease;
+}
+
+.text-light-hover-blue:hover {
+  color: rgb(96 165 250) !important;    /* text-sky-400 (#60a5fa) */
+  font-weight: 700;
+}
+
+/* 1) Let pills be pills everywhere (restore Tailwind rounded-full) */
+.btn.rounded-full { 
+  border-radius: 9999px !important;
+}
+
+/* 2) Keep header button size/height consistent */
+header .btn {
+  padding: 0.5rem 1rem !important;     /* match your intended height */
+  line-height: 1.25rem !important;
+  font-weight: 500 !important;          /* stable, no weight jump */
+}
+
+/* 3) Avoid bold jumps on hover for header nav links */
+.text-light-hover-blue { 
+  font-weight: 400;                     /* base weight */
+}
+.text-light-hover-blue:hover {
+  color: rgb(96 165 250) !important;    /* keep the color change */
+  font-weight: 400;                     /* don't increase weight */
+}
+
+/* (Optional) If you prefer lighter buttons in header */
+header .btn.btn-secondary { 
+  font-weight: 400 !important;
+}
+
+

@@ -3,6 +3,26 @@
   /* Anti-flicker + reserve space so content below never jumps */
   html.loading * { transition: none !important; }
   header { min-height: 70px; }
+
+  /* ---------- Header sizing guardrails ---------- */
+  /* Stop page-level "leading-*" utilities from inflating header */
+  header .nav-link,
+  header nav a,
+  header .btn { line-height: 1.25rem !important; } /* 20px */
+
+  /* Consistent button height/shape in header */
+  header .btn {
+    height: 2.25rem;          /* 36px */
+    padding: 0 1rem;          /* horizontal stays the same */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* If a large button is ever placed in header, keep it tidy too */
+  header .btn.btn-lg {
+    height: 2.5rem;           /* 40px */
+    padding: 0 1.125rem;
+  }
 </style>
 
 <header class="bg-white shadow-sm sticky top-0 z-50">
@@ -17,9 +37,9 @@
     <nav class="hidden md:flex items-center gap-6 text-sm relative">
       <!-- Services + dropdown -->
       <div class="relative group">
-        <a id="nav-services" href="index.html#services" class="hover:text-blue-600 inline-flex items-center gap-1">
+        <a id="nav-services" href="index.html#services" class="text-light-hover-blue inline-flex items-center gap-1">
           Services
-          <svg aria-hidden="true" width="14" height="14" viewBox="0 0 20 20" class="mt-[1px]">
+          <svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 20 20" class="mt-[1px]">
             <path d="M6 8l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
         </a>
@@ -39,38 +59,45 @@
         </div>
       </div>
 
-      <a href="about.html" class="hover:text-blue-600">About Us</a>
-      <a href="service-areas.html" class="hover:text-blue-600">Service Areas</a>
-      <a href="faq.html" class="hover:text-blue-600">FAQs</a>
+      <a href="about.html" class="text-light-hover-blue">About Us</a>
+      <a href="service-areas.html" class="text-light-hover-blue">Service Areas</a>
+      <a href="faq.html" class="text-light-hover-blue">FAQs</a>
       <!-- <a href="index.html#pricing" class="hover:text-blue-600">Lesson Packages</a> -->
-      <a href="index.html#contact" class="hover:text-blue-600">Contact</a>
+      <a href="index.html#contact" class="text-light-hover-blue">Contact</a>
     </nav>
 
     <!-- Auth controls (middle cluster) -->
     <div class="hidden md:flex items-center gap-3">
       <!-- Sign Up as text link - hidden by default -->
-      <a href="signup.html" id="signupBtn" class="hidden md:inline-block text-sm text-gray-700 hover:text-blue-600 transition-colors">Sign Up</a>
+      <a href="signup.html" id="signupBtn" 
+        class="hidden md:inline-block btn btn-secondary">
+        Sign Up
+      </a>
+
       <!-- Login as button - hidden by default -->
-      <a href="login.html" id="loginBtn" class="hidden md:inline-block text-blue-600 border border-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors">Login</a>
-      <!-- Sign Out button (desktop) - hidden by default -->
-      <button id="logoutBtnHeader" class="hidden md:inline-block border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">Sign Out</button>
+      <a href="login.html" id="loginBtn" class="hidden md:inline-block btn btn-primary">Login</a>
+      <!-- Log Out button (desktop) - hidden by default -->
+      <button id="logoutBtnHeader" class="hidden md:inline-block btn btn-secondary">Log Out</button>
       <!-- My Account - hidden by default -->
-      <a href="portal.html" id="portalBtnHeader" class="hidden md:inline-block hover:text-blue-600 transition-colors">My Account</a>
+      <a href="portal.html" id="portalBtnHeader" class="hidden md:inline-block text-light-hover-blue transition-colors">My Account</a>
       <a href="admin.html" id="adminBtn" class="hidden hover:text-blue-600 font-semibold text-orange-600">Admin</a>
     </div>
 
     <div class="flex items-center gap-4">
-      <a href="tel:{{PHONE_LINK}}" class="hidden md:inline-flex items-center gap-2 text-blue-500 font-semibold hover:text-blue-600">📞 {{PHONE}}</a>
+      <a href="tel:{{PHONE_LINK}}" 
+        class="hidden md:inline-flex items-center gap-2 text-blue-dark font-semibold">
+        📞 {{PHONE}}
+      </a>
 
       <!-- WhatsApp button (placeholder for now) -->
-      <a href="https://wa.me/61403632313" target="_blank" rel="noopener"
-        class="hidden md:inline-block border border-blue-400 text-blue-400 hover:bg-blue-500 hover:text-white rounded-lg px-4 py-2 text-sm transition">
-        <i class="fa-brands fa-whatsapp"></i> WhatsApp
+      <a href="https://wa.me/61403632313" target="_blank" rel="noopener noreferrer"
+        class="hidden md:inline-block btn btn-secondary">
+        <i class="fa-brands fa-whatsapp" aria-hidden="true"></i> WhatsApp
       </a>
 
       <!-- Book Now as primary CTA -->
       <a href="booking.html"
-        class="hidden md:inline-block bg-blue-600 text-white px-5 py-2.5 rounded-lg shadow-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-semibold transition-all">
+        class="hidden md:inline-block btn btn-primary btn-lg">
         Book Now
       </a>
       <!-- Mobile Book button -->
@@ -123,7 +150,7 @@
         class="hidden px-4 py-2 rounded border border-orange-600 text-orange-600 hover:bg-orange-50 text-center font-semibold"
         onclick="window.closeMenu?window.closeMenu():null">Admin</a>
       <button id="logoutBtnMobile"
-        class="hidden px-4 py-2 rounded border border-gray-300 text-gray-800 hover:bg-gray-50 text-center">Sign Out</button>
+        class="hidden px-4 py-2 rounded border border-gray-300 text-gray-800 hover:bg-gray-50 text-center">Log Out</button>
 
       <!-- Phone & CTA -->
       <a href="tel:{{PHONE_LINK}}"

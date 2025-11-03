@@ -55,15 +55,23 @@
   }
 </style>
 <section id="section-calendar" class="section-content bg-white border rounded-2xl shadow-sm p-5" style="background-color: white !important; color: #111827 !important;">
-  <div class="flex items-center justify-between mb-1">
-    <h2 class="text-xl font-semibold">Calendar</h2>
-    <div class="space-x-2">
-      <button id="prevWeek" class="calendar-nav-btn">Prev</button>
-      <button id="todayBtn" class="calendar-nav-btn">Today</button>
-      <button id="nextWeek" class="calendar-nav-btn">Next</button>
+  <!-- Week range + navigation + message -->
+  <div class="flex items-center justify-between mb-3" role="group" aria-label="Calendar navigation">
+    <div class="flex items-center gap-3">
+      <span id="weekRange" class="text-lg font-bold text-blue-600">
+        Week: 09/11/2025 - 15/11/2025
+      </span>
+      <div class="flex items-center gap-2">
+        <button id="prevWeek" class="calendar-nav-btn !px-2 !py-1" aria-label="Previous week">←</button>
+        <button id="nextWeek" class="calendar-nav-btn !px-2 !py-1" aria-label="Next week">→</button>
+        <button id="todayBtn" class="calendar-nav-btn !px-3 !py-1" aria-label="Jump to today">Today</button>
+      </div>
+      <span id="noBookingsMsg" class="text-blue-500 font-semibold hidden ml-2">
+        No bookings found for this week
+      </span>
     </div>
   </div>
-  <div id="weekRange" class="text-lg font-bold text-blue-600 mb-3"></div>
+
   <div id="calendar" class="overflow-auto max-h-[600px] relative">
     <div id="weekGrid" class="grid grid-cols-8 text-sm" style="grid-template-columns: 80px repeat(7, minmax(120px, 1fr));"></div>
   </div>
@@ -189,13 +197,25 @@
     console.log(`✅ Found ${bookings?.length || 0} bookings for this week:`, bookings);
 
     if (!bookings || bookings.length === 0) {
-      console.log('⚠️ No bookings found for this week');
+      console.log('ℹ️ No bookings found for this week');
+
+      // Update week range
       const weekRange = document.getElementById('weekRange');
       if (weekRange) {
-        const rangeText = `Week: ${weekStart.toLocaleDateString('en-AU')} - ${addDays(weekStart, 6).toLocaleDateString('en-AU')}`;
-        weekRange.innerHTML = `${rangeText} <span class="text-amber-600 ml-2">⚠️ No bookings found for this week</span>`;
+        weekRange.textContent = `Week: ${weekStart.toLocaleDateString('en-AU')} - ${addDays(weekStart, 6).toLocaleDateString('en-AU')}`;
       }
+
+      // Show message beside buttons
+      const msg = document.getElementById('noBookingsMsg');
+      if (msg) {
+        msg.textContent = "No bookings found for this week";
+        msg.classList.remove("hidden");
+      }
+
       return;
+    } else {
+      const msg = document.getElementById('noBookingsMsg');
+      if (msg) msg.classList.add("hidden");
     }
 
     bookings.forEach(booking => {

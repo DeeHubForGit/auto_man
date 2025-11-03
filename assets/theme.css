@@ -227,7 +227,7 @@ html { scroll-behavior: smooth; }
 .btn-primary {
   background-color: #3b82f6 !important;
   color: #fff !important;
-  border: 0.1px solid rgba(125,211,252,0.55) !important; /* sky-300 edge */
+  border: 0.1px solid #0D47A1 !important; /* sky-300 edge */
   box-shadow:
     0 0 0 1px rgba(96,165,250,0.35),
     0 2px 6px rgba(59,130,246,0.35) !important;
@@ -237,7 +237,7 @@ html { scroll-behavior: smooth; }
 .btn-secondary {
   background-color: #111827 !important;               /* slate-900 */
   color: #e5e7eb !important;                           /* light gray */
-  border: 1px solid rgba(96,165,250,0.45) !important;  /* blue-tinted edge */
+  border: 1px solid #0D47A1 !important;  /* blue-tinted edge */
   box-shadow: 0 0 8px rgba(59,130,246,0.25) !important;
 }
 

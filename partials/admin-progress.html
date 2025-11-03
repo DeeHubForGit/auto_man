@@ -43,6 +43,9 @@
 <script>
 (function() {
   // Client Progress logic
+  let hasUnsavedChanges = false;
+  let originalSkillsState = {};
+  
   function renderSkills(values){
     const box = document.getElementById('cpSkills');
     box.innerHTML='';
@@ -89,6 +92,11 @@
       cb.checked = !!values?.[s];
       cb.className='w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer';
       
+      // Track changes to checkboxes
+      cb.addEventListener('change', function() {
+        hasUnsavedChanges = true;
+      });
+      
       const span = document.createElement('span'); 
       span.textContent = s;
       span.className='text-sm select-none text-gray-900';
@@ -115,6 +123,10 @@
     
     const { data } = await window.supabaseClient.from('client_progress').select('*').eq('email', email).maybeSingle();
     renderSkills(data?.skills || {});
+    
+    // Store original state for comparison
+    originalSkillsState = JSON.parse(JSON.stringify(data?.skills || {}));
+    hasUnsavedChanges = false;
     
     // Clear message after loading
     msg.textContent = '';
@@ -146,6 +158,9 @@
     } else {
       msg.textContent = 'Client progress saved successfully';
       msg.className = 'mt-3 text-sm text-green-600';
+      // Clear unsaved changes flag
+      hasUnsavedChanges = false;
+      originalSkillsState = JSON.parse(JSON.stringify(skills));
       // Clear success message after 3 seconds
       setTimeout(() => { msg.textContent = ''; }, 3000);
     }
@@ -232,7 +247,77 @@
       
       // Auto-load progress when client is selected from dropdown
       const cpClientSelect = document.getElementById('cpClient');
-      if (cpClientSelect) cpClientSelect.addEventListener('change', cpLoad);
+      if (cpClientSelect) {
+        // Track the current client BEFORE the dropdown changes
+        let previousClient = cpClientSelect.value;
+        
+        // Update previousClient whenever we successfully load a client
+        const originalCpLoad = cpLoad;
+        cpLoad = async function() {
+          await originalCpLoad();
+          previousClient = cpClientSelect.value;
+        };
+        
+        cpClientSelect.addEventListener('change', function(e) {
+          const newValue = e.target.value;
+          
+          // Check for unsaved changes before switching
+          if (hasUnsavedChanges) {
+            // The dropdown has already changed to newValue
+            // We need to revert it to previousClient (the one with unsaved changes)
+            cpClientSelect.value = previousClient;
+            
+            // Show confirmation modal
+            if (window.Modal && window.Modal.confirm) {
+              window.Modal.confirm(
+                'You have unsaved changes. Do you want to save before switching clients?',
+                async function() {
+                  // Save previous client's changes (dropdown shows previousClient)
+                  await cpSave();
+                  // Now switch to new client
+                  cpClientSelect.value = newValue;
+                  previousClient = newValue;
+                  await cpLoad();
+                },
+                function() {
+                  // Discard changes and switch to new client
+                  hasUnsavedChanges = false;
+                  cpClientSelect.value = newValue;
+                  previousClient = newValue;
+                  cpLoad();
+                },
+                'Save Changes'
+              );
+            } else {
+              // Fallback to native confirm
+              if (confirm('You have unsaved changes. Save before switching?')) {
+                // Save previous client first
+                cpSave().then(() => {
+                  cpClientSelect.value = newValue;
+                  previousClient = newValue;
+                  cpLoad();
+                });
+              } else {
+                hasUnsavedChanges = false;
+                cpClientSelect.value = newValue;
+                previousClient = newValue;
+                cpLoad();
+              }
+            }
+          } else {
+            cpLoad();
+          }
+        });
+      }
+      
+      // Warn before leaving page with unsaved changes
+      window.addEventListener('beforeunload', function(e) {
+        if (hasUnsavedChanges) {
+          e.preventDefault();
+          e.returnValue = '';
+          return '';
+        }
+      });
     };
     
     if (document.readyState === 'loading') {

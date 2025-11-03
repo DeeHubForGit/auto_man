@@ -1,31 +1,51 @@
 <!-- Meet Your Instructor -->
-<div class="card">
-  <h2 style="margin-top:0;font-size:28px;margin-bottom:20px">Meet Your Instructor</h2>
-  <p id="instructor-name-section" class="text-blue-dark" style="font-size:20px;font-weight:600;margin-bottom:16px">
-    {{OWNER}}
-  </p>
+<div class="card" style="display:flex;align-items:flex-start;gap:30px;flex-wrap:wrap;">
 
-  <p style="font-size:16px;line-height:1.8;margin-bottom:24px;color:var(--muted)">
-    Auto-Man Driving School, owned and operated by <span id="owner-name-inline">{{OWNER}}</span>, is dedicated to 
-    providing exceptional driver education in Geelong and surrounding suburbs.
-  </p>
+  <!-- Left column: text -->
+  <div style="flex:1 1 420px;min-width:300px;">
+    <h2 style="margin-top:0;font-size:28px;margin-bottom:20px">Meet Your Instructor</h2>
+    <p id="instructor-name-section" class="text-blue-dark"
+       style="font-size:20px;font-weight:600;margin-bottom:16px">
+      {{OWNER}}
+    </p>
 
-  <p style="font-size:16px;line-height:1.8;margin-bottom:24px;color:var(--muted)">
-    {{OWNER}} started his Driving Instructor career over 20 years ago while in the Australian Army. His instructor was impressed with not only his driving ability in different vehicles but also his willingness and ability to help his classmates overcome their challenges. As a result, he was awarded <em>Highest Achiever</em> and asked to return to instruct subsequent driving courses.
-  </p>
+    <p style="font-size:16px;line-height:1.8;margin-bottom:24px;color:var(--muted)">
+      Auto-Man Driving School, owned and operated by 
+      <span id="owner-name-inline">{{OWNER}}</span>, is dedicated to providing exceptional 
+      driver education in Geelong and surrounding suburbs.
+    </p>
 
-  <p style="font-size:16px;line-height:1.8;margin-bottom:24px;color:var(--muted)">
-    When he became a civilian, {{OWNER}} maintained his passion for helping others, assisting his friends and family to get their driving licences and volunteering as a mentor for the L2P program, which assists disadvantaged youth to obtain their required hours, skills and confidence to pass their driving test.
-  </p>
+    <p style="font-size:16px;line-height:1.8;margin-bottom:24px;color:var(--muted)">
+      {{OWNER}} started his Driving Instructor career over 20 years ago while in the Australian Army. 
+      His instructor was impressed with not only his driving ability in different vehicles but also 
+      his willingness and ability to help his classmates overcome their challenges. As a result, he 
+      was awarded <em>Highest Achiever</em> and asked to return to instruct subsequent driving courses.
+    </p>
 
-  <p style="font-size:16px;line-height:1.8;margin-bottom:24px;color:var(--muted)">
-    As a professional Driving Instructor, {{OWNER}} maintains a patient and calm disposition to provide not only the ability and confidence to pass the driving test but also the knowledge and skills to stay safe on busy roads thereafter.
-  </p>
+    <p style="font-size:16px;line-height:1.8;margin-bottom:24px;color:var(--muted)">
+      When he became a civilian, {{OWNER}} maintained his passion for helping others, assisting 
+      his friends and family to get their driving licences and volunteering as a mentor for the L2P program, 
+      which assists disadvantaged youth to obtain their required hours, skills and confidence to pass their driving test.
+    </p>
 
-  <h3 style="font-size:20px;margin-bottom:16px;color:#e5e7eb">Qualifications & Experience</h3>
-  <ul class="feature-list">
-    <li><strong>Certificate IV</strong> – Motor Vehicle Driver Training</li>
-    <li><strong>Police and Working with Children Check</strong></li>
-    <li><strong>Public Liability and Professional Indemnity Insured</strong></li>
-  </ul>
+    <p style="font-size:16px;line-height:1.8;margin-bottom:24px;color:var(--muted)">
+      As a professional Driving Instructor, {{OWNER}} maintains a patient and calm disposition to 
+      provide not only the ability and confidence to pass the driving test but also the knowledge 
+      and skills to stay safe on busy roads thereafter.
+    </p>
+
+    <h3 style="font-size:20px;margin-bottom:16px;color:#e5e7eb">Qualifications & Experience</h3>
+    <ul class="feature-list">
+      <li><strong>Certificate IV</strong> – Motor Vehicle Driver Training</li>
+      <li><strong>Police and Working with Children Check</strong></li>
+      <li><strong>Public Liability and Professional Indemnity Insured</strong></li>
+    </ul>
+  </div>
+
+  <!-- Right column: image -->
+  <div style="flex:1 1 320px;max-width:420px;margin-top:5px;">
+    <img src="images/owner-with-car.jpg" alt="Owner of Auto-Man Driving School"
+         style="width:100%;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.35);">
+  </div>
+
 </div>

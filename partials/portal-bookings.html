@@ -1,24 +1,106 @@
 <!-- Portal Bookings Section -->
 <style>
-  /* Force light backgrounds and dark text for booking cards */
+  /* Booking cards */
   #upcoming-list .booking-card,
   #past-list .booking-card,
   #cancelled-list .booking-card {
-    background-color: #dbeafe !important; /* bg-blue-100 */
-    border: 1px solid #d1d5db !important; /* gray-300 */
-    color: #111827 !important; /* gray-900 */
+    background-color: #dbeafe !important;  /* bg-blue-100 */
+    border: 2px solid #3b82f6 !important;  /* blue-500 edge */
+    border-radius: 0.5rem;
+    color: #111827 !important;             /* gray-900 text */
   }
-  
-  #upcoming-list .booking-card *,
-  #past-list .booking-card *,
-  #cancelled-list .booking-card * {
-    color: #111827 !important; /* gray-900 */
+
+  /* Ensure base colour applies only to normal text, not status */
+  #upcoming-list .booking-card *:not(.status-label):not(.status-label *),
+  #past-list .booking-card *:not(.status-label):not(.status-label *),
+  #cancelled-list .booking-card *:not(.status-label):not(.status-label *) {
+    color: #111827 !important;
   }
-  
+
   #upcoming-list .booking-card svg,
   #past-list .booking-card svg,
   #cancelled-list .booking-card svg {
-    color: #4b5563 !important; /* gray-600 */
+    color: #4b5563 !important; /* gray-600 icons */
+  }
+
+  /* Status labels (CONFIRMED / CANCELLED / etc.) */
+  .status-label {
+    font-size: .8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+    margin-left: .5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  /* 3D icon style */
+  .status-icon {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    width: 1.1em;
+    height: 1.1em;
+    border-radius: 50%;
+    font-size: 0.75em;
+    font-weight: 700;
+    box-shadow: inset 0 1px 2px rgba(255,255,255,0.6),
+                0 1px 3px rgba(0,0,0,0.25);
+  }
+
+  /* CONFIRMED: bright blue */
+  .status-confirmed {
+    color: #1d4ed8 !important; /* blue-700 */
+  }
+  .status-confirmed .status-icon {
+    background: linear-gradient(145deg, #60a5fa, #2563eb);
+    color: #fff;
+  }
+
+  /* COMPLETED: green tone */
+  .status-completed {
+    color: #15803d !important;
+  }
+  .status-completed .status-icon {
+    background: linear-gradient(145deg, #86efac, #16a34a);
+    color: #fff;
+  }
+
+  /* CANCELLED: neutral grey but with more contrast */
+  .status-cancelled {
+    color: #4b5563 !important; /* darker gray-600 text */
+  }
+  .status-cancelled .status-icon {
+    background: linear-gradient(145deg, #6b7280, #374151); /* slate grey range */
+    color: #f9fafb; /* off-white for soft contrast */
+    box-shadow: inset 0 1px 2px rgba(255,255,255,0.5),
+                0 1px 3px rgba(0,0,0,0.25);
+  }
+
+  /* NO SHOW: red for missed appointment */
+  .status-no-show {
+    color: #b91c1c !important; /* red-700 */
+  }
+  .status-no-show .status-icon {
+    background: linear-gradient(145deg, #fca5a5, #dc2626); /* soft red gradient */
+    color: #fff;
+  }
+
+  .status-icon {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    width: 1.2em;
+    height: 1.2em;
+    border-radius: 50%;
+    font-size: 0.8em;
+    font-weight: 700;
+    line-height: 1;                /* prevents emoji clipping */
+    vertical-align: middle;        /* aligns icon nicely with text */
+    transform: translateY(-0.5px); /* micro-adjust for perfect centering */
+    box-shadow: inset 0 1px 2px rgba(255,255,255,0.6),
+                0 1px 3px rgba(0,0,0,0.25);
   }
 </style>
 
@@ -35,21 +117,21 @@
       <button 
         onclick="switchBookingTab('upcoming')" 
         id="tab-upcoming"
-        class="booking-tab px-4 py-3 text-sm font-medium border-b-2 border-blue-600 text-blue-600 transition-colors"
+        class="booking-tab px-4 py-3 text-sm font-medium border-b-2 border-blue-600 text-blue-400 hover:text-blue-200 transition-colors"
       >
         Upcoming Bookings
       </button>
       <button 
         onclick="switchBookingTab('past')" 
         id="tab-past"
-        class="booking-tab px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors"
+        class="booking-tab px-4 py-3 text-sm font-medium border-b-2 border-transparent text-blue-300 hover:text-blue-100 transition-colors"
       >
         Past Bookings
       </button>
       <button 
         onclick="switchBookingTab('cancelled')" 
         id="tab-cancelled"
-        class="booking-tab px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors"
+        class="booking-tab px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-400 transition-colors"
       >
         Cancelled
       </button>

@@ -538,16 +538,24 @@
 
       const duration = Math.round((endTime - startTime) / (1000 * 60));
 
-      // Status badge
       let statusBadge = '';
       if (booking.status === 'confirmed') {
-        statusBadge = '<span class="px-2 py-1 text-xs font-medium bg-blue-300 text-white rounded">Confirmed</span>';
-      } else if (booking.status === 'cancelled') {
-        statusBadge = '<span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded">Cancelled</span>';
+        statusBadge = '<span class="status-label status-confirmed"><span class="status-icon">✔</span>CONFIRMED</span>';
       } else if (booking.status === 'completed') {
-        statusBadge = '<span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded">Completed</span>';
+        statusBadge = `
+          <span class="status-label status-completed">
+            <span class="status-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="white" width="12" height="12">
+                <circle cx="10" cy="10" r="9" stroke="#16a34a" stroke-width="2" fill="#16a34a" />
+                <path d="M6 10l2 2 5-5" stroke="white" stroke-width="2" fill="none" stroke-linecap="round" />
+              </svg>
+            </span>
+            COMPLETED
+          </span>`;
+      } else if (booking.status === 'cancelled') {
+        statusBadge = '<span class="status-label status-cancelled"><span class="status-icon">✖</span>CANCELLED</span>';
       } else if (booking.status === 'no_show') {
-        statusBadge = '<span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded">No Show</span>';
+        statusBadge = '<span class="status-label status-no-show"><span class="status-icon">—</span>NO SHOW</span>';
       }
 
       // Service name
@@ -628,12 +636,12 @@
     function switchBookingTab(tab) {
       // Update tab buttons
       document.querySelectorAll('.booking-tab').forEach(btn => {
-        btn.classList.remove('border-blue-600', 'text-blue-600');
+        btn.classList.remove('border-blue-400', 'text-blue-600');
         btn.classList.add('border-transparent', 'text-gray-500');
       });
       
       document.getElementById('tab-' + tab).classList.remove('border-transparent', 'text-gray-500');
-      document.getElementById('tab-' + tab).classList.add('border-blue-600', 'text-blue-600');
+      document.getElementById('tab-' + tab).classList.add('border-blue-400', 'text-blue-600');
 
       // Show/hide content
       document.querySelectorAll('.booking-content').forEach(content => {

@@ -247,6 +247,16 @@
             <div class="booking-name font-medium">${clientName}</div>
             ${booking.pickup_location ? `<div class="text-gray-600">📍 ${booking.pickup_location}</div>` : ''}
             ${booking.mobile ? `<div class="text-gray-600">📱 ${booking.mobile}</div>` : ''}
+            <div class="mt-1">
+              <select class="booking-status-select text-xs border border-gray-300 rounded px-1 py-0.5 w-full" 
+                      data-booking-id="${booking.id}" 
+                      data-original-status="${booking.status || 'confirmed'}">
+                <option value="confirmed" ${(booking.status || 'confirmed') === 'confirmed' ? 'selected' : ''}>Confirmed</option>
+                <option value="completed" ${booking.status === 'completed' ? 'selected' : ''}>Completed</option>
+                <option value="cancelled" ${booking.status === 'cancelled' ? 'selected' : ''}>Cancelled</option>
+                <option value="no_show" ${booking.status === 'no_show' ? 'selected' : ''}>No Show</option>
+              </select>
+            </div>
           `;
         } else {
           // This is a regular calendar appointment - show title and times
@@ -263,6 +273,87 @@
         cell.appendChild(bookingDiv);
       }
     });
+
+    // Add event listeners to all status dropdowns
+    document.querySelectorAll('.booking-status-select').forEach(select => {
+      select.addEventListener('change', async function(e) {
+        const bookingId = this.getAttribute('data-booking-id');
+        const originalStatus = this.getAttribute('data-original-status');
+        const newStatus = this.value;
+        
+        console.log(`[calendar] Status change: booking ${bookingId} from ${originalStatus} to ${newStatus}`);
+        
+        // If changing to cancelled, show confirmation modal
+        if (newStatus === 'cancelled') {
+          // Check if Modal is available
+          if (window.Modal && window.Modal.confirm) {
+            window.Modal.confirm(
+              'Are you sure you want to cancel this booking?',
+              async () => {
+                // User confirmed - proceed with cancellation
+                await updateBookingStatus(this, bookingId, newStatus, originalStatus);
+              },
+              () => {
+                // User cancelled - revert to original status
+                console.log('[calendar] Cancellation cancelled, reverting to:', originalStatus);
+                this.value = originalStatus;
+              },
+              'Cancel Booking'
+            );
+          } else {
+            // Fallback to native confirm if Modal not loaded
+            if (confirm('Are you sure you want to cancel this booking?')) {
+              await updateBookingStatus(this, bookingId, newStatus, originalStatus);
+            } else {
+              this.value = originalStatus;
+            }
+          }
+        } else {
+          // For other status changes, update immediately
+          await updateBookingStatus(this, bookingId, newStatus, originalStatus);
+        }
+      });
+    });
+    
+    // Helper function to update booking status
+    async function updateBookingStatus(selectElement, bookingId, newStatus, originalStatus) {
+      const originalBg = selectElement.style.backgroundColor;
+      selectElement.style.backgroundColor = '#fef3c7'; // yellow-100
+      selectElement.disabled = true;
+      
+      try {
+        // Update the booking status in the database
+        const { error } = await window.supabaseClient
+          .from('booking')
+          .update({ status: newStatus })
+          .eq('id', bookingId);
+        
+        if (error) {
+          console.error('[calendar] Error updating status:', error);
+          // Revert to original status
+          selectElement.value = originalStatus;
+          alert('Failed to update booking status: ' + error.message);
+          selectElement.style.backgroundColor = '#fee2e2'; // red-100
+        } else {
+          console.log('[calendar] ✅ Status updated successfully');
+          // Update the data attribute to reflect new status
+          selectElement.setAttribute('data-original-status', newStatus);
+          selectElement.style.backgroundColor = '#d1fae5'; // green-100
+          
+          // Clear success color after 1 second
+          setTimeout(() => {
+            selectElement.style.backgroundColor = originalBg;
+          }, 1000);
+        }
+      } catch (err) {
+        console.error('[calendar] Exception updating status:', err);
+        selectElement.value = originalStatus;
+        alert('Failed to update booking status: ' + err.message);
+        selectElement.style.backgroundColor = '#fee2e2'; // red-100
+      } finally {
+        selectElement.disabled = false;
+      }
+    }
   }
 
   // Initialize calendar when this partial loads

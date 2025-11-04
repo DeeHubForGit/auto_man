@@ -31,12 +31,16 @@
   <!-- Skills checklist (2-3 column responsive grid) -->
   <div id="cpSkills" class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 mb-4"></div>
   
-  <!-- Actions -->
-  <div class="flex items-center gap-3">
-    <button id="cpSave" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:brightness-110 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
-      Save Progress
-    </button>
-    <div id="cpMsg" class="text-sm"></div>
+  <!-- Actions / messages -->
+  <div class="flex flex-col gap-1">
+    <div class="flex items-center gap-3">
+      <!-- Save status (transient): Saving… / Saved / Errors -->
+      <div id="cpMsg" class="text-sm"></div>
+      <!-- Completion badge lives here (separate so it doesn’t fight the status line) -->
+      <div id="cpBadge" class="text-sm"></div>
+    </div>
+    <!-- Static reassurance -->
+    <p id="cpAutoNote" class="mt-2 text-xs text-gray-400">Changes will be automatically saved.</p>
   </div>
 </section>
 
@@ -45,77 +49,156 @@
   // Client Progress logic
   let hasUnsavedChanges = false;
   let originalSkillsState = {};
-  
-  function renderSkills(values){
-    const box = document.getElementById('cpSkills');
-    box.innerHTML='';
+
+  // --- Auto-save additions (minimal & self-contained) ---
+  let cpAutosaveTimer = null;     // debounce timer
+  let cpPendingSave = null;       // in-flight save promise
+
+  function cpSetMsg(text, cls){
+    const msg = document.getElementById('cpMsg');
+    if (!msg) return;
+    msg.textContent = text || '';
+    msg.className = 'text-sm ' + (cls || '');
+  }
+
+  // Debounced auto-save entry point
+  function cpMarkDirty(){
+    hasUnsavedChanges = true;
+    cpSetMsg('Saving…', 'text-blue-500'); // non-intrusive status
+    clearTimeout(cpAutosaveTimer);
+    cpAutosaveTimer = setTimeout(() => { void cpAutoSave(); }, 800);
+  }
+
+  async function cpFlushAutoSave(){
+    clearTimeout(cpAutosaveTimer);
+    if (hasUnsavedChanges) await cpAutoSave();
+    if (cpPendingSave) await cpPendingSave;
+  }
+
+  async function cpAutoSave(){
+    if (cpPendingSave) return cpPendingSave;
+    cpPendingSave = (async () => {
+      try {
+        const ok = await cpSave(true /* autoMode */);
+        if (ok) {
+          cpSetMsg('Saved', 'text-gray-400');
+          setTimeout(() => {
+            const el = document.getElementById('cpMsg');
+            // clear transient status; the static note remains in #cpAutoNote
+            if (el && el.textContent === 'Saved') el.textContent = '';
+          }, 1500);
+        }
+      } finally {
+        cpPendingSave = null;
+      }
+    })();
+    return cpPendingSave;
+  }
+  // --- end auto-save additions ---
+
+  // Recalculate and refresh the completion badge from current checkboxes
+  function cpUpdateBadge(){
     const tasks = Array.isArray(window.SITE_CONFIG?.DRIVING_TASKS) ? window.SITE_CONFIG.DRIVING_TASKS : [];
-    
+    const badgeEl = document.getElementById('cpBadge');
+    if (!badgeEl || tasks.length === 0) return;
+
+    let done = 0;
+    for (const s of tasks){
+      const id = 'skill_' + s.replace(/[^a-z0-9]/gi,'_');
+      const el = document.getElementById(id);
+      if (el && el.checked) done++;
+    }
+    const pct = Math.round((done / tasks.length) * 100);
+    const badge = `<span class="ml-2 px-2 py-0.5 text-xs font-medium rounded-full ${
+      pct === 100 ? 'bg-green-100 text-green-800' :
+      pct >= 50 ? 'bg-blue-100 text-blue-800' :
+                  'bg-gray-100 text-gray-800'
+    }">${done}/${tasks.length} skills (${pct}%)</span>`;
+
+    badgeEl.innerHTML = badge;
+    badgeEl.className = 'text-sm';
+  }
+
+  function renderSkills(values) {
+    const box = document.getElementById('cpSkills');
+    box.innerHTML = '';
+    const tasks = Array.isArray(window.SITE_CONFIG?.DRIVING_TASKS)
+      ? window.SITE_CONFIG.DRIVING_TASKS
+      : [];
+
     // Show the skills container now that we have a client selected
     box.style.display = tasks.length > 0 ? '' : 'none';
-    
+
     // Calculate completion percentage
     let completedCount = 0;
     for (const s of tasks) {
       if (values?.[s]) completedCount++;
     }
-    const percentage = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : 0;
-    
-    // Update client selector label with completion badge if client selected
+    const percentage =
+      tasks.length > 0
+        ? Math.round((completedCount / tasks.length) * 100)
+        : 0;
+
+    // ----- CHANGED: write completion badge to #cpBadge (not #cpMsg) -----
     const sel = document.getElementById('cpClient');
-    if (sel && sel.value && tasks.length > 0) {
+    const badgeEl = document.getElementById('cpBadge');
+    if (sel && sel.value && tasks.length > 0 && badgeEl) {
       const label = sel.options[sel.selectedIndex]?.text || '';
-      const clientName = label.split('<')[0].trim();
       const badge = `<span class="ml-2 px-2 py-0.5 text-xs font-medium rounded-full ${
-        percentage === 100 ? 'bg-green-100 text-green-800' : 
-        percentage >= 50 ? 'bg-blue-100 text-blue-800' : 
-        'bg-gray-100 text-gray-800'
+        percentage === 100
+          ? 'bg-green-100 text-green-800'
+          : percentage >= 50
+          ? 'bg-blue-100 text-blue-800'
+          : 'bg-gray-100 text-gray-800'
       }">${completedCount}/${tasks.length} skills (${percentage}%)</span>`;
-      
-      // Show completion in message area
-      const msg = document.getElementById('cpMsg');
-      if (msg) {
-        msg.innerHTML = badge;
-        msg.className = 'text-sm';
-      }
+      badgeEl.innerHTML = badge;
+      badgeEl.className = 'text-sm';
     }
-    
+    // -------------------------------------------------------------------
+
     // Render checkboxes
-    for (const s of tasks){
-      const id = 'skill_'+s.replace(/[^a-z0-9]/gi,'_');
+    for (const s of tasks) {
+      const id = 'skill_' + s.replace(/[^a-z0-9]/gi, '_');
       const wrap = document.createElement('label');
-      wrap.className='flex items-center gap-2 cursor-pointer hover:text-blue-600 transition-colors text-gray-900';
-      
+      wrap.className =
+        'flex items-center gap-2 cursor-pointer hover:text-blue-600 transition-colors text-gray-900';
+
       const cb = document.createElement('input');
-      cb.type='checkbox'; 
-      cb.id=id; 
+      cb.type = 'checkbox';
+      cb.id = id;
       cb.checked = !!values?.[s];
-      cb.className='w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer';
-      
-      // Track changes to checkboxes
-      cb.addEventListener('change', function() {
-        hasUnsavedChanges = true;
+      cb.className =
+        'w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer';
+
+      // Track changes to checkboxes (auto-save trigger + badge update)
+      cb.addEventListener('change', function () {
+        cpUpdateBadge();  // refresh live badge
+        cpMarkDirty();    // flag unsaved changes / auto-save
       });
-      
-      const span = document.createElement('span'); 
+
+      const span = document.createElement('span');
       span.textContent = s;
-      span.className='text-sm select-none text-gray-900';
-      
-      wrap.appendChild(cb); 
+      span.className = 'text-sm select-none text-gray-900';
+
+      wrap.appendChild(cb);
       wrap.appendChild(span);
       box.appendChild(wrap);
     }
+
+    // After all checkboxes are rendered, calculate badge once
+    cpUpdateBadge();
   }
 
   async function cpLoad(){
     const sel = document.getElementById('cpClient');
     const email = (sel && sel.value) ? sel.value : '';
-    const msg = document.getElementById('cpMsg');
-    
+
     if (!email) { 
-      // No client selected - hide checkboxes and clear message
+      // No client selected - hide checkboxes and clear badge/status
       document.getElementById('cpSkills').style.display = 'none';
-      msg.textContent = '';
+      const badgeEl = document.getElementById('cpBadge');
+      if (badgeEl) badgeEl.textContent = '';
+      cpSetMsg('', '');
       return; 
     }
     
@@ -127,19 +210,20 @@
     // Store original state for comparison
     originalSkillsState = JSON.parse(JSON.stringify(data?.skills || {}));
     hasUnsavedChanges = false;
-    
-    // Clear message after loading
-    msg.textContent = '';
+
+    // Do NOT clear the static note; leave #cpAutoNote alone
+    // Clear transient status line
+    cpSetMsg('', '');
   }
 
-  async function cpSave(){
+  // NOTE: extended to support autoMode for subtle status handling
+  async function cpSave(autoMode){
     const sel = document.getElementById('cpClient');
     const email = (sel && sel.value) ? sel.value : '';
-    const msg = document.getElementById('cpMsg');
     
     if (!email) { 
-      msg.textContent = 'Please select a client';
-      return; 
+      if (!autoMode) cpSetMsg('Please select a client', 'mt-3 text-red-600');
+      return false; 
     }
     
     const skills = {}; 
@@ -150,25 +234,28 @@
     });
     
     const row = { email, skills };
+
+    if (autoMode) cpSetMsg('Saving…', 'text-blue-500');
+
     const { error } = await window.supabaseClient.from('client_progress').upsert(row, { onConflict: 'email' });
     
     if (error) {
-      msg.textContent = 'Error: ' + error.message;
-      msg.className = 'mt-3 text-sm text-red-600';
+      if (autoMode) cpSetMsg('Error saving (will retry)…', 'text-red-500');
+      else cpSetMsg('Error: ' + error.message, 'mt-3 text-red-600');
+      return false;
     } else {
-      msg.textContent = 'Client progress saved successfully';
-      msg.className = 'mt-3 text-sm text-green-600';
-      // Clear unsaved changes flag
+      if (!autoMode) {
+        cpSetMsg('Client progress saved successfully', 'mt-3 text-green-600');
+        setTimeout(() => { cpSetMsg('', ''); }, 3000);
+      }
       hasUnsavedChanges = false;
       originalSkillsState = JSON.parse(JSON.stringify(skills));
-      // Clear success message after 3 seconds
-      setTimeout(() => { msg.textContent = ''; }, 3000);
+      return true;
     }
   }
 
   async function loadClientOptions(){
     const sel = document.getElementById('cpClient');
-    const msg = document.getElementById('cpMsg');
     
     console.log('[admin-progress] loadClientOptions called');
     console.log('[admin-progress] supabaseClient exists:', !!window.supabaseClient);
@@ -181,12 +268,12 @@
     if (!window.supabaseClient) {
       console.error('[admin-progress] supabaseClient not available');
       sel.innerHTML = '<option value="">Supabase not connected</option>';
-      if (msg) msg.textContent = 'Supabase client not initialized';
+      cpSetMsg('Supabase client not initialized', 'text-red-600');
       return;
     }
     
     sel.innerHTML = '<option value="">Loading…</option>';
-    if (msg) msg.textContent = 'Loading clients...';
+    cpSetMsg('Loading clients...', 'text-gray-400');
     
     try {
       console.log('[admin-progress] Querying client table...');
@@ -214,11 +301,11 @@
         console.log('[admin-progress] Successfully loaded', rows.length, 'clients');
       }
       
-      // Clear any messages after loading
-      if (msg) msg.textContent = '';
+      // Clear transient status; static note remains
+      cpSetMsg('', '');
     } catch (e) {
       sel.innerHTML = '<option value="">Failed to load clients</option>';
-      if (msg) msg.textContent = 'Error: ' + (e?.message || String(e));
+      cpSetMsg('Error: ' + (e?.message || String(e)), 'text-red-600');
       console.error('[admin-progress] loadClientOptions error:', e);
     }
   }
@@ -235,84 +322,28 @@
       const cpSkillsBox = document.getElementById('cpSkills');
       if (cpSkillsBox) cpSkillsBox.style.display = 'none';
       
-      // Wire up buttons
+      // (Save button was removed/hidden; leave handler if you re-enable it)
       const cpSaveBtn = document.getElementById('cpSave');
-      if (cpSaveBtn) cpSaveBtn.onclick = cpSave;
+      if (cpSaveBtn) cpSaveBtn.onclick = () => cpSave(false /* manual */);
       
       const cpRefreshBtn = document.getElementById('cpRefresh');
       if (cpRefreshBtn) cpRefreshBtn.onclick = loadClientOptions;
       
       // Load clients into dropdown
       loadClientOptions();
-      
+
       // Auto-load progress when client is selected from dropdown
       const cpClientSelect = document.getElementById('cpClient');
       if (cpClientSelect) {
-        // Track the current client BEFORE the dropdown changes
-        let previousClient = cpClientSelect.value;
-        
-        // Update previousClient whenever we successfully load a client
-        const originalCpLoad = cpLoad;
-        cpLoad = async function() {
-          await originalCpLoad();
-          previousClient = cpClientSelect.value;
-        };
-        
-        cpClientSelect.addEventListener('change', function(e) {
-          const newValue = e.target.value;
-          
-          // Check for unsaved changes before switching
-          if (hasUnsavedChanges) {
-            // The dropdown has already changed to newValue
-            // We need to revert it to previousClient (the one with unsaved changes)
-            cpClientSelect.value = previousClient;
-            
-            // Show confirmation modal
-            if (window.Modal && window.Modal.confirm) {
-              window.Modal.confirm(
-                'You have unsaved changes. Do you want to save before switching clients?',
-                async function() {
-                  // Save previous client's changes (dropdown shows previousClient)
-                  await cpSave();
-                  // Now switch to new client
-                  cpClientSelect.value = newValue;
-                  previousClient = newValue;
-                  await cpLoad();
-                },
-                function() {
-                  // Discard changes and switch to new client
-                  hasUnsavedChanges = false;
-                  cpClientSelect.value = newValue;
-                  previousClient = newValue;
-                  cpLoad();
-                },
-                'Save Changes'
-              );
-            } else {
-              // Fallback to native confirm
-              if (confirm('You have unsaved changes. Save before switching?')) {
-                // Save previous client first
-                cpSave().then(() => {
-                  cpClientSelect.value = newValue;
-                  previousClient = newValue;
-                  cpLoad();
-                });
-              } else {
-                hasUnsavedChanges = false;
-                cpClientSelect.value = newValue;
-                previousClient = newValue;
-                cpLoad();
-              }
-            }
-          } else {
-            cpLoad();
-          }
+        cpClientSelect.addEventListener('change', async function() {
+          await cpFlushAutoSave(); // save previous client if needed
+          await cpLoad();
         });
       }
       
       // Warn before leaving page with unsaved changes
       window.addEventListener('beforeunload', function(e) {
-        if (hasUnsavedChanges) {
+        if (hasUnsavedChanges || cpPendingSave) {
           e.preventDefault();
           e.returnValue = '';
           return '';

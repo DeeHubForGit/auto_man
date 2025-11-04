@@ -421,3 +421,24 @@ header #nav-services-menu a:hover { color: #ffffff !important; }
   border: 2px solid rgba(59,130,246,0.5);
   box-shadow: 0 0 6px rgba(59,130,246,0.25);
 }
+
+/* Contact Messages => match client booking card look */
+.contact-card{
+  background-color: #dbeafe !important;   /* same as booking cards */
+  border: 2px solid #3b82f6 !important;   /* blue edge */
+  border-radius: 0.5rem !important;        /* rounded-md look */
+  color: #111827 !important;               /* dark text */
+  box-shadow: none !important;
+  padding: 1rem !important;                /* p-4 */
+}
+.contact-card *{
+  color: #111827 !important;               /* ensure inner text is dark */
+}
+.contact-card svg{ color: #4b5563 !important; } /* gray-600 icons */
+
+/* Fix: arrow crowding “Newest first” */
+#contactSort{
+  padding-right: 2.9rem !important;
+  background-position: right .65rem center !important;
+  background-size: 1.25em 1.25em !important;
+}

@@ -324,6 +324,9 @@
 
       // Initialize bookings after partial loads
       initBookingsAfterPartial();
+      
+      // Subscribe to realtime booking updates (once per page load)
+      setupBookingRealtime();
     }
 
     // ===== BOOKINGS MANAGEMENT =====
@@ -389,6 +392,70 @@
         initBookingsAfterPartial();
       }
     });
+
+    // Setup realtime subscription for booking changes
+    function setupBookingRealtime() {
+      // Only subscribe once per page load
+      if (window.__bookingRealtime) {
+        console.log('[realtime] Already subscribed to booking changes');
+        return;
+      }
+
+      // Wait for clientData to be available
+      if (!window.clientData?.id) {
+        console.log('[realtime] Waiting for clientData before subscribing...');
+        setTimeout(setupBookingRealtime, 500);
+        return;
+      }
+
+      console.log('[realtime] Setting up booking subscription for client:', window.clientData.id);
+
+      window.__bookingRealtime = window.supabaseClient
+        .channel('booking-realtime')
+        .on(
+          'postgres_changes',
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'booking', 
+            filter: `client_id=eq.${window.clientData.id}` 
+          },
+          (payload) => {
+            console.log('[realtime] Booking change detected:', payload);
+            
+            // Cheap merge and re-render; avoids a full page fetch most of the time
+            const b = payload.new || payload.old;
+            if (!b) return;
+            
+            const idx = allBookings.findIndex(x => x.id === b.id);
+            
+            if (payload.eventType === 'DELETE') {
+              if (idx !== -1) {
+                console.log('[realtime] Removing deleted booking:', b.id);
+                allBookings.splice(idx, 1);
+              }
+            } else if (payload.eventType === 'INSERT') {
+              if (idx === -1) {
+                console.log('[realtime] Adding new booking:', b.id);
+                allBookings.push(payload.new);
+              }
+            } else if (payload.eventType === 'UPDATE') {
+              if (idx !== -1) {
+                console.log('[realtime] Updating booking:', b.id);
+                allBookings[idx] = { ...allBookings[idx], ...payload.new };
+              } else {
+                console.log('[realtime] Adding updated booking (not in local list):', b.id);
+                allBookings.push(payload.new);
+              }
+            }
+            
+            renderBookings();
+          }
+        )
+        .subscribe((status) => {
+          console.log('[realtime] Booking channel status:', status);
+        });
+    }
 
     async function loadBookings() {
       if (!window.supabaseClient || !window.currentUser) {

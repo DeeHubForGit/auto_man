@@ -50,14 +50,17 @@ window.GoogleCalendar = (function() {
         })
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      // Success (200) or Not Found/Gone (404/410) => treat as success
+      // 404/410 means event is already deleted, which is our goal
+      if (response.ok || response.status === 404 || response.status === 410) {
+        const result = await response.json().catch(() => ({ ok: true }));
+        console.log('[GoogleCalendar] ✅ Event cancelled successfully:', result);
+        return { success: true };
       }
 
-      const result = await response.json();
-      console.log('[GoogleCalendar] ✅ Event cancelled successfully:', result);
-      return { success: true };
+      // Other errors - actually fail
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
 
     } catch (error) {
       console.error('[GoogleCalendar] ❌ Error cancelling event:', error);

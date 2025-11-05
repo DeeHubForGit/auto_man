@@ -340,9 +340,16 @@
             selectElement.setAttribute('data-original-status', newStatus);
             selectElement.style.backgroundColor = '#d1fae5'; // green-100
             
+            // Refresh the calendar after a short delay to show the updated state
             setTimeout(() => {
-              selectElement.style.backgroundColor = originalBg;
-            }, 1000);
+              console.log('[calendar] Refreshing calendar view after cancellation...');
+              if (typeof renderWeek === 'function' && window.currentWeekStart) {
+                renderWeek(window.currentWeekStart);
+              } else {
+                // Fallback: reload the page
+                window.location.reload();
+              }
+            }, 1500);
           } else {
             // Fallback if GoogleCalendar not loaded - just update database
             console.warn('[calendar] GoogleCalendar not available, updating database only');
@@ -355,9 +362,16 @@
             
             selectElement.setAttribute('data-original-status', newStatus);
             selectElement.style.backgroundColor = '#d1fae5'; // green-100
+            
+            // Refresh the calendar after a short delay
             setTimeout(() => {
-              selectElement.style.backgroundColor = originalBg;
-            }, 1000);
+              console.log('[calendar] Refreshing calendar view after cancellation...');
+              if (typeof renderWeek === 'function' && window.currentWeekStart) {
+                renderWeek(window.currentWeekStart);
+              } else {
+                window.location.reload();
+              }
+            }, 1500);
           }
         } else {
           // For non-cancellation status changes, update database directly

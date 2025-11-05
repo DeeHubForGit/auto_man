@@ -1,4 +1,5 @@
 <!-- Admin Calendar Section -->
+<script src="assets/js/googleCalendar.js"></script>
 <style>
   /* Scoped styles for calendar bookings - ensure dark text on light backgrounds */
   #section-calendar .booking-card {
@@ -250,6 +251,7 @@
             <div class="mt-1">
               <select class="booking-status-select text-xs border border-gray-300 rounded px-1 py-0.5 w-full" 
                       data-booking-id="${booking.id}" 
+                      data-google-event-id="${booking.google_event_id || ''}"
                       data-original-status="${booking.status || 'confirmed'}">
                 <option value="confirmed" ${(booking.status || 'confirmed') === 'confirmed' ? 'selected' : ''}>Confirmed</option>
                 <option value="completed" ${booking.status === 'completed' ? 'selected' : ''}>Completed</option>
@@ -322,28 +324,62 @@
       selectElement.disabled = true;
       
       try {
-        // Update the booking status in the database
-        const { error } = await window.supabaseClient
-          .from('booking')
-          .update({ status: newStatus })
-          .eq('id', bookingId);
-        
-        if (error) {
-          console.error('[calendar] Error updating status:', error);
-          // Revert to original status
-          selectElement.value = originalStatus;
-          alert('Failed to update booking status: ' + error.message);
-          selectElement.style.backgroundColor = '#fee2e2'; // red-100
-        } else {
-          console.log('[calendar] ✅ Status updated successfully');
-          // Update the data attribute to reflect new status
-          selectElement.setAttribute('data-original-status', newStatus);
-          selectElement.style.backgroundColor = '#d1fae5'; // green-100
+        // If cancelling, use Google Calendar integration
+        if (newStatus === 'cancelled') {
+          const googleEventId = selectElement.getAttribute('data-google-event-id');
           
-          // Clear success color after 1 second
-          setTimeout(() => {
-            selectElement.style.backgroundColor = originalBg;
-          }, 1000);
+          // Use the shared Google Calendar cancellation function
+          if (window.GoogleCalendar && window.GoogleCalendar.cancelBooking) {
+            const result = await window.GoogleCalendar.cancelBooking(bookingId, googleEventId);
+            
+            if (!result.success) {
+              throw new Error(result.error || 'Failed to cancel booking');
+            }
+            
+            console.log('[calendar] ✅ Booking cancelled successfully (including Google Calendar)');
+            selectElement.setAttribute('data-original-status', newStatus);
+            selectElement.style.backgroundColor = '#d1fae5'; // green-100
+            
+            setTimeout(() => {
+              selectElement.style.backgroundColor = originalBg;
+            }, 1000);
+          } else {
+            // Fallback if GoogleCalendar not loaded - just update database
+            console.warn('[calendar] GoogleCalendar not available, updating database only');
+            const { error } = await window.supabaseClient
+              .from('booking')
+              .update({ status: newStatus })
+              .eq('id', bookingId);
+            
+            if (error) throw error;
+            
+            selectElement.setAttribute('data-original-status', newStatus);
+            selectElement.style.backgroundColor = '#d1fae5'; // green-100
+            setTimeout(() => {
+              selectElement.style.backgroundColor = originalBg;
+            }, 1000);
+          }
+        } else {
+          // For non-cancellation status changes, update database directly
+          const { error } = await window.supabaseClient
+            .from('booking')
+            .update({ status: newStatus })
+            .eq('id', bookingId);
+          
+          if (error) {
+            console.error('[calendar] Error updating status:', error);
+            selectElement.value = originalStatus;
+            alert('Failed to update booking status: ' + error.message);
+            selectElement.style.backgroundColor = '#fee2e2'; // red-100
+          } else {
+            console.log('[calendar] ✅ Status updated successfully');
+            selectElement.setAttribute('data-original-status', newStatus);
+            selectElement.style.backgroundColor = '#d1fae5'; // green-100
+            
+            setTimeout(() => {
+              selectElement.style.backgroundColor = originalBg;
+            }, 1000);
+          }
         }
       } catch (err) {
         console.error('[calendar] Exception updating status:', err);

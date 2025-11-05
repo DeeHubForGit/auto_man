@@ -12,6 +12,7 @@
   <script src="assets/render-helpers.js" defer></script>
   <script src="assets/include.js" defer></script>
   <script src="assets/js/modal.js"></script>
+  <script src="assets/js/googleCalendar.js"></script>
   <script src="assets/js/auth.js" defer></script>
 </head>
 <body class="bg-gray-50 text-gray-900">
@@ -435,11 +436,15 @@
         }, 10000); // 10s hard timeout
 
         console.log('Querying bookings table...');
+        if (!window.clientData?.id) {
+          console.warn('No clientData yet; waiting and retrying loadBookings()');
+          await new Promise(r => setTimeout(r, 300));
+        }
         const { data, error } = await window.supabaseClient
           .from('booking')
           .select('*')
-          .eq('client_id', window.currentUser.id)
-          .order('start_time', { ascending: true }); // Changed to ascending for next appointment first
+          .eq('client_id', window.clientData.id)
+          .order('start_time', { ascending: true });
 
         if (error) {
           // Handle session expiry
@@ -606,12 +611,19 @@
               </div>
             </div>
 
-            ${isUpcoming && booking.status === 'confirmed' && booking.google_html_link ? `
+            ${isUpcoming && booking.status === 'confirmed' ? `
               <div class="flex flex-col gap-2">
-                <a href="${booking.google_html_link}" target="_blank" 
-                   class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-center whitespace-nowrap">
-                  View in Calendar
-                </a>
+                ${booking.google_html_link ? `
+                  <a href="${booking.google_html_link}" target="_blank" 
+                     class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-center whitespace-nowrap">
+                    View in Calendar
+                  </a>
+                ` : ''}
+                <button 
+                  onclick="handleCancelBooking('${booking.id}', '${booking.google_event_id || ''}', this)" 
+                  class="px-4 py-2 text-sm font-medium text-red-500 border border-red-500 bg-transparent rounded-lg hover:bg-red-500 hover:text-white transition-colors text-center whitespace-nowrap">
+                  Cancel Booking
+                </button>
               </div>
             ` : ''}
           </div>
@@ -652,33 +664,84 @@
     }
     window.switchBookingTab = switchBookingTab;
 
-    async function cancelBooking(bookingId) {
-      Modal.confirm(
-        'Are you sure you want to cancel this booking? This action cannot be undone.',
-        async function() {
-          try {
-            const { error } = await window.supabaseClient
-              .from('booking')
-              .update({ 
-                status: 'cancelled',
-                cancelled_at: new Date().toISOString()
-              })
-              .eq('id', bookingId);
+    // Global function to handle booking cancellation from the UI
+    async function handleCancelBooking(bookingId, googleEventId, buttonElement) {
+      console.log('[portal] handleCancelBooking called:', { bookingId, googleEventId });
+      
+      // Show confirmation modal
+      if (window.Modal && window.Modal.confirm) {
+        window.Modal.confirm(
+          'Are you sure you want to cancel this booking? This action cannot be undone.',
+          async function() {
+            // User confirmed - proceed with cancellation
+            await performCancellation(bookingId, googleEventId, buttonElement);
+          },
+          null,
+          'Cancel Booking'
+        );
+      } else {
+        // Fallback to native confirm
+        if (confirm('Are you sure you want to cancel this booking? This action cannot be undone.')) {
+          await performCancellation(bookingId, googleEventId, buttonElement);
+        }
+      }
+    }
+    window.handleCancelBooking = handleCancelBooking;
 
-            if (error) throw error;
+    async function performCancellation(bookingId, googleEventId, buttonElement) {
+      // Disable button and show loading
+      if (buttonElement) {
+        buttonElement.disabled = true;
+        buttonElement.textContent = 'Cancelling...';
+        buttonElement.classList.add('opacity-50', 'cursor-not-allowed');
+      }
 
-            Modal.success('Your booking has been cancelled successfully.', 'Booking Cancelled');
-            
-            // Reload bookings
-            await loadBookings();
-          } catch (err) {
-            console.error('Error cancelling booking:', err);
-            Modal.error('Could not cancel the booking. Please contact us directly.', 'Cancellation Failed');
-          }
-        },
-        null,
-        'Cancel Booking'
-      );
+      try {
+        // Step 1: Cancel in Google (if integration exists)
+        if (window.GoogleCalendar?.cancelBooking) {
+          const result = await window.GoogleCalendar.cancelBooking(bookingId, googleEventId);
+          if (!result?.success) throw new Error(result?.error || 'Failed to cancel booking in Google');
+        } else {
+          console.warn('[portal] GoogleCalendar not available, skipping Google cancel');
+        }
+
+        // Step 2: Update DB status (do this even if Google returned 404 => already gone)
+        const { error: dbErr } = await window.supabaseClient
+          .from('booking')
+          .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
+          .eq('id', bookingId);
+        if (dbErr) throw dbErr;
+
+        // Step 3: Optimistically update in-memory list (so the card disappears immediately)
+        const idx = allBookings.findIndex(b => b.id === bookingId);
+        if (idx !== -1) {
+          allBookings[idx] = { ...allBookings[idx], status: 'cancelled', cancelled_at: new Date().toISOString() };
+          renderBookings();
+        } else {
+          // Fallback: full reload if we can't find it locally
+          await loadBookings();
+        }
+
+        // Success notice
+        if (window.Modal?.success) {
+          window.Modal.success('Your booking has been cancelled successfully.', 'Booking Cancelled');
+        } else {
+          alert('Your booking has been cancelled successfully.');
+        }
+      } catch (err) {
+        console.error('[portal] Error cancelling booking:', err);
+        if (window.Modal?.error) {
+          window.Modal.error('Could not cancel the booking. Please contact us directly.', 'Cancellation Failed');
+        } else {
+          alert('Could not cancel the booking: ' + (err.message || String(err)));
+        }
+        // Re-enable button
+        if (buttonElement) {
+          buttonElement.disabled = false;
+          buttonElement.textContent = 'Cancel Booking';
+          buttonElement.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+      }
     }
     // ===== END BOOKINGS MANAGEMENT =====
 
@@ -857,7 +920,7 @@
           const { data, error } = await window.supabaseClient
             .from('client')
             .update(fullFormData)
-            .eq('id', window.currentUser.id);
+            .eq('id', window.clientData.id);
 
           if (error) throw error;
 

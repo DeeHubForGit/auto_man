@@ -154,15 +154,15 @@
       showModal({ type: 'info', title, message });
     },
     
-    confirm: function(message, onConfirm, onCancel, title = 'Confirm') {
+    confirm: function(message, onConfirm, onCancel, title = 'Confirm', options = {}) {
       showModal({ 
         type: 'confirm', 
         title, 
         message, 
         onConfirm, 
         onCancel,
-        confirmText: 'Confirm',
-        cancelText: 'Cancel'
+        confirmText: options.confirmText || 'Yes',
+        cancelText: options.cancelText || 'No'
       });
     }
   };

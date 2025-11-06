@@ -235,10 +235,11 @@ html { scroll-behavior: smooth; }
 
 /* Base: Secondary */
 .btn-secondary {
-  background-color: #111827 !important;               /* slate-900 */
-  color: #e5e7eb !important;                           /* light gray */
-  border: 1px solid #0D47A1 !important;  /* blue-tinted edge */
-  box-shadow: 0 0 8px rgba(59,130,246,0.25) !important;
+  background-color: #111827 !important;  /* slate-900 */
+  color: #e5e7eb !important;             /* light gray */
+  border: 1px solid #ffffff !important;  /* subtle blue edge */
+  box-shadow: none !important;           /* no glow at rest */
+  transition: all 0.15s ease-in-out;     /* smooth hover/focus */
 }
 
 /* --- Hovers (DIFFERENT) --- */
@@ -441,4 +442,18 @@ header #nav-services-menu a:hover { color: #ffffff !important; }
   padding-right: 2.9rem !important;
   background-position: right .65rem center !important;
   background-size: 1.25em 1.25em !important;
+}
+
+/* Keep icons as FA, force adjacent text back to normal font */
+.status-chip{
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+                "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji",
+                "Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji" !important;
+  line-height: 1;
+}
+.status-chip .fa-solid,
+.status-chip .fa-regular,
+.status-chip .fa-brands{
+  font-family: "Font Awesome 6 Free","Font Awesome 6 Brands" !important;
+  font-weight: 900;
 }

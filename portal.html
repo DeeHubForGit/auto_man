@@ -503,10 +503,19 @@
         }, 10000); // 10s hard timeout
 
         console.log('Querying bookings table...');
-        if (!window.clientData?.id) {
-          console.warn('No clientData yet; waiting and retrying loadBookings()');
-          await new Promise(r => setTimeout(r, 300));
+        
+        // Wait for clientData to be available (with timeout)
+        let retries = 0;
+        while (!window.clientData?.id && retries < 20) {
+          console.warn('No clientData yet; waiting... (attempt', retries + 1, ')');
+          await new Promise(r => setTimeout(r, 200));
+          retries++;
         }
+        
+        if (!window.clientData?.id) {
+          throw new Error('Client data not available. Please refresh the page.');
+        }
+        
         const { data, error } = await window.supabaseClient
           .from('booking')
           .select('*')
@@ -554,9 +563,17 @@
 
     function renderBookings() {
       const now = new Date();
-      const upcoming = allBookings.filter(b => new Date(b.start_time) >= now && b.status !== 'cancelled');
-      const past = allBookings.filter(b => new Date(b.start_time) < now && b.status !== 'cancelled');
-      const cancelled = allBookings.filter(b => b.status === 'cancelled');
+      
+      // Filter out any invalid bookings before processing
+      const validBookings = allBookings.filter(b => b && b.id && b.start_time && b.end_time);
+      
+      if (validBookings.length < allBookings.length) {
+        console.warn('Filtered out', allBookings.length - validBookings.length, 'invalid bookings');
+      }
+      
+      const upcoming = validBookings.filter(b => new Date(b.start_time) >= now && b.status !== 'cancelled');
+      const past = validBookings.filter(b => new Date(b.start_time) < now && b.status !== 'cancelled');
+      const cancelled = validBookings.filter(b => b.status === 'cancelled');
 
       renderBookingList('upcoming-list', upcoming, true);
       renderBookingList('past-list', past, false);
@@ -586,8 +603,42 @@
       // Set aria-busy to false after rendering
       container.setAttribute('aria-busy', 'false');
     }
+    
+    function renderStatusChip(status) {
+      if (status === 'confirmed') {
+        return `<span class="inline-flex items-center gap-1.5">
+          <i class="fa-solid fa-circle-check" style="color: #3b82f6 !important; font-size: 16px !important;" aria-hidden="true"></i>
+          <span style="font-family: ui-sans-serif, system-ui, sans-serif !important; color: #3b82f6 !important; font-size: 11px !important; font-weight: 600 !important; letter-spacing: 0.025em !important;">CONFIRMED</span>
+        </span>`;
+      }
+      if (status === 'completed') {
+        return `<span class="inline-flex items-center gap-1.5">
+          <i class="fa-solid fa-circle-check" style="color: #16a34a !important; font-size: 16px !important;" aria-hidden="true"></i>
+          <span style="font-family: ui-sans-serif, system-ui, sans-serif !important; color: #16a34a !important; font-size: 11px !important; font-weight: 600 !important; letter-spacing: 0.025em !important;">COMPLETED</span>
+        </span>`;
+      }
+      if (status === 'cancelled') {
+        return `<span class="inline-flex items-center gap-1.5">
+          <i class="fa-solid fa-circle-xmark" style="color: #808080 !important; font-size: 16px !important;" aria-hidden="true"></i>
+          <span style="font-family: ui-sans-serif, system-ui, sans-serif !important; color: #808080 !important; font-size: 11px !important; font-weight: 600 !important; letter-spacing: 0.025em !important;">CANCELLED</span>
+        </span>`;
+      }
+      if (status === 'no_show') {
+        return `<span class="inline-flex items-center gap-1.5">
+          <i class="fa-solid fa-circle-minus" style="color: #FF0000 !important; font-size: 16px !important;" aria-hidden="true"></i>
+          <span style="font-family: ui-sans-serif, system-ui, sans-serif !important; color: #FF0000 !important; font-size: 11px !important; font-weight: 600 !important; letter-spacing: 0.025em !important;">NO SHOW</span>
+        </span>`;
+      }
+      return '';
+    }
 
     function renderBookingCard(booking, isUpcoming) {
+      // Safety check: ensure booking exists and has required fields
+      if (!booking || !booking.id || !booking.start_time || !booking.end_time) {
+        console.error('Invalid booking data:', booking);
+        return '';
+      }
+      
       const startTime = new Date(booking.start_time);
       const endTime = new Date(booking.end_time);
       
@@ -610,37 +661,37 @@
 
       const duration = Math.round((endTime - startTime) / (1000 * 60));
 
-      let statusBadge = '';
-      if (booking.status === 'confirmed') {
-        statusBadge = '<span class="status-label status-confirmed"><span class="status-icon">✔</span>CONFIRMED</span>';
-      } else if (booking.status === 'completed') {
-        statusBadge = `
-          <span class="status-label status-completed">
-            <span class="status-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="white" width="12" height="12">
-                <circle cx="10" cy="10" r="9" stroke="#16a34a" stroke-width="2" fill="#16a34a" />
-                <path d="M6 10l2 2 5-5" stroke="white" stroke-width="2" fill="none" stroke-linecap="round" />
-              </svg>
-            </span>
-            COMPLETED
-          </span>`;
-      } else if (booking.status === 'cancelled') {
-        statusBadge = '<span class="status-label status-cancelled"><span class="status-icon">✖</span>CANCELLED</span>';
-      } else if (booking.status === 'no_show') {
-        statusBadge = '<span class="status-label status-no-show"><span class="status-icon">—</span>NO SHOW</span>';
+      let statusBadge = renderStatusChip(booking.status);
+      let cancelButton = '';
+      
+      if (booking.status === 'confirmed' && isUpcoming) {
+        // Cancel button in header for confirmed bookings
+        cancelButton = `
+          <button 
+            onclick="handleCancelBooking('${booking.id}', '${booking.google_event_id || ''}', this)" 
+            class="p-0.5" title="Cancel Booking" aria-label="Cancel Booking">
+            <i class="fa-solid fa-xmark text-2xl" style="color:#FF0000 !important;"></i>
+          </button>`;
       }
 
       // Service name
       const serviceName = getServiceName(booking.service_code);
 
       return `
-        <div class="booking-card bg-gray-100 border border-gray-300 rounded-xl p-4 hover:shadow-md transition-shadow">
-          <div class="flex items-start justify-between gap-4">
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 mb-2">
-                <h3 class="text-lg font-semibold text-gray-900">${serviceName}</h3>
-                ${statusBadge}
-              </div>
+        <div class="booking-card bg-gray-100 border border-gray-300 rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow">
+          <!-- Header with title, status, and cancel -->
+          <div class="flex items-start justify-between gap-2 mb-2">
+            <div class="flex items-center gap-2 flex-1 min-w-0">
+              <h3 class="text-sm sm:text-base font-semibold text-gray-900">${serviceName}</h3>
+              ${statusBadge}
+            </div>
+            <div class="flex-shrink-0">
+              ${cancelButton}
+            </div>
+          </div>
+          
+          <!-- Booking details -->
+          <div class="flex-1 min-w-0">
               
               <div class="space-y-1 text-sm text-gray-700">
                 <div class="flex items-center gap-2">
@@ -654,16 +705,16 @@
                   <svg class="w-4 h-4 flex-shrink-0 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span class="text-gray-900">${timeStr} - ${endTimeStr} (${duration} minutes)</span>
+                  <span class="text-gray-900 break-words">${timeStr} - ${endTimeStr} (${duration} minutes)</span>
                 </div>
 
                 ${booking.pickup_location ? `
-                  <div class="flex items-center gap-2">
-                    <svg class="w-4 h-4 flex-shrink-0 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div class="flex items-start gap-2">
+                    <svg class="w-4 h-4 flex-shrink-0 text-gray-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
-                    <span class="text-gray-900">${booking.pickup_location}</span>
+                    <span class="text-gray-900 break-words">${booking.pickup_location}</span>
                   </div>
                 ` : ''}
 
@@ -675,25 +726,18 @@
                     <span class="text-gray-900">$${(booking.price_cents / 100).toFixed(2)}</span>
                   </div>
                 ` : ''}
+                
+                ${isUpcoming && booking.status === 'confirmed' && booking.google_html_link ? `
+                  <div class="mt-2">
+                    <a href="${booking.google_html_link}" target="_blank" 
+                       class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 hover:underline">
+                      <i class="fa-solid fa-calendar"></i>
+                      <span>View in Calendar</span>
+                    </a>
+                  </div>
+                ` : ''}
               </div>
             </div>
-
-            ${isUpcoming && booking.status === 'confirmed' ? `
-              <div class="flex flex-col gap-2">
-                ${booking.google_html_link ? `
-                  <a href="${booking.google_html_link}" target="_blank" 
-                     class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-center whitespace-nowrap">
-                    View in Calendar
-                  </a>
-                ` : ''}
-                <button 
-                  onclick="handleCancelBooking('${booking.id}', '${booking.google_event_id || ''}', this)" 
-                  class="px-4 py-2 text-sm font-medium text-red-500 border border-red-500 bg-transparent rounded-lg hover:bg-red-500 hover:text-white transition-colors text-center whitespace-nowrap">
-                  Cancel Booking
-                </button>
-              </div>
-            ` : ''}
-          </div>
         </div>
       `;
     }

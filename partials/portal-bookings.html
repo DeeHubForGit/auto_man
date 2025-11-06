@@ -106,32 +106,32 @@
 
 <div class="bg-white rounded-2xl border shadow-sm">
   <!-- Header -->
-  <div class="px-6 py-4 border-b">
-    <h2 class="text-2xl font-bold text-gray-900">My Bookings</h2>
-    <p class="text-sm text-gray-600 mt-1">View and manage your driving lesson bookings</p>
+  <div class="px-4 sm:px-6 py-3 sm:py-4 border-b">
+    <h2 class="text-xl sm:text-2xl font-bold text-gray-900">My Bookings</h2>
+    <p class="text-xs sm:text-sm text-gray-600 mt-0.5">View and manage your driving lesson bookings</p>
   </div>
 
   <!-- Tabs -->
   <div class="border-b">
-    <div class="flex px-6">
+    <div class="flex px-4 sm:px-6">
       <button 
         onclick="switchBookingTab('upcoming')" 
         id="tab-upcoming"
-        class="booking-tab px-4 py-3 text-sm font-medium border-b-2 border-blue-600 text-blue-400 hover:text-blue-200 transition-colors"
+        class="booking-tab px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium border-b-2 border-blue-600 text-blue-400 hover:text-blue-200 transition-colors"
       >
-        Upcoming Bookings
+        Upcoming
       </button>
       <button 
         onclick="switchBookingTab('past')" 
         id="tab-past"
-        class="booking-tab px-4 py-3 text-sm font-medium border-b-2 border-transparent text-blue-300 hover:text-blue-100 transition-colors"
+        class="booking-tab px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium border-b-2 border-transparent text-blue-300 hover:text-blue-100 transition-colors"
       >
-        Past Bookings
+        Past
       </button>
       <button 
         onclick="switchBookingTab('cancelled')" 
         id="tab-cancelled"
-        class="booking-tab px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-400 transition-colors"
+        class="booking-tab px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-400 transition-colors"
       >
         Cancelled
       </button>
@@ -139,11 +139,11 @@
   </div>
 
   <!-- Bookings Content -->
-  <div class="p-6">
+  <div class="p-3 sm:p-6">
     
     <!-- Upcoming Bookings -->
     <div id="upcoming-bookings" class="booking-content">
-      <div id="upcoming-list" class="space-y-4" aria-live="polite" aria-busy="true">
+      <div id="upcoming-list" class="space-y-2 sm:space-y-3" aria-live="polite" aria-busy="true">
         <div class="flex items-center justify-center py-12">
           <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           <span class="ml-3 text-gray-600">Loading bookings...</span>
@@ -153,14 +153,14 @@
 
     <!-- Past Bookings -->
     <div id="past-bookings" class="booking-content hidden">
-      <div id="past-list" class="space-y-4" aria-live="polite" aria-busy="false">
+      <div id="past-list" class="space-y-2 sm:space-y-3" aria-live="polite" aria-busy="false">
         <!-- Will be populated by JS -->
       </div>
     </div>
 
     <!-- Cancelled Bookings -->
     <div id="cancelled-bookings" class="booking-content hidden">
-      <div id="cancelled-list" class="space-y-4" aria-live="polite" aria-busy="false">
+      <div id="cancelled-list" class="space-y-2 sm:space-y-3" aria-live="polite" aria-busy="false">
         <!-- Will be populated by JS -->
       </div>
     </div>

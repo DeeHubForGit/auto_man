@@ -1,4 +1,7 @@
 <!-- header.html -->
+<!-- Font Awesome for icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
 <style>
   /* Anti-flicker + reserve space so content below never jumps */
   html.loading * { transition: none !important; }
@@ -26,15 +29,19 @@
 </style>
 
 <header class="bg-white shadow-sm sticky top-0 z-50">
-  <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+  <div class="container mx-auto px-4 py-3 flex items-center justify-between gap-2">
     <!-- Left: logo + title grouped -->
-    <div class="flex items-center gap-2 md:gap-3 min-w-0">
-      <img src="images/auto-man-small-logo-website-header.png" alt="Auto-Man Driving School logo" class="h-8 w-auto" decoding="async" fetchpriority="high" />
-      <a href="index.html" class="logo text-lg md:text-xl font-bold tracking-tight whitespace-nowrap" style="font-family: Tahoma, Verdana, sans-serif;">Auto-Man Driving School</a>
+    <div class="flex items-center gap-2 min-w-0 flex-shrink-0">
+      <img src="images/auto-man-small-logo-website-header.png" alt="Auto-Man Driving School logo" class="h-8 w-8 flex-shrink-0" decoding="async" fetchpriority="high" />
+      <!-- Full text on large screens, "Auto-Man" on small/medium -->
+      <a href="index.html" class="logo text-base sm:text-lg lg:text-xl font-bold tracking-tight whitespace-nowrap" style="font-family: Tahoma, Verdana, sans-serif;">
+        <span class="hidden lg:inline">Auto-Man Driving School</span>
+        <span class="lg:hidden">Auto-Man</span>
+      </a>
     </div>
 
     <!-- Desktop nav -->
-    <nav class="hidden md:flex items-center gap-6 text-sm relative">
+    <nav class="hidden lg:flex items-center gap-4 xl:gap-6 text-sm relative flex-shrink">
       <!-- Services + dropdown -->
       <div class="relative group">
         <a id="nav-services" href="index.html#services" class="text-light-hover-blue inline-flex items-center gap-1">
@@ -67,7 +74,7 @@
     </nav>
 
     <!-- Auth controls (middle cluster) -->
-    <div class="hidden md:flex items-center gap-3">
+    <div class="hidden lg:flex items-center gap-2 xl:gap-3 flex-shrink-0">
       <!-- Sign Up as text link - hidden by default -->
       <a href="signup.html" id="signupBtn" 
         class="hidden md:inline-block btn btn-secondary">
@@ -83,32 +90,61 @@
       <a href="admin.html" id="adminBtn" class="hidden hover:text-blue-600 font-semibold text-blue-400">Admin</a>
     </div>
 
-    <div class="flex items-center gap-4">
+    <!-- Right: Auth, Phone, WhatsApp, Book, Menu -->
+    <div class="flex items-center gap-2 xl:gap-3 flex-shrink-0">
+      <!-- Sign Up - visible on mobile when not logged in -->
+      <a href="signup.html" id="signupBtnMobile" 
+        class="lg:hidden text-sm text-gray-700 hover:text-gray-900 whitespace-nowrap">
+        Sign Up
+      </a>
+      
+      <!-- Login - visible on mobile when not logged in -->
+      <a href="login.html" id="loginBtnMobile2" 
+        class="lg:hidden text-sm text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap">
+        Login
+      </a>
+      
+      <!-- My Account - visible on mobile when logged in -->
+      <a href="portal.html" id="portalBtnMobileHeader" 
+        class="hidden lg:hidden text-sm text-gray-700 hover:text-gray-900 whitespace-nowrap" title="My Account">
+        <span class="hidden sm:inline">My Account</span>
+        <span class="sm:hidden">Acct</span>
+      </a>
+      
+      <!-- Log Out - visible on mobile when logged in -->
+      <button id="logoutBtnMobileHeader" 
+        class="hidden lg:hidden text-sm text-gray-700 hover:text-gray-900 p-1" title="Log Out" aria-label="Log Out">
+        <i class="fa-solid fa-right-from-bracket text-lg"></i>
+      </button>
+      
+      <!-- Phone - hidden on mobile and small tablets -->
       <a href="tel:{{PHONE_LINK}}" 
-        class="hidden md:inline-flex items-center gap-2 text-blue-dark font-semibold">
+        class="hidden xl:inline-flex items-center gap-2 text-blue-dark font-semibold whitespace-nowrap">
         📞 {{PHONE}}
       </a>
 
-      <!-- WhatsApp button (placeholder for now) -->
+      <!-- WhatsApp button - always show icon, text on XL -->
       <a href="https://wa.me/61403632313" target="_blank" rel="noopener noreferrer"
-        class="hidden md:inline-block btn btn-secondary">
-        <i class="fa-brands fa-whatsapp" aria-hidden="true"></i> WhatsApp
+        class="btn btn-secondary whitespace-nowrap flex items-center gap-1">
+        <i class="fa-brands fa-whatsapp text-lg" aria-hidden="true"></i>
+        <span class="hidden xl:inline">WhatsApp</span>
       </a>
 
-      <!-- Book Now as primary CTA -->
+      <!-- Book Now - always visible, text changes by screen size -->
       <a href="booking.html"
-        class="hidden md:inline-block btn btn-primary btn-lg">
-        Book Now
+        class="btn btn-primary btn-lg whitespace-nowrap">
+        <span class="hidden sm:inline">Book Now</span>
+        <span class="sm:hidden">Book</span>
       </a>
-      <!-- Mobile Book button -->
-      <a href="booking.html" class="md:hidden bg-blue-600 text-white px-3 py-2 rounded-lg shadow hover:bg-blue-700 text-sm ml-2">Book</a>
-      <button id="menuToggleBtn" type="button" class="md:hidden px-3 py-2 border rounded select-none touch-manipulation z-50 pointer-events-auto" style="-webkit-tap-highlight-color: transparent;" onclick="toggleMenu()" aria-label="Toggle menu" aria-expanded="false" aria-controls="mobileMenu" role="button">☰</button>
+      
+      <!-- Mobile menu toggle - hidden on large screens -->
+      <button id="menuToggleBtn" type="button" class="lg:hidden px-3 py-2 border rounded select-none touch-manipulation z-50 pointer-events-auto" style="-webkit-tap-highlight-color: transparent;" onclick="toggleMenu()" aria-label="Toggle menu" aria-expanded="false" aria-controls="mobileMenu" role="button">☰</button>
     </div>
   </div>
 
   <!-- Mobile Nav -->
   <div id="mobileMenu"
-      class="md:hidden hidden fixed inset-x-0 top-14 z-50 bg-white text-slate-900 border-t shadow-lg">
+      class="lg:hidden hidden fixed inset-x-0 top-[70px] z-50 bg-white text-slate-900 border-t shadow-lg max-h-[calc(100vh-70px)] overflow-y-auto">
     <nav class="px-4 py-3 flex flex-col gap-2 text-base">
       <!-- Services (collapsible) -->
       <button id="mobileServicesBtn"
@@ -136,31 +172,21 @@
       <a class="block py-2 hover:underline" href="faq.html" onclick="window.closeMenu?window.closeMenu():null">FAQs</a>
       <a class="block py-2 hover:underline" href="index.html#contact" onclick="window.closeMenu?window.closeMenu():null">Contact</a>
 
-      <!-- Auth -->
-      <a href="signup.html" id="signupBtnMobile"
-        class="mt-1 px-4 py-2 rounded text-gray-700 border border-gray-300 hover:bg-gray-50 text-center"
-        onclick="window.closeMenu?window.closeMenu():null">Sign Up</a>
-      <a href="login.html" id="loginBtnMobile"
-        class="px-4 py-2 rounded border border-blue-600 text-blue-600 hover:bg-blue-50 text-center"
-        onclick="window.closeMenu?window.closeMenu():null">Login</a>
-      <a href="portal.html" id="portalBtnMobile"
-        class="hidden px-4 py-2 rounded border border-gray-300 text-gray-800 hover:bg-gray-50 text-center"
-        onclick="window.closeMenu?window.closeMenu():null">My Account</a>
-      <a href="admin.html" id="adminBtnMobile"
-        class="hidden px-4 py-2 rounded border border-orange-600 text-orange-600 hover:bg-orange-50 text-center font-semibold"
+      <!-- Admin - only show in menu when admin -->
+      <a href="admin.html" id="adminBtnMobileMenu"
+        class="hidden mt-1 px-4 py-2 rounded border border-orange-600 text-orange-600 hover:bg-orange-50 text-center font-semibold"
         onclick="window.closeMenu?window.closeMenu():null">Admin</a>
-      <button id="logoutBtnMobile"
-        class="hidden px-4 py-2 rounded border border-gray-300 text-gray-800 hover:bg-gray-50 text-center">Log Out</button>
-
-      <!-- Phone & CTA -->
+      
+      <!-- Phone -->
       <a href="tel:{{PHONE_LINK}}"
         class="flex items-center gap-2 py-2 font-semibold text-blue-700"
         onclick="window.closeMenu?window.closeMenu():null">📞 Call {{PHONE}}</a>
-
-      <a href="booking.html"
-        class="bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 text-center"
-        onclick="window.closeMenu?window.closeMenu():null">Book Now</a>
     </nav>
+    
+    <!-- Close handle at bottom -->
+    <div class="flex justify-center py-3 border-t border-gray-200 bg-gray-50">
+      <button onclick="window.closeMenu?window.closeMenu():null" class="w-12 h-1 bg-gray-400 rounded-full hover:bg-gray-500 transition-colors" aria-label="Close menu"></button>
+    </div>
   </div>
 
 </header>
@@ -288,10 +314,10 @@ window.performLogout = async function performLogout() {
         const adminBtn         = document.getElementById('adminBtn');
 
         const signupBtnMobile  = document.getElementById('signupBtnMobile');
-        const loginBtnMobile   = document.getElementById('loginBtnMobile');
-        const portalBtnMobile  = document.getElementById('portalBtnMobile');
-        const logoutBtnMobile  = document.getElementById('logoutBtnMobile');
-        const adminBtnMobile   = document.getElementById('adminBtnMobile');
+        const loginBtnMobile2  = document.getElementById('loginBtnMobile2');
+        const portalBtnMobileHeader  = document.getElementById('portalBtnMobileHeader');
+        const logoutBtnMobileHeader  = document.getElementById('logoutBtnMobileHeader');
+        const adminBtnMobileMenu   = document.getElementById('adminBtnMobileMenu');
 
         const loggedIn = !!(session && session.user);
 
@@ -315,12 +341,14 @@ window.performLogout = async function performLogout() {
         setVisible(logoutBtnHeader, loggedIn);
         setVisible(adminBtn, loggedIn && isAdmin);
 
-        // Mobile
+        // Mobile header buttons
         setVisible(signupBtnMobile, !loggedIn);
-        setVisible(loginBtnMobile,  !loggedIn);
-        setVisible(portalBtnMobile, loggedIn && !isAdmin); // Hide for admins
-        setVisible(logoutBtnMobile, loggedIn);
-        setVisible(adminBtnMobile, loggedIn && isAdmin);
+        setVisible(loginBtnMobile2,  !loggedIn);
+        setVisible(portalBtnMobileHeader, loggedIn && !isAdmin); // Hide for admins
+        setVisible(logoutBtnMobileHeader, loggedIn);
+        
+        // Mobile menu items
+        setVisible(adminBtnMobileMenu, loggedIn && isAdmin);
 
         // Wire logout handlers - use the global headerLogout function
         const wireLogout = (btn) => {
@@ -329,7 +357,7 @@ window.performLogout = async function performLogout() {
         };
         if (loggedIn) {
           wireLogout(logoutBtnHeader);
-          wireLogout(logoutBtnMobile);
+          wireLogout(logoutBtnMobileHeader);
         }
       } catch (err) {
         console.error('[header] ❌ Error checking auth state:', err);
@@ -416,6 +444,17 @@ window.performLogout = async function performLogout() {
       if (!mobileMenu || mobileMenu.classList.contains('hidden')) return;
       const clickInside = mobileMenu.contains(e.target) || (menuToggleBtn && menuToggleBtn.contains(e.target));
       if (!clickInside) closeMenu();
+    });
+    
+    // Close menu on scroll (common mobile UX pattern)
+    let lastScrollY = window.scrollY;
+    window.addEventListener('scroll', () => {
+      if (!mobileMenu || mobileMenu.classList.contains('hidden')) return;
+      // Close menu if user scrolls down more than 50px
+      if (Math.abs(window.scrollY - lastScrollY) > 50) {
+        closeMenu();
+        lastScrollY = window.scrollY;
+      }
     });
 
     // ---------- Desktop services dropdown (click support for touch) ----------

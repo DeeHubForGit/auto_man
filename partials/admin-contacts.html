@@ -1,7 +1,36 @@
 <!-- Admin Contact Messages Section -->
+<style>
+  /* Custom scrollbar for contact messages */
+  #contactsScrollContainer {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+  }
+  
+  #contactsScrollContainer::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  #contactsScrollContainer::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+  }
+  
+  #contactsScrollContainer::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+  }
+  
+  #contactsScrollContainer::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+</style>
+
 <section id="section-contacts" class="section-content bg-white border rounded-2xl shadow-sm p-5 hidden">
   <div class="flex items-center justify-between mb-4">
-    <h2 class="text-xl font-semibold">Contact Messages</h2>
+    <div class="flex items-center gap-3">
+      <h2 class="text-xl font-semibold">Contact Messages</h2>
+      <span id="contactsCount" class="text-sm text-gray-600"></span>
+    </div>
     <button id="reloadContacts" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
       <span id="reloadContactsText">Reload</span>
       <span id="reloadContactsSpinner" class="hidden">
@@ -28,16 +57,48 @@
       <option value="newest">Newest first</option>
       <option value="oldest">Oldest first</option>
     </select>
+    <select 
+      id="contactsPerPage" 
+      class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px]"
+    >
+      <option value="10" selected>10 per page</option>
+      <option value="25">25 per page</option>
+      <option value="50">50 per page</option>
+      <option value="100">100 per page</option>
+    </select>
   </div>
   
-  <!-- Messages list -->
-  <div id="contactsList" class="space-y-3"></div>
+  <!-- Scrollable Messages container -->
+  <div id="contactsScrollContainer" class="overflow-y-auto max-h-[600px] border border-gray-200 rounded-lg p-3 mb-4">
+    <div id="contactsList" class="space-y-3"></div>
+  </div>
+  
+  <!-- Pagination -->
+  <div id="contactsPagination" class="flex items-center justify-between">
+    <div class="text-sm text-gray-600">
+      <span id="paginationInfo"></span>
+    </div>
+    <div class="flex items-center gap-3">
+      <button id="prevPage" class="btn btn-secondary px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Previous page" aria-label="Previous page">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
+      <span id="pageNumbers" class="text-sm text-gray-700 font-medium min-w-[80px] text-center"></span>
+      <button id="nextPage" class="btn btn-primary !bg-blue-600 !text-white hover:!bg-blue-700 px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Next page" aria-label="Next page">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </button>
+    </div>
+  </div>
 </section>
 
 <script>
 (function() {
-  // Contact Messages - Store for filtering
+  // Contact Messages - Store for filtering and pagination
   let allContactMessages = [];
+  let currentPage = 1;
   
   async function loadContacts(){
     const box = document.getElementById('contactsList');
@@ -80,6 +141,7 @@
       }
       
       allContactMessages = Array.isArray(data) ? data : [];
+      currentPage = 1; // Reset to first page on reload
       renderContactMessages();
       
       console.log('[admin-contacts] Loaded', allContactMessages.length, 'contact messages');
@@ -98,6 +160,12 @@
     const box = document.getElementById('contactsList');
     const searchTerm = (document.getElementById('contactSearch')?.value || '').toLowerCase();
     const sortOrder = document.getElementById('contactSort')?.value || 'newest';
+    const perPage = parseInt(document.getElementById('contactsPerPage')?.value || '10');
+    const contactsCount = document.getElementById('contactsCount');
+    const paginationInfo = document.getElementById('paginationInfo');
+    const pageNumbers = document.getElementById('pageNumbers');
+    const prevBtn = document.getElementById('prevPage');
+    const nextBtn = document.getElementById('nextPage');
     
     if (!box) return;
     
@@ -119,6 +187,54 @@
       return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
     });
     
+    // Update total count
+    if (contactsCount) {
+      contactsCount.textContent = `(${filtered.length} total)`;
+    }
+    
+    // Calculate pagination
+    const totalPages = Math.ceil(filtered.length / perPage);
+    if (currentPage > totalPages && totalPages > 0) {
+      currentPage = totalPages;
+    }
+    if (currentPage < 1) currentPage = 1;
+    
+    const startIdx = (currentPage - 1) * perPage;
+    const endIdx = startIdx + perPage;
+    const paginatedMessages = filtered.slice(startIdx, endIdx);
+    
+    // Update pagination info
+    if (paginationInfo) {
+      if (filtered.length === 0) {
+        paginationInfo.textContent = '';
+      } else if (totalPages <= 1) {
+        // Single page - show "Showing all X"
+        paginationInfo.textContent = `Showing all ${filtered.length}`;
+      } else {
+        // Multiple pages - show range
+        const start = startIdx + 1;
+        const end = Math.min(endIdx, filtered.length);
+        if (start === end) {
+          paginationInfo.textContent = `Showing ${start} of ${filtered.length}`;
+        } else {
+          paginationInfo.textContent = `Showing ${start}-${end} of ${filtered.length}`;
+        }
+      }
+    }
+    
+    // Update page numbers
+    if (pageNumbers) {
+      pageNumbers.textContent = totalPages > 0 ? `Page ${currentPage} of ${totalPages}` : '';
+    }
+    
+    // Update prev/next buttons
+    if (prevBtn) {
+      prevBtn.disabled = currentPage <= 1;
+    }
+    if (nextBtn) {
+      nextBtn.disabled = currentPage >= totalPages;
+    }
+    
     // Render
     box.innerHTML = '';
     
@@ -130,7 +246,7 @@
       return;
     }
     
-    filtered.forEach(row => {
+    paginatedMessages.forEach(row => {
       const card = document.createElement('div');
       card.className = 'contact-card mb-3 cursor-pointer';
       
@@ -190,6 +306,7 @@
       const contactSearch = document.getElementById('contactSearch');
       if (contactSearch) {
         contactSearch.addEventListener('input', () => {
+          currentPage = 1; // Reset to page 1 when searching
           renderContactMessages();
         });
       }
@@ -197,7 +314,39 @@
       const contactSort = document.getElementById('contactSort');
       if (contactSort) {
         contactSort.addEventListener('change', () => {
+          currentPage = 1; // Reset to page 1 when sorting changes
           renderContactMessages();
+        });
+      }
+      
+      const contactsPerPage = document.getElementById('contactsPerPage');
+      if (contactsPerPage) {
+        contactsPerPage.addEventListener('change', () => {
+          currentPage = 1; // Reset to page 1 when per-page changes
+          renderContactMessages();
+        });
+      }
+      
+      // Pagination buttons
+      const prevPage = document.getElementById('prevPage');
+      if (prevPage) {
+        prevPage.addEventListener('click', () => {
+          if (currentPage > 1) {
+            currentPage--;
+            renderContactMessages();
+            // Scroll to top of messages
+            document.getElementById('contactsScrollContainer')?.scrollTo(0, 0);
+          }
+        });
+      }
+      
+      const nextPage = document.getElementById('nextPage');
+      if (nextPage) {
+        nextPage.addEventListener('click', () => {
+          currentPage++;
+          renderContactMessages();
+          // Scroll to top of messages
+          document.getElementById('contactsScrollContainer')?.scrollTo(0, 0);
         });
       }
       

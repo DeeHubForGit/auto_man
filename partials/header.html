@@ -87,7 +87,13 @@
       <button id="logoutBtnHeader" class="hidden md:inline-block btn btn-secondary">Log Out</button>
       <!-- My Account - hidden by default -->
       <a href="portal.html" id="portalBtnHeader" class="hidden md:inline-block text-light-hover-blue transition-colors">My Account</a>
-      <a href="admin.html" id="adminBtn" class="hidden hover:text-blue-600 font-semibold text-blue-400">Admin</a>
+      
+      <!-- Admin - desktop, hidden by default -->
+      <a href="admin.html" 
+        id="adminBtn" 
+        class="hidden md:inline-block text-white hover:text-blue-300 transition-colors">
+        Admin
+      </a>
     </div>
 
     <!-- Right: Auth, Phone, WhatsApp, Book, Menu -->
@@ -109,6 +115,13 @@
         class="hidden lg:hidden text-sm text-gray-700 hover:text-gray-900 whitespace-nowrap" title="My Account">
         <span class="hidden sm:inline">My Account</span>
         <span class="sm:hidden">Acct</span>
+      </a>
+      
+      <!-- Admin - mobile, hidden by default -->
+      <a href="admin.html" 
+        id="adminBtnMobile" 
+        class="lg:hidden text-white hover:text-blue-300 transition-colors">
+        Admin
       </a>
       
       <!-- Log Out - visible on mobile when logged in -->
@@ -171,11 +184,6 @@
       <a class="block py-2 hover:underline" href="service-areas.html" onclick="window.closeMenu?window.closeMenu():null">Service Areas</a>
       <a class="block py-2 hover:underline" href="faq.html" onclick="window.closeMenu?window.closeMenu():null">FAQs</a>
       <a class="block py-2 hover:underline" href="index.html#contact" onclick="window.closeMenu?window.closeMenu():null">Contact</a>
-
-      <!-- Admin - only show in menu when admin -->
-      <a href="admin.html" id="adminBtnMobileMenu"
-        class="hidden mt-1 px-4 py-2 rounded border border-orange-600 text-orange-600 hover:bg-orange-50 text-center font-semibold"
-        onclick="window.closeMenu?window.closeMenu():null">Admin</a>
       
       <!-- Phone -->
       <a href="tel:{{PHONE_LINK}}"
@@ -317,7 +325,7 @@ window.performLogout = async function performLogout() {
         const loginBtnMobile2  = document.getElementById('loginBtnMobile2');
         const portalBtnMobileHeader  = document.getElementById('portalBtnMobileHeader');
         const logoutBtnMobileHeader  = document.getElementById('logoutBtnMobileHeader');
-        const adminBtnMobileMenu   = document.getElementById('adminBtnMobileMenu');
+        const adminBtnMobile   = document.getElementById('adminBtnMobile');
 
         const loggedIn = !!(session && session.user);
 
@@ -347,8 +355,8 @@ window.performLogout = async function performLogout() {
         setVisible(portalBtnMobileHeader, loggedIn && !isAdmin); // Hide for admins
         setVisible(logoutBtnMobileHeader, loggedIn);
         
-        // Mobile menu items
-        setVisible(adminBtnMobileMenu, loggedIn && isAdmin);
+        // Admin buttons (desktop and mobile header)
+        setVisible(adminBtnMobile, loggedIn && isAdmin);
 
         // Wire logout handlers - use the global headerLogout function
         const wireLogout = (btn) => {

@@ -40,7 +40,6 @@ function renderServices(containerId = 'services-container') {
               ${service.icon ? (service.icon.endsWith('.svg') ? `<img src="${service.icon}" alt="" width="28" height="28" class="inline-block">` : `<span class="text-2xl">${service.icon}</span>`) : ''}
               ${service.name}
             </span>
-            <span class="text-blue-600">→</span>
           </h3>
           <p class="text-sm text-gray-600">${service.description}</p>
           ${priceDisplay}

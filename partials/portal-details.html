@@ -106,6 +106,7 @@
             id="emergencyContactPhone" 
             name="emergency_contact_phone"
             inputmode="tel"
+            placeholder="0403 632 313 or (03) 9876 5432"
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
           <p id="emergencyContactPhoneError" class="text-xs text-red-500 mt-1 hidden"></p>
@@ -242,13 +243,13 @@
     return true;
   }
   
-  function isValidAuPhone(v){
+  function isValidAuLandline(v){
     if (!v) return false;
     const cleaned = v.trim();
     const digits = normaliseDigits(cleaned);
     
     // Accept: 8-digit local, 10-digit national (0X), or 11-digit international (61X)
-    if (!/^(\d{8}|0\d{9}|61\d{9})$/.test(digits)) return false;
+    if (!/^(\d{8}|0[2-9]\d{8}|61[2-9]\d{8})$/.test(digits)) return false;
     
     // Ensure no invalid characters (only digits, spaces, +, -, parentheses)
     if (!/^[\d\s+\-()]+$/.test(cleaned)) return false;
@@ -257,6 +258,12 @@
     if (cleaned.startsWith('+') && !cleaned.startsWith('+61')) return false;
     
     return true;
+  }
+  
+  // Accept either mobile or landline
+  function isValidAuPhone(v){
+    if (!v) return false;
+    return isValidAuMobile(v) || isValidAuLandline(v);
   }
 
   // Sanitize phone inputs - strict formatting
@@ -302,7 +309,7 @@
     const v = this.value.trim();
     if (!v) { clearError('emergencyContactPhone','emergencyContactPhoneError'); return; }
     if (!isValidAuPhone(v)) {
-      showError('emergencyContactPhone','emergencyContactPhoneError','Enter a valid AU phone number');
+      showError('emergencyContactPhone','emergencyContactPhoneError','Enter a valid Australian mobile (04XX XXX XXX) or landline (0X XXXX XXXX)');
     } else {
       clearError('emergencyContactPhone','emergencyContactPhoneError');
     }
@@ -383,7 +390,7 @@
     
     // Emergency phone validation - must be valid if provided
     if (ePhone && !isValidAuPhone(ePhone)) { 
-      showError('emergencyContactPhone', 'emergencyContactPhoneError', 'Enter a valid AU phone number'); 
+      showError('emergencyContactPhone', 'emergencyContactPhoneError', 'Enter a valid Australian mobile or landline'); 
       hasError = true; 
     }
 

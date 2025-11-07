@@ -175,6 +175,27 @@ select { background-color: white !important; color: black !important; }
 /* Smooth scrolling */
 html { scroll-behavior: smooth; }
 
+@media (max-width: 480px) {
+  #bookNowBtn,
+  .btn-book-now {
+    padding: 0.25rem 0.5rem !important; /* smaller padding */
+    font-size: 0.75rem !important;      /* text-smaller */
+  }
+  header .btn-primary.btn-lg {
+    padding: 0.25rem 0.7rem !important;
+    font-size: 0.85rem !important;
+    min-width: 0 !important;
+    border-radius: 0.45rem !important;
+  }
+  header .btn-secondary {
+    padding: 0.22rem 0.5rem !important;
+    font-size: 0.8rem !important;
+    min-width: 0 !important;
+    border-radius: 0.45rem !important;
+  }
+}
+
+
 /* --- Admin Sidebar Navigation --- */
 .nav-item{
   color: var(--text-gray) !important;

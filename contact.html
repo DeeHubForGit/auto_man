@@ -52,22 +52,22 @@
                 type="text"
                 id="name"
                 name="name"
-                required
                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-black"
                 placeholder="Your full name"
               />
+              <p id="nameError" class="text-xs text-red-500 mt-1 hidden"></p>
             </div>
 
             <div class="mb-6">
               <label for="email" class="block text-gray-900 font-semibold mb-2">Email *</label>
               <input
-                type="email"
+                type="text"
                 id="email"
                 name="email"
-                required
                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-black"
                 placeholder="your.email@example.com"
               />
+              <p id="emailError" class="text-xs text-red-500 mt-1 hidden"></p>
             </div>
 
             <div class="mb-6">
@@ -76,9 +76,11 @@
                 type="tel"
                 id="phone"
                 name="phone"
+                inputmode="tel"
                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-black"
-                placeholder="0403 632 313"
+                placeholder="0403 632 313 or (03) 9876 5432"
               />
+              <p id="phoneError" class="text-xs text-red-500 mt-1 hidden"></p>
             </div>
 
             <div class="mb-6">
@@ -87,10 +89,10 @@
                 id="message"
                 name="message"
                 rows="6"
-                required
                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-vertical text-black"
                 placeholder="Tell us how we can help you..."
               ></textarea>
+              <p id="messageError" class="text-xs text-red-500 mt-1 hidden"></p>
             </div>
 
             <button
@@ -188,6 +190,165 @@
   <div data-include="partials/footer.html"></div>
 
   <script>
+    // Phone validators (same as portal-details)
+    function normaliseDigits(v){ return (v||'').replace(/\D+/g,''); }
+    
+    function isValidAuMobile(v){
+      if (!v) return false;
+      const cleaned = v.trim();
+      const digits = normaliseDigits(cleaned);
+      
+      // Must be exactly 10 digits starting with 04, or 11 digits starting with 614
+      if (!/^(04\d{8}|614\d{8})$/.test(digits)) return false;
+      
+      // Ensure no invalid characters (only digits, spaces, +, -, parentheses)
+      if (!/^[\d\s+\-()]+$/.test(cleaned)) return false;
+      
+      // If starts with +, must be +61
+      if (cleaned.startsWith('+') && !cleaned.startsWith('+61')) return false;
+      
+      return true;
+    }
+    
+    function isValidAuLandline(v){
+      if (!v) return false;
+      const cleaned = v.trim();
+      const digits = normaliseDigits(cleaned);
+      
+      // Accept: 8-digit local, 10-digit national (0X), or 11-digit international (61X)
+      if (!/^(\d{8}|0[2-9]\d{8}|61[2-9]\d{8})$/.test(digits)) return false;
+      
+      // Ensure no invalid characters (only digits, spaces, +, -, parentheses)
+      if (!/^[\d\s+\-()]+$/.test(cleaned)) return false;
+      
+      // If starts with +, must be +61
+      if (cleaned.startsWith('+') && !cleaned.startsWith('+61')) return false;
+      
+      return true;
+    }
+    
+    // Accept either mobile or landline
+    function isValidAuPhone(v){
+      if (!v) return true; // Optional field
+      return isValidAuMobile(v) || isValidAuLandline(v);
+    }
+    
+    // Helper functions for showing/hiding errors
+    function showError(inputId, errorId, message) {
+      const input = document.getElementById(inputId);
+      const error = document.getElementById(errorId);
+      if (input) input.classList.add('border-red-500');
+      if (error) {
+        error.textContent = message;
+        error.classList.remove('hidden');
+      }
+    }
+    
+    function clearError(inputId, errorId) {
+      const input = document.getElementById(inputId);
+      const error = document.getElementById(errorId);
+      if (input) input.classList.remove('border-red-500');
+      if (error) {
+        error.textContent = '';
+        error.classList.add('hidden');
+      }
+    }
+    
+    // Sanitize phone input
+    function sanitizePhoneInput(input, errorId) {
+      input.addEventListener('input', function() {
+        let val = this.value;
+        
+        // Remove any characters that aren't digits, spaces, +, -, or parentheses
+        val = val.replace(/[^\d\s+\-()]/g, '');
+        
+        // Only allow + at the start
+        const hasPlus = val.startsWith('+');
+        val = val.replace(/\+/g, '');
+        if (hasPlus) val = '+' + val;
+        
+        // Remove trailing special characters
+        val = val.replace(/[\s\-()]+$/, '');
+        
+        this.value = val;
+        
+        // Clear error if value becomes valid or empty
+        if (!val || isValidAuPhone(val)) {
+          clearError(input.id, errorId);
+        }
+      });
+    }
+    
+    // Setup validation
+    const nameInput = document.getElementById('name');
+    const emailInput = document.getElementById('email');
+    const phoneInput = document.getElementById('phone');
+    const messageInput = document.getElementById('message');
+    
+    // Name validation on blur
+    nameInput?.addEventListener('blur', function() {
+      const val = this.value.trim();
+      if (!val) {
+        showError('name', 'nameError', 'Name is required');
+      } else {
+        clearError('name', 'nameError');
+      }
+    });
+    
+    nameInput?.addEventListener('input', function() {
+      if (this.value.trim()) {
+        clearError('name', 'nameError');
+      }
+    });
+    
+    // Email validation on blur
+    emailInput?.addEventListener('blur', function() {
+      const val = this.value.trim();
+      if (!val) {
+        showError('email', 'emailError', 'Email is required');
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+        showError('email', 'emailError', 'Enter a valid email address');
+      } else {
+        clearError('email', 'emailError');
+      }
+    });
+    
+    emailInput?.addEventListener('input', function() {
+      if (this.value.trim()) {
+        clearError('email', 'emailError');
+      }
+    });
+    
+    // Phone validation
+    if (phoneInput) {
+      sanitizePhoneInput(phoneInput, 'phoneError');
+      
+      phoneInput.addEventListener('blur', function() {
+        const val = this.value.trim();
+        if (val && !isValidAuPhone(val)) {
+          showError('phone', 'phoneError', 'Enter a valid Australian mobile (04XX XXX XXX) or landline (0X XXXX XXXX)');
+        } else {
+          clearError('phone', 'phoneError');
+        }
+      });
+    }
+    
+    // Message validation on blur
+    messageInput?.addEventListener('blur', function() {
+      const val = this.value.trim();
+      if (!val) {
+        showError('message', 'messageError', 'Message is required');
+      } else {
+        clearError('message', 'messageError');
+      }
+    });
+    
+    messageInput?.addEventListener('input', function() {
+      if (this.value.trim()) {
+        clearError('message', 'messageError');
+      }
+    });
+
     // Contact form handler
     document.getElementById('contactForm')?.addEventListener('submit', function (e) {
       e.preventDefault();
@@ -195,11 +356,52 @@
       const submitButton = this.querySelector('button[type="submit"]');
       const originalButtonText = submitButton.textContent;
 
+      // Clear all errors
+      clearError('name', 'nameError');
+      clearError('email', 'emailError');
+      clearError('phone', 'phoneError');
+      clearError('message', 'messageError');
+      
+      // Validate before submit
+      let hasError = false;
+      
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const phone = document.getElementById('phone').value.trim();
+      const message = document.getElementById('message').value.trim();
+      
+      if (!name) {
+        showError('name', 'nameError', 'Name is required');
+        hasError = true;
+      }
+      
+      if (!email) {
+        showError('email', 'emailError', 'Email is required');
+        hasError = true;
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showError('email', 'emailError', 'Enter a valid email address');
+        hasError = true;
+      }
+      
+      if (phone && !isValidAuPhone(phone)) {
+        showError('phone', 'phoneError', 'Enter a valid Australian mobile or landline');
+        hasError = true;
+      }
+      
+      if (!message) {
+        showError('message', 'messageError', 'Message is required');
+        hasError = true;
+      }
+      
+      if (hasError) {
+        return;
+      }
+
       const formData = {
-        name: document.getElementById('name').value,
-        email: document.getElementById('email').value,
-        phone: document.getElementById('phone').value,
-        message: document.getElementById('message').value,
+        name: name,
+        email: email,
+        phone: phone ? normaliseDigits(phone) : '', // Strip formatting
+        message: message,
       };
 
       submitButton.disabled = true;
@@ -212,9 +414,13 @@
       window.supabaseClient.functions.invoke('contact', { body: formData })
       .then(() => {
         formMessage.textContent = "Thank you! We'll get back to you soon.";
-        formMessage.className = 'mt-4 text-center text-green-600 font-semibold';
+        formMessage.className = 'mt-4 text-center text-blue-dark font-semibold';
         formMessage.classList.remove('hidden');
         (document.getElementById('contactForm')).reset();
+        clearError('name', 'nameError');
+        clearError('email', 'emailError');
+        clearError('phone', 'phoneError');
+        clearError('message', 'messageError');
       })
       .catch((err) => {
         console.error('Contact submit error:', err);

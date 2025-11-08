@@ -15,9 +15,6 @@
     .card{background:var(--card);border:1px solid #1f2937;border-radius:16px;padding:30px;box-shadow:0 10px 30px rgba(0,0,0,.25);margin-bottom:30px}
     .btn{display:inline-flex;align-items:center;gap:8px;background:var(--brand);color:white;border:0;border-radius:999px;padding:14px 28px;font-weight:600;cursor:pointer;text-decoration:none;transition:all 0.3s}
     .btn:hover{background:#2563eb;transform:translateY(-2px)}
-    .feature-list{list-style:none;padding:0;margin:20px 0}
-    .feature-list li{padding:12px 0 12px 30px;position:relative;line-height:1.6}
-    .feature-list li:before{content:"✓";position:absolute;left:0;color:var(--brand);font-weight:bold;font-size:20px}
     .page-spacer{height:16px}
     .two-col-layout{display:grid;grid-template-columns:1fr;gap:30px;margin-bottom:30px}
     @media(min-width:768px){.two-col-layout{grid-template-columns:1fr 400px}}
@@ -114,12 +111,12 @@
         <!-- How it works -->
         <div class="card">
           <h2 style="margin-top:0;font-size:24px;margin-bottom:16px">How It Works</h2>
-          <ol style="margin:0;padding-left:18px;line-height:1.9;color:#cbd5e1">
+          <ul style="margin:0;padding-left:24px;line-height:1.9;color:#cbd5e1;list-style:disc">
             <li><strong>Quick chat</strong>—tell us your goals and any supports that help you learn.</li>
             <li><strong>First lesson</strong>—gentle assessment, then a clear plan tailored to you.</li>
             <li><strong>Build skills</strong>—calm, consistent practice at your pace.</li>
             <li><strong>Optional test prep</strong>—when ready, we’ll map a path to your driving test.</li>
-          </ol>
+          </ul>
         </div>
       </div>
 
@@ -134,7 +131,7 @@
           </div>
 
           <div style="margin-top:24px">
-            <a href="tel:{{PHONE_LINK}}" class="btn" style="font-size:16px;width:100%;justify-content:center">📞 Call {{OWNER}} {{PHONE}}</a>
+            <a href="tel:{{PHONE_LINK}}" class="btn btn-primary" style="font-size:16px;width:100%;justify-content:center">📞 Call {{OWNER}} {{PHONE}}</a>
           </div>
           <!--
           <div style="margin-top:16px">

@@ -791,6 +791,17 @@
       // Click backdrop to close
       backdrop.addEventListener('click', closeAllBookings);
       
+      // Click calendar grid to close popup
+      const calendar = document.getElementById('calendar');
+      if (calendar) {
+        calendar.addEventListener('click', (e) => {
+          // Only close if clicking the calendar itself or a grid cell, not a booking card
+          if (!e.target.closest('.booking-card') && backdrop.classList.contains('active')) {
+            closeAllBookings();
+          }
+        });
+      }
+      
       cards.forEach(card => {
         card.addEventListener('click', (e) => {
           // Ignore clicks on the status dropdowns or close button

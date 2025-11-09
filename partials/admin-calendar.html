@@ -768,7 +768,50 @@
     });
     
     // Mobile: tap a blue block to toggle details
-    if (window.matchMedia('(max-width: 768px)').matches) {
+    setupMobileInteractions();
+    
+    // Handle window resize to clean up states when switching between desktop/mobile
+    let resizeTimeout;
+    let wasMobile = window.matchMedia('(max-width: 768px)').matches;
+    
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        const isMobile = window.matchMedia('(max-width: 768px)').matches;
+        const cards = document.querySelectorAll('#section-calendar .booking-card');
+        const backdrop = document.getElementById('booking-backdrop');
+        
+        if (!isMobile) {
+          // Switching to desktop: clean up mobile popup states
+          cards.forEach(c => c.classList.remove('booking-active'));
+          if (backdrop) backdrop.classList.remove('active');
+          document.querySelectorAll('#section-calendar .booking-close-btn').forEach(btn => btn.remove());
+          
+          // If we just switched from mobile to desktop, refresh the calendar to recalculate heights
+          if (wasMobile && !isMobile) {
+            console.log('[calendar] Switched from mobile to desktop - refreshing calendar');
+            renderWeek(weekStart);
+          }
+        } else {
+          // Switching to mobile: force remove any hover states by cloning cards
+          cards.forEach(card => {
+            const clone = card.cloneNode(true);
+            card.parentNode.replaceChild(clone, card);
+          });
+          // Re-setup mobile interactions after cloning
+          setupMobileInteractions();
+        }
+        
+        // Update the previous state
+        wasMobile = isMobile;
+      }, 100);
+    });
+    
+    // Wrap mobile setup in a function so it can be called on resize
+    function setupMobileInteractions() {
+      const isMobile = window.matchMedia('(max-width: 768px)').matches;
+      if (!isMobile) return;
+      
       // Create backdrop element
       let backdrop = document.getElementById('booking-backdrop');
       if (!backdrop) {
@@ -782,22 +825,44 @@
       
       // Function to close all active bookings
       const closeAllBookings = () => {
-        cards.forEach(c => c.classList.remove('booking-active'));
+        cards.forEach(c => {
+          c.classList.remove('booking-active');
+          // Temporarily disable pointer events to clear hover state
+          c.style.pointerEvents = 'none';
+          setTimeout(() => { c.style.pointerEvents = ''; }, 10);
+        });
         backdrop.classList.remove('active');
         // Remove any injected close buttons to restore compact layout
         document.querySelectorAll('#section-calendar .booking-close-btn').forEach(btn => btn.remove());
       };
       
+      // Remove existing backdrop listeners by replacing it
+      const newBackdrop = backdrop.cloneNode(true);
+      backdrop.parentNode.replaceChild(newBackdrop, backdrop);
+      backdrop = newBackdrop;
+      
       // Click backdrop to close
       backdrop.addEventListener('click', closeAllBookings);
       
-      // Click calendar grid to close popup
+      // Click calendar grid to close popup - use event delegation, don't clone
       const calendar = document.getElementById('calendar');
-      if (calendar) {
+      if (calendar && !calendar.dataset.mobileListenerAdded) {
+        calendar.dataset.mobileListenerAdded = 'true';
         calendar.addEventListener('click', (e) => {
           // Only close if clicking the calendar itself or a grid cell, not a booking card
-          if (!e.target.closest('.booking-card') && backdrop.classList.contains('active')) {
-            closeAllBookings();
+          if (!e.target.closest('.booking-card')) {
+            const backdrop = document.getElementById('booking-backdrop');
+            if (backdrop && backdrop.classList.contains('active')) {
+              const cards = document.querySelectorAll('#section-calendar .booking-card');
+              cards.forEach(c => {
+                c.classList.remove('booking-active');
+                // Temporarily disable pointer events to clear hover state
+                c.style.pointerEvents = 'none';
+                setTimeout(() => { c.style.pointerEvents = ''; }, 10);
+              });
+              backdrop.classList.remove('active');
+              document.querySelectorAll('#section-calendar .booking-close-btn').forEach(btn => btn.remove());
+            }
           }
         });
       }

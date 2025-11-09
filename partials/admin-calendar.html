@@ -27,22 +27,24 @@
     display: none;
   }
   
-  /* Expanded view on hover - show full details */
-  #section-calendar .booking-card:hover {
-    z-index: 50 !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    transform: scale(1.02);
-    height: auto !important;
-    min-height: fit-content !important;
-    overflow: visible;
-  }
-  
-  #section-calendar .booking-card:hover .booking-details {
-    display: block;
-  }
-  /* Desktop hover: hide entire summary when details are shown to avoid duplicates */
-  #section-calendar .booking-card:hover .booking-summary {
-    display: none !important;
+  /* Expanded view on hover - show full details - DESKTOP ONLY */
+  @media (min-width: 769px) {
+    #section-calendar .booking-card:hover {
+      z-index: 50 !important;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      transform: scale(1.02);
+      height: auto !important;
+      min-height: fit-content !important;
+      overflow: visible;
+    }
+    
+    #section-calendar .booking-card:hover .booking-details {
+      display: block;
+    }
+    /* Desktop hover: hide entire summary when details are shown to avoid duplicates */
+    #section-calendar .booking-card:hover .booking-summary {
+      display: none !important;
+    }
   }
   
   /* Compact summary styling */
@@ -770,6 +772,9 @@
     // Wrap mobile setup in a function so it can be called on resize
     function setupMobileInteractions() {
       const isMobile = window.matchMedia('(max-width: 768px)').matches;
+      const viewportWidth = window.innerWidth;
+      console.log('[mobile] Viewport width:', viewportWidth, 'isMobile:', isMobile);
+      
       if (!isMobile) {
         console.log('[mobile] Not mobile, skipping mobile interactions setup');
         return;
@@ -936,6 +941,17 @@
           console.log('[calendar] Switched from desktop to mobile - setting up mobile interactions');
           document.querySelectorAll('#section-calendar .booking-close-btn').forEach(btn => btn.remove());
           if (backdrop) backdrop.classList.remove('active');
+          
+          // Force remove hover states by temporarily disabling pointer events
+          cards.forEach(c => {
+            c.style.pointerEvents = 'none';
+          });
+          setTimeout(() => {
+            cards.forEach(c => {
+              c.style.pointerEvents = '';
+            });
+          }, 50);
+          
           // Re-setup mobile interactions for existing cards
           setupMobileInteractions();
         }

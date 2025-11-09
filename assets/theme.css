@@ -289,7 +289,7 @@ html { scroll-behavior: smooth; }
   transform: translateY(-1px);
 }
 
-/* Light-blue variant used for Login button */
+/* Light-blue variant used for Login / Book Now */
 .btn-primary-light {
   background-color: #60a5fa !important;   /* sky-400 */
   color: #fff !important;
@@ -298,13 +298,41 @@ html { scroll-behavior: smooth; }
     0 0 6px rgba(147,197,253,0.4),
     0 0 0 1px rgba(147,197,253,0.3) !important;
   transition: all 0.25s ease;
+  font-weight: 600;
 }
+
+/* Hover – vivid blue glow + lift */
 .btn-primary-light:hover {
-  background-color: #60a5fa !important;   /* brand blue */
-  border-color: #93c5fd !important;       /* lighter edge */
+  background-color: #60a5fa !important;   /* keep same base blue */
+  border-color: #7dd3fc !important;       /* bright edge */
   box-shadow:
-    inset 0 0 6px rgba(255,255,255,0.25),
-    0 0 12px rgba(96,165,250,0.55) !important;
+    inset 0 0 6px rgba(255,255,255,0.2),   /* subtle inner shine */
+    0 0 0 1px rgba(96,165,250,0.5),        /* crisp edge */
+    0 0 14px rgba(96,165,250,0.65) !important; /* outer glow */
+  transform: translateY(-1px);
+}
+
+/* Base: Secondary Light (transparent look with blue outline) */
+.btn-secondary-light {
+  background-color: transparent !important;
+  color: #ffffff !important;                     /* white text */
+  border: 2px solid rgba(255,255,255,0.9) !important; /* crisp white edge */
+  box-shadow:
+    0 0 4px rgba(255,255,255,0.3),
+    inset 0 0 4px rgba(255,255,255,0.15) !important;
+  font-weight: 600;
+  transition: all 0.15s ease-in-out;
+}
+
+/* Hover: glow like primary buttons */
+.btn-secondary-light:hover {
+  background-color: rgba(255,255,255,0.08) !important;
+  color: #ffffff !important;
+  border-color: #e0f2fe !important;
+  box-shadow:
+    inset 0 0 6px rgba(255,255,255,0.2),
+    0 0 0 1px rgba(147,197,253,0.4),
+    0 0 14px rgba(147,197,253,0.6) !important;
   transform: translateY(-1px);
 }
 

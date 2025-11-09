@@ -65,6 +65,28 @@
   #section-calendar .calendar-time-cell {
     color: #111827 !important;
     background-color: #f9fafb !important;
+    padding: 4px 6px; /* Tighter vertical spacing for mobile */
+    position: sticky;
+    left: 0;
+    z-index: 10;
+  }
+  
+  /* Hide mobile-only elements on desktop */
+  #section-calendar .mobile-only {
+    display: none;
+  }
+  
+  /* Tighter row height for mobile */
+  #section-calendar #weekGrid > div > div {
+    min-height: 56px; /* down from 80px */
+  }
+  
+  /* Fix for header time cell */
+  #section-calendar .calendar-header:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 20;
+    background-color: #f3f4f6 !important;
   }
   
   /* Calendar grid cells */
@@ -107,10 +129,198 @@
     height: 20px;
     display: block;
   }
+  
+  /* Mobile scroll improvements */
+  #section-calendar #calendar {
+    overflow-x: auto;
+    overflow-y: auto;
+  }
+  
+  /* Desktop: wider columns */
+  #section-calendar #weekGrid {
+    min-width: auto; /* Allow mobile to shrink */
+  }
+  
+  /* Visible scrollbar for mobile */
+  #section-calendar #calendar::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+  
+  #section-calendar #calendar::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+  }
+  
+  #section-calendar #calendar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+  }
+  
+  #section-calendar #calendar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+  
+  /* Firefox scrollbar */
+  #section-calendar #calendar {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+  }
+  
+  /* Mobile: narrower columns so all 7 days fit */
+  @media (max-width: 768px) {
+    /* Hide desktop-only content in compact blue blocks */
+    #section-calendar .booking-card .desktop-only {
+      display: none !important;
+    }
+    
+    /* Show mobile-only content */
+    #section-calendar .booking-card .mobile-only {
+      display: block !important;
+    }
+    
+    /* In expanded view, show everything */
+    #section-calendar .booking-card.booking-active .desktop-only {
+      display: block !important;
+    }
+    
+    #section-calendar #weekGrid {
+      grid-template-columns: 35px repeat(7, 1fr) !important;
+      min-width: 100% !important; /* Remove forced scroll, fit to screen */
+    }
 
+    #section-calendar .calendar-header,
+    #section-calendar .calendar-time-cell {
+      padding: 2px 1px;
+      font-size: 9px;
+      line-height: 1.0;
+      text-align: center;
+    }
+
+    /* Slightly shorter rows to reduce vertical scroll */
+    #section-calendar #weekGrid > div > div {
+      min-height: 48px;
+    }
+    
+    /* Reduce cell padding for tighter fit */
+    #section-calendar #weekGrid > div > div {
+      padding: 1px;
+    }
+    
+    /* Mobile: compact blue blocks, expand on tap */
+    /* Default: show as a simple blue bar with name/suburb */
+    #section-calendar .booking-card {
+      background-color: #2563eb !important;
+      border-left: none !important;
+      border-radius: 2px;
+      padding: 2px 3px !important;
+      overflow: hidden;
+      font-size: 9px !important;
+      line-height: 1.2;
+      color: white !important;
+      font-weight: 500;
+    }
+    
+    /* White text for booking name in compact mobile view */
+    #section-calendar .booking-card .booking-name {
+      color: white !important;
+    }
+    
+    /* Show minimal info in compact view */
+    #section-calendar .booking-card .booking-summary {
+      display: block !important;
+    }
+    
+    #section-calendar .booking-card .booking-summary > * {
+      color: white !important;
+    }
+
+    /* Hide detailed info by default */
+    #section-calendar .booking-card .booking-details {
+      display: none;
+    }
+
+    /* Expanded: centered modal wider for readability */
+    #section-calendar .booking-card.booking-active {
+      background-color: #dbeafe !important;
+      border-left: 2px solid #2563eb !important;
+      padding: 12px 16px !important;
+      z-index: 50 !important;
+      overflow: visible;
+      position: fixed !important;
+      left: 50% !important;
+      top: 50% !important;
+      transform: translate(-50%, -50%) !important;
+      width: 90vw !important;
+      max-width: 420px !important;
+      height: auto !important;
+      max-height: 80vh !important;
+      overflow-y: auto !important;
+      box-shadow: 0 14px 48px rgba(0,0,0,0.35) !important;
+      font-size: 13px !important;
+      border-radius: 12px !important;
+      color: #111827 !important;
+    }
+    
+    /* All text in expanded modal should be dark */
+    #section-calendar .booking-card.booking-active,
+    #section-calendar .booking-card.booking-active * { color: #111827 !important; }
+    #section-calendar .booking-card.booking-active .booking-name { color: #111827 !important; }
+  /* Hide mobile summary lines inside expanded view to avoid duplication */
+  #section-calendar .booking-card.booking-active .mobile-only { display: none !important; }
+  /* Also hide the desktop summary address for level-1 when expanded to avoid duplicate address lines */
+  #section-calendar .booking-card.booking-active .summary-address-l1 { display: none !important; }
+    
+    /* Close button for mobile modal (neutral gray, overlays content) */
+    #section-calendar .booking-close-btn {
+      position: absolute;
+      top: 10px;           /* slightly lower to align with first line of text */
+      right: 10px;
+      width: 22px;
+      height: 22px;
+      background: transparent;  /* no fill */
+      color: #6b7280 !important; /* gray-500 */
+      border: none;
+      border-radius: 50%;       /* still clickable circle area */
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: bold;
+      line-height: 1;
+      z-index: 60;
+    }
+    
+    #section-calendar .booking-close-btn:hover {
+      background: rgba(0,0,0,0.04);
+      color: #374151 !important; /* gray-700 */
+    }
+
+    #section-calendar .booking-card.booking-active .booking-details {
+      display: block;
+    }
+    
+    /* Backdrop for closing modal */
+    #section-calendar .booking-backdrop {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 45;
+    }
+    
+    #section-calendar .booking-backdrop.active {
+      display: block;
+    }
+  }
+  
 </style>
 <section id="section-calendar" class="section-content bg-white border rounded-2xl shadow-sm p-5" style="background-color: white !important; color: #111827 !important;">
-  <!-- Week range + navigation + message -->
+  <!-- Week range + navigation -->
   <div class="flex items-center justify-between mb-3" role="group" aria-label="Calendar navigation">
     <div class="flex items-center gap-3">
       <span id="weekRange" class="text-base sm:text-lg font-bold text-blue-600">
@@ -130,10 +340,12 @@
           </svg>
         </button>
       </div>
-      <span id="noBookingsMsg" class="text-blue-500 font-semibold hidden ml-2">
-        No bookings found for this week
-      </span>
     </div>
+  </div>
+  
+  <!-- No bookings message - displayed below navigation -->
+  <div id="noBookingsMsg" class="text-blue-500 font-semibold text-center mb-3 hidden">
+    No bookings found for this week
   </div>
 
   <div id="calendar" class="overflow-auto max-h-[600px] relative">
@@ -177,7 +389,13 @@
       if (idx === 0) cell.classList.add('left-0', 'z-20');
       if (idx > 0) {
         const date = addDays(weekStart, idx - 1);
-        cell.textContent = `${day} ${date.getDate()}/${date.getMonth() + 1}`;
+        // For mobile: show day name on line 1, date on line 2
+        const isMobile = window.matchMedia('(max-width: 768px)').matches;
+        if (isMobile) {
+          cell.innerHTML = `<div style="line-height: 1.1;">${day}</div><div style="line-height: 1.1;">${date.getDate()}/${date.getMonth() + 1}</div>`;
+        } else {
+          cell.textContent = `${day} ${date.getDate()}/${date.getMonth() + 1}`;
+        }
       } else {
         cell.textContent = day;
       }
@@ -330,8 +548,17 @@
         const endTime = end.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
         
         // Calculate exact pixel height based on duration
-        // Each cell is 80px min-height, so calculate proportionally
-        const cellHeight = 80; // matches min-h-[80px]
+        // Each cell is 80px min-height on desktop, 48px on mobile
+        const isMobile = window.matchMedia('(max-width: 768px)').matches;
+        // Determine actual rendered cell height (fallback to defaults)
+        let cellHeight = isMobile ? 48 : 80;
+        try {
+          // Find any existing time slot cell to measure
+          const sampleCell = document.querySelector('#weekGrid div.p-2.border.min-h-[80px]');
+          if (sampleCell) {
+            cellHeight = sampleCell.getBoundingClientRect().height || cellHeight;
+          }
+        } catch (e) { /* ignore measurement errors */ }
         const heightPx = durationHours * cellHeight;
         
         // Decide detail level by visual height (works for 1h/1.5h/2h)
@@ -347,7 +574,8 @@
         if (booking.is_booking) {
           // This is a booking with client information - show service name
           bookingDiv.className = 'booking-card text-xs bg-blue-100 border-l-2 border-blue-600 p-1 rounded absolute left-0 right-0 z-10';
-          bookingDiv.style.height = `${heightPx - 4}px`; // -4px for padding
+          const padAdjust = isMobile ? 4 : 8;
+          bookingDiv.style.height = `${Math.max(heightPx - padAdjust, 4)}px`;
           bookingDiv.style.top = `${minuteOffset}px`;
           
           const serviceName = serviceMap[booking.service_code] || 'Driving Lesson';
@@ -356,18 +584,40 @@
           // Determine transmission type from service code
           const transmissionType = booking.service_code?.includes('manual') ? 'Manual' : 'Automatic';
           
+          // Build a compact location label for mobile
+          let locationLabel = '';
+          if (booking.pickup_location) {
+            // Trim whitespace and remove trailing commas
+            locationLabel = booking.pickup_location.trim().replace(/,+$/, '');
+            // Truncate for small screens
+            if (locationLabel.length > 26) {
+              locationLabel = locationLabel.substring(0, 26) + '...';
+            }
+          }
+          
           // Build HTML based on detail level
           let summaryHTML = '';
           let detailsHTML = '';
           
           if (detailLevel === 1) {
-            // 1 hour: Minimal info, most in hover details
+            // Compact view: desktop shows richer info; mobile minimal (transmission + duration + address)
+            // Shorten 'Automatic' to 'Auto' for mobile summary
+            const shortTransmission = transmissionType === 'Automatic' ? 'Auto' : transmissionType;
+            const transmissionLine = `${transmissionType} - ${durationHours}h`;
+            // Duration implied by block height; omit address in desktop summary to reduce duplication.
+            const desktopAddress = booking.pickup_location ? `📍 ${booking.pickup_location}` : '';
             summaryHTML = `
-              <div class="font-semibold text-gray-900">${transmissionType} - ${durationHours}h</div>
-              <div class="booking-name font-medium truncate">${clientName}</div>
-              ${booking.pickup_location ? `<div class="text-gray-600 truncate" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">📍 ${booking.pickup_location}</div>` : ''}
+              <div class="desktop-only font-semibold text-gray-900">${transmissionLine}</div>
+              <!-- Desktop summary shows address only; client name removed for space -->
+              <div class="desktop-only text-gray-600 summary-address-l1" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.2;">${desktopAddress}</div>
+              <div class="mobile-only font-semibold" style="color:white !important;">${shortTransmission}</div>
+              <div class="mobile-only" style="display:none;">${locationLabel}</div>
             `;
+            // In details panel: show client name always; show address ONLY on mobile (desktop already has it in summary to avoid duplication)
+            const addressInDetailsL1 = (isMobile && booking.pickup_location) ? `<div class=\"text-gray-700 text-xs mb-1 details-address-l1\">📍 ${booking.pickup_location}</div>` : '';
             detailsHTML = `
+              <div class="text-gray-900 text-sm font-semibold mb-1">${clientName}</div>
+              ${addressInDetailsL1}
               <div class="text-gray-700 text-xs mb-1 font-medium">🕐 ${time} - ${endTime}</div>
               ${booking.mobile ? `<div class="text-gray-600 text-xs mb-1">📱 ${booking.mobile}</div>` : ''}
               <div class="mt-1">
@@ -386,12 +636,13 @@
             // 1.5 hours: Show service, client, address (2 lines), times, mobile. Status on hover.
             summaryHTML = `
               <div class="font-semibold text-gray-900">${transmissionType} - ${durationHours}h</div>
-              <div class="booking-name font-medium truncate">${clientName}</div>
+              <!-- Client name removed from web summary to prioritise address -->
               ${booking.pickup_location ? `<div class="text-gray-600 text-xs" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3;">📍 ${booking.pickup_location}</div>` : ''}
               <div class="text-gray-700 text-xs mt-1 font-medium">🕐 ${time} - ${endTime}</div>
               ${booking.mobile ? `<div class="text-gray-600 text-xs">📱 ${booking.mobile}</div>` : ''}
             `;
             detailsHTML = `
+              <div class="text-gray-900 text-sm font-semibold mb-1">${clientName}</div>
               <div class="mt-1">
                 <select class="booking-status-select text-xs border border-gray-300 rounded px-1 py-0.5 w-full" 
                         data-booking-id="${booking.id}" 
@@ -408,7 +659,7 @@
             // 2+ hours: Show all info including status
             summaryHTML = `
               <div class="font-semibold text-gray-900">${transmissionType} - ${durationHours}h</div>
-              <div class="booking-name font-medium truncate">${clientName}</div>
+              <!-- Client name removed from web summary to prioritise address -->
               ${booking.pickup_location ? `<div class="text-gray-600 text-xs" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3;">📍 ${booking.pickup_location}</div>` : ''}
               <div class="text-gray-700 text-xs mt-1 font-medium">🕐 ${time} - ${endTime}</div>
               ${booking.mobile ? `<div class="text-gray-600 text-xs">📱 ${booking.mobile}</div>` : ''}
@@ -424,7 +675,7 @@
                 </select>
               </div>
             `;
-            detailsHTML = ''; // No additional details needed - everything is shown
+            detailsHTML = `<div class="text-gray-900 text-sm font-semibold mb-1">${clientName}</div>`; // Name shown on hover/expanded
           }
           
           bookingDiv.innerHTML = `
@@ -436,7 +687,8 @@
         } else {
           // This is a regular calendar appointment - show title and times
           bookingDiv.className = 'booking-card text-xs bg-gray-100 border-l-2 border-gray-400 p-1 rounded absolute left-0 right-0 z-10';
-          bookingDiv.style.height = `${heightPx - 4}px`; // -4px for padding
+          const padAdjust2 = isMobile ? 4 : 8;
+          bookingDiv.style.height = `${Math.max(heightPx - padAdjust2, 4)}px`;
           bookingDiv.style.top = `${minuteOffset}px`;
           
           const eventTitle = booking.event_title || 'Appointment';
@@ -491,6 +743,73 @@
         }
       });
     });
+    
+    // Mobile: tap a blue block to toggle details
+    if (window.matchMedia('(max-width: 768px)').matches) {
+      // Create backdrop element
+      let backdrop = document.getElementById('booking-backdrop');
+      if (!backdrop) {
+        backdrop = document.createElement('div');
+        backdrop.id = 'booking-backdrop';
+        backdrop.className = 'booking-backdrop';
+        document.body.appendChild(backdrop);
+      }
+      
+      const cards = document.querySelectorAll('#section-calendar .booking-card');
+      
+      // Function to close all active bookings
+      const closeAllBookings = () => {
+        cards.forEach(c => c.classList.remove('booking-active'));
+        backdrop.classList.remove('active');
+        // Remove any injected close buttons to restore compact layout
+        document.querySelectorAll('#section-calendar .booking-close-btn').forEach(btn => btn.remove());
+      };
+      
+      // Click backdrop to close
+      backdrop.addEventListener('click', closeAllBookings);
+      
+      cards.forEach(card => {
+        card.addEventListener('click', (e) => {
+          // Ignore clicks on the status dropdowns or close button
+          if (e.target.closest('.booking-status-select')) return;
+          if (e.target.closest('.booking-close-btn')) return;
+
+          e.stopPropagation();
+
+          // Close others
+          cards.forEach(c => {
+            if (c !== card) c.classList.remove('booking-active');
+          });
+
+          // Toggle this one
+          const isOpening = !card.classList.contains('booking-active');
+          card.classList.toggle('booking-active');
+          
+          // Show/hide backdrop
+          if (isOpening) {
+            backdrop.classList.add('active');
+            
+            // Add close button if not already present
+            if (!card.querySelector('.booking-close-btn')) {
+              const closeBtn = document.createElement('button');
+              closeBtn.className = 'booking-close-btn';
+              closeBtn.innerHTML = '×';
+              closeBtn.setAttribute('aria-label', 'Close');
+              closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                closeAllBookings();
+              });
+              card.appendChild(closeBtn);
+            }
+          } else {
+            backdrop.classList.remove('active');
+            // Remove close button on closing this card
+            const btn = card.querySelector('.booking-close-btn');
+            if (btn) btn.remove();
+          }
+        });
+      });
+    }
     
     // Helper function to update booking status
     async function updateBookingStatus(selectElement, bookingId, newStatus, originalStatus) {

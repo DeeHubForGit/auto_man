@@ -546,3 +546,182 @@ header #nav-services-menu a:hover { color: #ffffff !important; }
   color: #0f172a;                       /* dark text */
   font-weight: 500;
 }
+
+/* Public site contact cards (safe: does NOT affect admin .contact-card) */
+.contact-card-public {
+  background: linear-gradient(180deg, #1a2236 0%, #0f172a 100%); /* soft top→bottom blue-gray gradient */
+  border-radius: 0.75rem;
+  border: 1px solid rgba(148,163,253,0.25);
+  padding: 1.75rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  text-align: center;
+  box-shadow: 0 10px 26px rgba(0,0,0,0.35);
+  transition: all 0.2s ease;
+}
+
+.contact-card-public .emoji {
+  font-size: 2.2rem;                                   /* make icon readable */
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.contact-card-public-title {
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.contact-card-public a {
+  color: #60a5fa;
+  font-size: 1.2rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.contact-card-public a:hover {
+  color: #93c5fd;
+}
+
+.contact-card-public {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4); /* softer glow, less height */
+}
+
+.contact-card-public .emoji {
+  filter: drop-shadow(0 0 2px rgba(255,255,255,0.15)); /* mild depth */
+}
+
+/* Our Ethos cards – scoped & safe */
+#ethos .grid .rounded-xl.border {
+  background:
+    radial-gradient(circle at top left, rgba(96,165,250,0.10), transparent),
+    linear-gradient(145deg, rgba(59,130,246,0.08), rgba(15,23,42,0.85));
+  border-color: rgba(148,163,253,0.25);
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 26px rgba(0,0,0,0.35);
+  transition: all 0.22s ease;
+}
+
+/* Hover: gentle lift + soft blue glow */
+#ethos .grid .rounded-xl.border:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 16px 40px rgba(15,23,42,0.6),
+    0 0 12px rgba(59,130,246,0.35);
+  border-color: rgba(129,140,248,0.35);
+}
+
+/* Icon + text colours inside Ethos cards */
+#ethos .grid .rounded-xl.border span.text-3xl {
+  font-size: 2.1rem;
+}
+
+#ethos .grid .rounded-xl.border h3 {
+  color: #e5e7eb;
+  font-weight: 600;
+}
+
+#ethos .grid .rounded-xl.border p {
+  color: #9ca3af;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+/* Step 1: Gentle gradient for Ethos boxes */
+#ethos .rounded-xl.border {
+  background: linear-gradient(145deg, rgba(59,130,246,0.08), rgba(15,23,42,0.85));
+}
+
+/* ============================================================= */
+/* Featured Testimonial (homepage)                               */
+/* ============================================================= */
+
+#testimonial-highlight {
+  background: transparent !important;
+}
+
+#testimonial-highlight .testimonial-card {
+  position: relative;
+  padding: 2.25rem 2.25rem;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(147,197,253,0.5);
+
+  /* Stronger contrast + color than page bg */
+  background:
+    radial-gradient(circle at top left, rgba(56,189,248,0.16), transparent),
+    radial-gradient(circle at top right, rgba(37,99,235,0.28), transparent),
+    linear-gradient(145deg, #020817, #020817 35%, #111827 100%);
+
+  /* Added top glow for subtle “spotlight” effect */
+  box-shadow:
+    0 -6px 18px rgba(96,165,250,0.25),
+    0 18px 40px rgba(0,0,0,0.8),
+    0 0 20px rgba(37,99,235,0.35);
+
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+  overflow: hidden;
+}
+
+/* Star icon */
+#testimonial-highlight .testimonial-icon {
+  font-size: 2.4rem;
+  line-height: 1;
+  flex-shrink: 0;
+  color: #fde68a; /* warm gold */
+  text-shadow: 0 0 10px rgba(253,224,71,0.45);
+  margin-top: -0.15rem;
+}
+
+/* Quote text */
+#testimonial-highlight .testimonial-text {
+  color: #f3f4f6; /* slightly brighter than before */
+  font-size: 1.08rem; /* slightly larger for presence */
+  line-height: 1.85;
+  font-style: italic;
+  margin: 0 0 1.25rem 0;
+}
+
+/* Meta (name) */
+#testimonial-highlight .testimonial-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+#testimonial-highlight .testimonial-name {
+  color: #bfdbfe;
+  font-weight: 600;
+  font-size: 0.98rem;
+}
+
+/* Hover: subtle lift + glow */
+#testimonial-highlight .testimonial-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 -6px 20px rgba(96,165,250,0.3),
+    0 22px 52px rgba(15,23,42,0.9),
+    0 0 26px rgba(59,130,246,0.45);
+}
+
+/* Mobile tweaks */
+@media (max-width: 640px) {
+  #testimonial-highlight .testimonial-card {
+    padding: 1.75rem 1.5rem;
+    gap: 1rem;
+  }
+
+  #testimonial-highlight .testimonial-icon {
+    font-size: 2.1rem;
+  }
+
+  #testimonial-highlight .testimonial-text {
+    font-size: 0.98rem;
+  }
+}
+
+#testimonial-highlight {
+  margin-bottom: -2.5rem; /* reduces space before Contact Us */
+}

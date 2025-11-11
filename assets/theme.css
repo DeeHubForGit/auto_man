@@ -603,15 +603,6 @@ header #nav-services-menu a:hover { color: #ffffff !important; }
   transition: all 0.22s ease;
 }
 
-/* Hover: gentle lift + soft blue glow */
-#ethos .grid .rounded-xl.border:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 16px 40px rgba(15,23,42,0.6),
-    0 0 12px rgba(59,130,246,0.35);
-  border-color: rgba(129,140,248,0.35);
-}
-
 /* Icon + text colours inside Ethos cards */
 #ethos .grid .rounded-xl.border span.text-3xl {
   font-size: 2.1rem;
@@ -697,15 +688,6 @@ header #nav-services-menu a:hover { color: #ffffff !important; }
   font-size: 0.98rem;
 }
 
-/* Hover: subtle lift + glow */
-#testimonial-highlight .testimonial-card:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 -6px 20px rgba(96,165,250,0.3),
-    0 22px 52px rgba(15,23,42,0.9),
-    0 0 26px rgba(59,130,246,0.45);
-}
-
 /* Mobile tweaks */
 @media (max-width: 640px) {
   #testimonial-highlight .testimonial-card {
@@ -725,3 +707,13 @@ header #nav-services-menu a:hover { color: #ffffff !important; }
 #testimonial-highlight {
   margin-bottom: -2.5rem; /* reduces space before Contact Us */
 }
+
+/* Subtle gradient for booking service cards (similar to Our Ethos) */
+.booking-category .service-card {
+  background: linear-gradient(
+    145deg,
+    rgba(59,130,246,0.08),
+    rgba(15,23,42,0.96)
+  );
+}
+

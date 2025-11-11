@@ -54,29 +54,25 @@
         <h3 class="text-lg font-semibold mb-3">Booking Information</h3>
         <ul class="space-y-2 text-slate-300">
           <li class="flex items-start">
-            <svg class="h-5 w-5 text-green-400 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg class="h-5 w-5 text-blue-400 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
             </svg>
             <span>Select your preferred time slot from the available options</span>
           </li>
           <li class="flex items-start">
-            <svg class="h-5 w-5 text-green-400 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg class="h-5 w-5 text-blue-400 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
             </svg>
             <span>You'll receive a confirmation email with all the details</span>
           </li>
           <li class="flex items-start">
-            <svg class="h-5 w-5 text-green-400 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg class="h-5 w-5 text-blue-400 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
             </svg>
             <span>24-hour cancellation policy applies</span>
           </li>
         </ul>
       </div>
-
-      <p class="text-sm text-slate-500 mt-6 text-center">
-        Booking opens in a new tab on calendar.google.com. Please ensure pop-ups are enabled for this site.
-      </p>
     </section>
   </main>
 
@@ -101,7 +97,7 @@
         // Create category section
         const categoryDiv = document.createElement('div');
         categoryDiv.className = 'booking-category';
-        
+
         // Category header (clickable to collapse/expand)
         const headerButton = document.createElement('button');
         headerButton.className = 'w-full text-left mb-4 flex items-center gap-3 group';
@@ -113,29 +109,26 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
           </svg>
         `;
-        
+
         // Services container (auto-expanded by default)
         const servicesDiv = document.createElement('div');
         servicesDiv.id = `services-${category.id}`;
         servicesDiv.className = 'space-y-3 category-services p-1';
-        
+
         // Check if coming soon
         if (category.comingSoon) {
           const comingSoonDiv = document.createElement('div');
-          comingSoonDiv.className = 'bg-[#101828] rounded-2xl p-4 shadow-sm ring-1 ring-white/10 flex items-center justify-center gap-3';
+          comingSoonDiv.className = 'service-card rounded-2xl p-4 shadow-sm ring-1 ring-white/10 flex items-center justify-center gap-3';
           comingSoonDiv.innerHTML = `
-            <svg class="w-5 h-5 text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span class="text-gray-300 font-medium">Coming Soon</span>
+            <span class="text-gray-300 font-medium">📱 Call {{OWNER}} {{PHONE}}</span>
           `;
           servicesDiv.appendChild(comingSoonDiv);
         } else {
           // Render each service
           category.services.forEach(service => {
             const serviceDiv = document.createElement('div');
-            serviceDiv.className = 'group flex flex-wrap items-center gap-3 justify-between bg-[#101828] rounded-2xl p-4 shadow-sm ring-1 ring-white/10 hover:ring-blue-400/60 transition';
-            
+            serviceDiv.className = 'service-card group flex flex-wrap items-center gap-3 justify-between rounded-2xl p-4 shadow-sm ring-1 ring-white/10 hover:ring-blue-400/60 transition';
+
             serviceDiv.innerHTML = `
               <div class="min-w-0 flex-1">
                 <p class="font-medium">${service.name} — ${service.duration}</p>
@@ -144,16 +137,16 @@
               <div class="flex items-center gap-4">
                 <span class="text-gray-300 font-medium">$${service.price}</span>
                 <a href="google-booking.html?bookingUrl=${encodeURIComponent(service.bookingUrl)}"
-                   class="px-3 py-1.5 rounded-lg border border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-white transition whitespace-nowrap">
+                  class="btn btn-primary whitespace-nowrap">
                   Book Now
                 </a>
               </div>
             `;
-            
+
             servicesDiv.appendChild(serviceDiv);
           });
         }
-        
+
         categoryDiv.appendChild(headerButton);
         categoryDiv.appendChild(servicesDiv);
         container.appendChild(categoryDiv);

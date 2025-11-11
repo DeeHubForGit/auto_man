@@ -246,9 +246,9 @@ html { scroll-behavior: smooth; }
 
 /* Base: Primary */
 .btn-primary {
-  background-color: #3b82f6 !important;
+  background-color: #60a5fa !important;
   color: #fff !important;
-  border: 0.1px solid #0D47A1 !important; /* sky-300 edge */
+  border: 2px solid rgba(147,197,253,0.85) !important;
   box-shadow:
     0 0 0 1px rgba(96,165,250,0.35),
     0 2px 6px rgba(59,130,246,0.35) !important;
@@ -265,15 +265,14 @@ html { scroll-behavior: smooth; }
 
 /* --- Hovers (DIFFERENT) --- */
 
-/* Primary: keep solid brand blue, add bright border + glow */
+/* Primary: darker brand blue with softer bright glow */
 .btn-primary:hover {
-  background-color: #3b82f6 !important;               /* stay medium blue */
-  color: #fff !important;
-  border-color: #7dd3fc !important;                    /* bright edge */
+  background-color: #60a5fa !important;   /* keep same base blue */
+  border-color: #7dd3fc !important;       /* bright edge */
   box-shadow:
-    inset 0 0 6px rgba(255,255,255,0.18),
-    0 0 0 1px rgba(96,165,250,0.50),
-    0 0 14px rgba(96,165,250,0.65) !important;
+    inset 0 0 6px rgba(255,255,255,0.2),   /* subtle inner shine */
+    0 0 0 1px rgba(96,165,250,0.5),        /* crisp edge */
+    0 0 14px rgba(96,165,250,0.65) !important; /* outer glow */
   transform: translateY(-1px);
 }
 
@@ -291,24 +290,22 @@ html { scroll-behavior: smooth; }
 
 /* Light-blue variant used for Login / Book Now */
 .btn-primary-light {
-  background-color: #60a5fa !important;   /* sky-400 */
-  color: #fff !important;
-  border: 2px solid rgba(147,197,253,0.8) !important; /* soft border */
+  background-color: #93c5fd !important;          /* slightly brighter than #60a5fa */
+  color: #2563eb !important;
+  border: 2px solid rgba(191,219,254,0.9) !important;
   box-shadow:
-    0 0 6px rgba(147,197,253,0.4),
-    0 0 0 1px rgba(147,197,253,0.3) !important;
-  transition: all 0.25s ease;
-  font-weight: 600;
+    0 0 0 1px rgba(96,165,250,0.35),
+    0 2px 6px rgba(59,130,246,0.35) !important;
 }
 
-/* Hover – vivid blue glow + lift */
+/* Hover – slightly lighter blue */
 .btn-primary-light:hover {
-  background-color: #60a5fa !important;   /* keep same base blue */
-  border-color: #7dd3fc !important;       /* bright edge */
+  background-color: #9ec2fc !important;      /* lighter than #93c5fd */
+  color: #2563eb !important;
+  border-color: #e5efff !important;
   box-shadow:
-    inset 0 0 6px rgba(255,255,255,0.2),   /* subtle inner shine */
-    0 0 0 1px rgba(96,165,250,0.5),        /* crisp edge */
-    0 0 14px rgba(96,165,250,0.65) !important; /* outer glow */
+    0 0 10px rgba(191,219,254,0.6),
+    0 0 0 1px rgba(191,219,254,0.85) !important;
   transform: translateY(-1px);
 }
 
@@ -396,8 +393,14 @@ html { scroll-behavior: smooth; }
 /* Link/text helpers                                             */
 /* ============================================================= */
 
-.text-blue-dark { color: #60a5fa !important; }
-.text-blue-dark:hover { color: #bfdbfe !important; }
+.text-blue-dark {
+  color: #60a5fa !important;              /* brand blue */
+  transition: color 0.2s ease;
+}
+
+.text-blue-dark:hover {
+  color: #93c5fd !important;              /* gently lighter, still solid */
+}
 
 .text-light-hover-blue {
   color: rgb(249 250 251) !important;

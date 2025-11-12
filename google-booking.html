@@ -26,24 +26,29 @@
           <h1 class="text-2xl sm:text-3xl font-bold">Book a Driving Lesson</h1>
         </div>
         <div class="border-t">
-          <!-- Google Calendar Appointment Scheduling begin -->
+          <!-- Google Calendar Appointment Scheduling -->
           <iframe
             id="gcalBookingFrame"
             class="w-full h-[820px] block [color-scheme:light]"
-            src="https://calendar.google.com/calendar/appointments/schedules/AcZssZ3X-StUtNHnSturB2uIJg4-jt2pQ04vsiuYyASi-eQyGfSkXmSe-5oRgYnaTnEk3njdqRUjO5xK?gv=true"
+            src=""
             style="border:0;background:#fff"
-            loading="lazy" frameborder="0"
+            loading="lazy"
+            frameborder="0"
             referrerpolicy="no-referrer-when-downgrade">
           </iframe>
-          <!-- end Google Calendar Appointment Scheduling -->
+          <!-- End Google Calendar Appointment Scheduling -->
         </div>
       </div>
 
       <p class="text-sm text-slate-400 mt-4">
-        If the calendar doesn’t load,
-        <a class="text-blue-400 underline"
-           href="https://calendar.google.com/calendar/appointments/schedules/AcZssZ3X-StUtNHnSturB2uIJg4-jt2pQ04vsiuYyASi-eQyGfSkXmSe-5oRgYnaTnEk3njdqRUjO5xK?gv=true"
-           target="_blank" rel="noopener">open in a new tab</a>.
+        If the calendar does not load,
+        <a id="gcalBookingDirectLink"
+           class="text-blue-400 underline"
+           href="#"
+           target="_blank"
+           rel="noopener">
+          open in a new tab
+        </a>.
       </p>
     </section>
   </main>
@@ -51,55 +56,86 @@
   <!-- Shared Footer -->
   <div data-include="partials/footer.html"></div>
   <script>
-    (function() {
-      // Fallback to 1-hour booking URL if any error occurs
+    (function () {
+      // Fallback: 1 hour booking URL
       const FALLBACK_BOOKING_URL = 'https://calendar.app.google/3ehp4B9MRcF83CEE9';
 
+      // Safely extract and decode the bookingUrl query parameter
       function getBookingUrlFromQuery() {
         try {
           const search = window.location.search || '';
+          if (!search) {
+            console.log('No query string present. Using fallback (1 hr).');
+            return FALLBACK_BOOKING_URL;
+          }
+
           const params = new URLSearchParams(search);
           const raw = params.get('bookingUrl');
+          console.log('Raw bookingUrl from query:', raw);
 
           if (!raw) {
-            console.warn('No bookingUrl param found. Using fallback (1 hr).');
+            console.log('bookingUrl missing. Using fallback (1 hr).');
             return FALLBACK_BOOKING_URL;
           }
 
-          // Handle both encoded and non-encoded values safely
+          // First decode attempt
           let decoded = raw;
           try {
-            // If it is encoded, this will give the real URL
             decoded = decodeURIComponent(raw);
           } catch (e) {
-            console.warn('decodeURIComponent failed, using raw bookingUrl.', e);
+            console.warn('decodeURIComponent failed on raw value. Using raw.', e);
           }
 
-          // Basic validation for Google Calendar URLs
-          if (!/^https?:\/\/(calendar\.google\.com|calendar\.app\.google)\//i.test(decoded)) {
-            console.warn('Invalid booking URL format. Using fallback (1 hr).', decoded);
+          // If it still looks encoded (e.g. contains %3A / %2F), try one more decode
+          if (/%25?3A/i.test(decoded) || /%25?2F/i.test(decoded)) {
+            try {
+              const second = decodeURIComponent(decoded);
+              if (/^https?:\/\//i.test(second)) {
+                decoded = second;
+              }
+            } catch (e) {
+              // ignore, use first decoded
+            }
+          }
+
+          // Final sanity check: must be http(s)
+          if (!/^https?:\/\//i.test(decoded)) {
+            console.warn('bookingUrl is not a valid http(s) URL. Using fallback (1 hr).', decoded);
             return FALLBACK_BOOKING_URL;
           }
 
+          // Log and return whatever we ended up with
+          console.log('Final parsed bookingUrl:', decoded);
           return decoded;
         } catch (err) {
-          console.error('Error processing booking URL. Using fallback (1 hr).', err);
+          console.error('Error processing bookingUrl. Using fallback (1 hr).', err);
           return FALLBACK_BOOKING_URL;
         }
       }
 
-      // Apply the booking URL when the page loads
-      document.addEventListener('DOMContentLoaded', function() {
-        const bookingFrame = document.getElementById('gcalBookingFrame');
+      function applyBookingUrl() {
         const targetUrl = getBookingUrlFromQuery();
 
+        const bookingFrame = document.getElementById('gcalBookingFrame');
         if (bookingFrame) {
           bookingFrame.src = targetUrl;
-          console.log('Using booking URL:', targetUrl);
         } else {
-          console.error('Booking iframe not found on page');
+          console.error('Booking iframe not found on page.');
         }
-      });
+
+        const directLink = document.getElementById('gcalBookingDirectLink');
+        if (directLink) {
+          directLink.href = targetUrl;
+        }
+
+        console.log('Using booking URL:', targetUrl);
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', applyBookingUrl);
+      } else {
+        applyBookingUrl();
+      }
     })();
   </script>
 </body>

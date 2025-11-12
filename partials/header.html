@@ -161,13 +161,13 @@
     <nav class="px-4 py-3 flex flex-col gap-2 text-base">
       <!-- Services (collapsible) -->
       <button id="mobileServicesBtn"
-              type="button"
-              class="flex items-center justify-between w-full py-2 font-medium"
-              aria-controls="mobileServicesSubmenu"
-              aria-expanded="false"
-              onclick="(function(e){e.preventDefault();e.stopPropagation();var s=document.getElementById('mobileServicesSubmenu');var btn=document.getElementById('mobileServicesBtn');if(!s||!btn)return false;var hidden=s.classList.toggle('hidden');if(!hidden){s.classList.add('block');}else{s.classList.remove('block');}btn.setAttribute('aria-expanded', hidden?'false':'true');var c=btn.querySelector('[data-caret]');if(c)c.classList.toggle('rotate-180',!hidden);return false;})(event)">
+            type="button"
+            class="flex items-center justify-between w-full py-2 font-medium"
+            aria-controls="mobileServicesSubmenu"
+            aria-expanded="false"
+            onclick="(function(e){e.preventDefault();e.stopPropagation();var s=document.getElementById('mobileServicesSubmenu');var btn=document.getElementById('mobileServicesBtn');if(!s||!btn)return false;var hidden=s.classList.toggle('hidden');if(!hidden){s.classList.add('block');}else{s.classList.remove('block');}btn.setAttribute('aria-expanded', hidden?'false':'true');var c=btn.querySelector('[data-caret]');if(c)c.classList.toggle('rotate-180',!hidden);return false;})(event)">
         <span>Services</span>
-        <span data-caret class="transition-transform transform">▾</span>
+        <span data-caret class="transition-transform transform">▼</span>
       </button>
 
       <div id="mobileServicesSubmenu" class="hidden pl-3 border-l flex flex-col gap-2">

@@ -698,3 +698,17 @@ header #nav-services-menu a:hover { color: #ffffff !important; }
   );
 }
 
+/* Larger, clearer caret in mobile menu */
+#mobileServicesBtn [data-caret] {
+  font-size: 1rem;   /* about 20 px — smaller than before */
+  line-height: 1;
+  font-weight: 600;
+  margin-left: 0.4rem;
+}
+
+/* Optional: slightly smaller on larger mobile/tablet */
+@media (min-width: 480px) {
+  #mobileServicesBtn [data-caret] {
+    font-size: 1.4rem;     /* ≈22px */
+  }
+}

@@ -51,19 +51,55 @@
   <!-- Shared Footer -->
   <div data-include="partials/footer.html"></div>
   <script>
-    (function(){
-      const params = new URLSearchParams(window.location.search);
-      const url = params.get('bookingUrl');
-      if (!url) return;
-      try {
-        const u = new URL(url, window.location.href);
-        const s = u.toString();
-        // Allow Google booking endpoints only
-        if (/^https:\/\/(calendar\.google\.com|calendar\.app\.google)\//.test(s)) {
-          const frame = document.getElementById('gcalBookingFrame');
-          if (frame) frame.src = s;
+    (function() {
+      // Fallback to 1-hour booking URL if any error occurs
+      const FALLBACK_BOOKING_URL = 'https://calendar.app.google/3ehp4B9MRcF83CEE9';
+
+      function getBookingUrlFromQuery() {
+        try {
+          const search = window.location.search || '';
+          const params = new URLSearchParams(search);
+          const raw = params.get('bookingUrl');
+
+          if (!raw) {
+            console.warn('No bookingUrl param found. Using fallback (1 hr).');
+            return FALLBACK_BOOKING_URL;
+          }
+
+          // Handle both encoded and non-encoded values safely
+          let decoded = raw;
+          try {
+            // If it is encoded, this will give the real URL
+            decoded = decodeURIComponent(raw);
+          } catch (e) {
+            console.warn('decodeURIComponent failed, using raw bookingUrl.', e);
+          }
+
+          // Basic validation for Google Calendar URLs
+          if (!/^https?:\/\/(calendar\.google\.com|calendar\.app\.google)\//i.test(decoded)) {
+            console.warn('Invalid booking URL format. Using fallback (1 hr).', decoded);
+            return FALLBACK_BOOKING_URL;
+          }
+
+          return decoded;
+        } catch (err) {
+          console.error('Error processing booking URL. Using fallback (1 hr).', err);
+          return FALLBACK_BOOKING_URL;
         }
-      } catch(_) { /* ignore invalid URL */ }
+      }
+
+      // Apply the booking URL when the page loads
+      document.addEventListener('DOMContentLoaded', function() {
+        const bookingFrame = document.getElementById('gcalBookingFrame');
+        const targetUrl = getBookingUrlFromQuery();
+
+        if (bookingFrame) {
+          bookingFrame.src = targetUrl;
+          console.log('Using booking URL:', targetUrl);
+        } else {
+          console.error('Booking iframe not found on page');
+        }
+      });
     })();
   </script>
 </body>

@@ -12,7 +12,24 @@
     body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans",sans-serif;background:#0b1220;color:#e5e7eb}
     .wrap{max-width:1100px;margin:40px auto;padding:0 20px}
     .hero-service{background:linear-gradient(135deg,#1e3a8a 0%,#3b82f6 100%);padding:60px 20px;text-align:center;border-radius:16px;margin-bottom:40px}
-    .card{background:var(--card);border:1px solid #1f2937;border-radius:16px;padding:30px;box-shadow:0 10px 30px rgba(0,0,0,.25);margin-bottom:30px}
+    .card{
+      background-color:#101828;                    /* flat dark card */
+      border:1px solid rgba(148,163,253,0.25);
+      border-radius:0.75rem;
+      padding:30px;                                /* keeps all your spacing */
+      box-shadow:0 10px 26px rgba(0,0,0,0.35);
+      margin-bottom:30px;
+      transition:all 0.22s ease;
+    }
+    .glow-panel {
+      background:
+        radial-gradient(circle at top left, rgba(96,165,250,0.10), transparent),
+        linear-gradient(145deg, rgba(59,130,246,0.08), rgba(15,23,42,0.85));
+      border-color: rgba(148,163,253,0.25);
+      border-radius: 0.75rem;
+      box-shadow: 0 10px 26px rgba(0,0,0,0.35);
+      transition: all 0.22s ease;
+    }
     .btn{display:inline-flex;align-items:center;gap:8px;background:var(--brand);color:white;border:0;border-radius:999px;padding:14px 28px;font-weight:600;cursor:pointer;text-decoration:none;transition:all 0.3s}
     .btn:hover{background:#2563eb;transform:translateY(-2px)}
     .page-spacer{height:16px}
@@ -50,22 +67,22 @@
       <!-- Left Column - Main Content -->
       <div>
         <div class="card">
-      <h2 style="margin-top:0;font-size:28px;margin-bottom:20px">Beginner Driver Lessons (All Levels)</h2>
-      
-      <p style="font-size:18px;line-height:1.8;margin-bottom:24px">
-        Perfect for students learning to drive in preparation for their driving test. Our experienced instructors provide patient, 
-        personalized instruction tailored to your level of experience and ability.
-      </p>
+          <h2 style="margin-top:0;font-size:28px;margin-bottom:20px">Beginner Driver Lessons (All Levels)</h2>
+          
+          <p style="font-size:18px;line-height:1.8;margin-bottom:24px">
+            Perfect for students learning to drive in preparation for their driving test. Our experienced instructors provide patient, 
+            personalized instruction tailored to your level of experience and ability.
+          </p>
 
-      <ul class="feature-list">
-        <li><strong>Suitable for all experience levels</strong> – Whether you're a complete beginner or need a refresher, we'll meet you where you are</li>
-        <li><strong>Personalized instruction</strong> – Lessons are adapted to your pace and learning style</li>
-        <li><strong>Modern, well-maintained vehicles</strong> – Learn in safe, reliable cars with dual controls</li>
-        <li><strong>Flexible pick-up and drop-off</strong> – We'll meet you at your chosen location to start and end your lesson</li>
-        <li><strong>Parents welcome</strong> – Parents are encouraged to observe lessons if desired</li>
-        <li><strong>Choose your lesson duration</strong> – 1 hour, 1.5 hours, or 2 hours to suit your schedule</li>
-        <li><strong>Package deals available</strong> – Save money with our multi-lesson packages</li>
-      </ul>
+          <ul class="feature-list">
+            <li><strong>Suitable for all experience levels</strong> – Whether you're a complete beginner or need a refresher, we'll meet you where you are</li>
+            <li><strong>Personalized instruction</strong> – Lessons are adapted to your pace and learning style</li>
+            <li><strong>Modern, well-maintained vehicles</strong> – Learn in safe, reliable cars with dual controls</li>
+            <li><strong>Flexible pick-up and drop-off</strong> – We'll meet you at your chosen location to start and end your lesson</li>
+            <li><strong>Parents welcome</strong> – Parents are encouraged to observe lessons if desired</li>
+            <li><strong>Choose your lesson duration</strong> – 1 hour, 1.5 hours, or 2 hours to suit your schedule</li>
+            <li><strong>Package deals available</strong> – Save money with our multi-lesson packages</li>
+          </ul>
         </div>
 
         <!-- What You'll Learn -->
@@ -73,7 +90,7 @@
           <h2 style="margin-top:0;font-size:28px;margin-bottom:20px">What You'll Learn</h2>
           
           <div class="grid md:grid-cols-2 gap-6">
-            <div class="rounded-xl border border-gray-700 p-6 hover:shadow-md transition-shadow">
+            <div class="rounded-xl border border-gray-700 p-6 glow-panel">
               <div class="flex items-start gap-3">
                 <span class="text-3xl flex-shrink-0">🚘</span>
                 <div>
@@ -83,7 +100,7 @@
               </div>
             </div>
             
-            <div class="rounded-xl border border-gray-700 p-6 hover:shadow-md transition-shadow">
+            <div class="rounded-xl border border-gray-700 p-6 glow-panel">
               <div class="flex items-start gap-3">
                 <span class="text-3xl flex-shrink-0">👁️</span>
                 <div>
@@ -93,7 +110,7 @@
               </div>
             </div>
             
-            <div class="rounded-xl border border-gray-700 p-6 hover:shadow-md transition-shadow">
+            <div class="rounded-xl border border-gray-700 p-6 glow-panel">
               <div class="flex items-start gap-3">
                 <span class="text-3xl flex-shrink-0">🅿️</span>
                 <div>
@@ -103,7 +120,7 @@
               </div>
             </div>
             
-            <div class="rounded-xl border border-gray-700 p-6 hover:shadow-md transition-shadow">
+            <div class="rounded-xl border border-gray-700 p-6 glow-panel">
               <div class="flex items-start gap-3">
                 <span class="text-3xl flex-shrink-0">📝</span>
                 <div>

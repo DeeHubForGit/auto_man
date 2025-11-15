@@ -33,19 +33,38 @@
             <p id="emailError" class="text-xs text-red-400 mt-1 hidden"></p>
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1" for="signupPassword">Password</label>
+            <label class="block text-sm font-medium mb-1" for="signupPassword">Create a Strong Password</label>
             <div class="relative">
-              <input id="signupPassword" type="password" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2 pr-48 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" required minlength="6" />
-              <div class="absolute right-2 top-1/2 -translate-y-1/2 flex gap-2">
-                <button type="button" id="toggleSignupPwd" class="px-2 py-1 text-sm border rounded bg-white text-gray-800 hover:bg-gray-100 font-medium">Show</button>
-                <button type="button" id="genSignupPwd" class="px-2 py-1 text-sm border rounded bg-white text-gray-800 hover:bg-gray-100 font-medium">Generate</button>
-                <button type="button" id="copySignupPwdTop" class="px-2 py-1 text-sm border rounded bg-white text-gray-800 hover:bg-gray-100" aria-label="Copy password" title="Copy password">
+              <input id="signupPassword" type="password" autocomplete="new-password" class="w-full border rounded-lg px-3 py-2 pr-40 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" required minlength="12" pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*_\-+=[\]{}|;:',.?/~`]).{12,}$" />
+              <div class="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                <button type="button" id="toggleSignupPwd" class="px-2 py-1 text-xs border rounded bg-white text-gray-800 hover:bg-gray-100 font-medium whitespace-nowrap">Show</button>
+                <button type="button" id="genSignupPwd" class="px-2 py-1 text-xs border rounded bg-white text-gray-800 hover:bg-gray-100 font-medium whitespace-nowrap">Generate</button>
+                <button type="button" id="copySignupPwdTop" class="p-1 border rounded bg-white text-gray-800 hover:bg-gray-100" aria-label="Copy password" title="Copy password">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block align-middle"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                 </button>
               </div>
             </div>
             <p id="passwordError" class="text-xs text-red-400 mt-1 hidden"></p>
-            <p class="text-xs text-gray-500 mt-1">Minimum 6 characters.</p>
+            <div class="mt-2">
+              <p class="text-xs font-medium text-gray-700 mb-1">Password must include:</p>
+              <ul class="text-xs text-gray-600 space-y-1">
+                <li id="req-length" class="flex items-center gap-1">
+                  <span class="text-gray-400">○</span> At least 12 characters
+                </li>
+                <li id="req-uppercase" class="flex items-center gap-1">
+                  <span class="text-gray-400">○</span> One uppercase letter (A-Z)
+                </li>
+                <li id="req-lowercase" class="flex items-center gap-1">
+                  <span class="text-gray-400">○</span> One lowercase letter (a-z)
+                </li>
+                <li id="req-number" class="flex items-center gap-1">
+                  <span class="text-gray-400">○</span> One number (0-9)
+                </li>
+                <li id="req-special" class="flex items-center gap-1">
+                  <span class="text-gray-400">○</span> One special character (!@#$%^&* etc.)
+                </li>
+              </ul>
+            </div>
             <div id="signupPwdContainer" class="mt-20 relative h-24">
               <div id="signupPwdTip" role="status" aria-live="polite" class="absolute inset-0 w-full rounded border bg-white text-sm p-2 shadow hidden">
                 <div class="flex items-center justify-between">
@@ -58,12 +77,12 @@
               </div>
             </div>
           </div>
-          <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors">Create account</button>
+          <button type="submit" class="w-full btn-primary py-2 rounded-lg">Create account</button>
         </form>
 
         <div class="mt-4 text-sm text-center">
           <span class="text-gray-600">Already a member?</span>
-          <a href="login.html" class="text-blue-600 hover:underline">Log in</a>
+          <a href="login.html" class="text-blue-dark hover:underline">Log in</a>
         </div>
       </div>
     </div>
@@ -131,16 +150,51 @@
         bar.className = 'h-1 rounded ' + colors[s];
         txt.textContent = s <= 1 ? 'Strength: Weak' : s === 2 ? 'Strength: Fair' : s === 3 ? 'Strength: Good' : 'Strength: Strong';
       }
-      function generatePassword(len = 18) {
-        const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{};:,.?';
-        const arr = crypto.getRandomValues(new Uint32Array(len));
-        return Array.from(arr, n => chars[n % chars.length]).join('');
+      function generatePassword(len = 16) {
+        const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+        const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const numbers = '0123456789';
+        const specials = '!@#$%^&*()_+-=[]{};\':"\\|,.<>/?`~';
+        
+        // Ensure at least one of each character type
+        const password = [
+          lowercase[Math.floor(Math.random() * lowercase.length)],
+          uppercase[Math.floor(Math.random() * uppercase.length)],
+          numbers[Math.floor(Math.random() * numbers.length)],
+          specials[Math.floor(Math.random() * specials.length)]
+        ];
+        
+        // Fill the rest with random characters
+        const allChars = lowercase + uppercase + numbers + specials;
+        for (let i = 4; i < len; i++) {
+          password.push(allChars[Math.floor(Math.random() * allChars.length)]);
+        }
+        
+        // Shuffle the array
+        for (let i = password.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [password[i], password[j]] = [password[j], password[i]];
+        }
+        
+        return password.join('');
       }
 
       // Strength panel behavior: hidden by default, shown when user types or generates
       function showTip(){ tip.classList.remove('hidden'); }
       function hideTip(){ tip.classList.add('hidden'); }
-      if (passwordInput.value) { showTip(); updateStrength(passwordInput.value); }
+      if (passwordInput.value) { 
+        showTip(); 
+        updateStrength(passwordInput.value);
+        updatePasswordRequirements(passwordInput.value);
+      }
+      
+      // Update requirements as user types
+      passwordInput.addEventListener('input', function(e) {
+        const password = e.target.value;
+        showTip();
+        updatePasswordRequirements(password);
+        updateStrength(password);
+      });
 
       togglePwd?.addEventListener('click', function(){
         const show = passwordInput.type === 'password';
@@ -149,13 +203,37 @@
         togglePwd.textContent = show ? 'Hide' : 'Show';
       });
 
+      function updatePasswordRequirements(password) {
+        const requirements = {
+          length: password.length >= 12,
+          hasUpper: /[A-Z]/.test(password),
+          hasLower: /[a-z]/.test(password),
+          hasNumber: /\d/.test(password),
+          hasSpecial: /[!@#$%^&*_\-+=[\]{}|;:',.?/~`]/.test(password)
+        };
+        
+        // Update the UI indicators
+        document.getElementById('req-length').querySelector('span').textContent = 
+          requirements.length ? '✓' : '○';
+        document.getElementById('req-uppercase').querySelector('span').textContent = 
+          requirements.hasUpper ? '✓' : '○';
+        document.getElementById('req-lowercase').querySelector('span').textContent = 
+          requirements.hasLower ? '✓' : '○';
+        document.getElementById('req-number').querySelector('span').textContent = 
+          requirements.hasNumber ? '✓' : '○';
+        document.getElementById('req-special').querySelector('span').textContent = 
+          requirements.hasSpecial ? '✓' : '○';
+      }
+
       genPwd?.addEventListener('click', function(){
-        passwordInput.value = generatePassword();
+        const newPassword = generatePassword();
+        passwordInput.value = newPassword;
         passwordInput.type = 'text';
         togglePwd?.setAttribute('aria-pressed', 'true');
         togglePwd && (togglePwd.textContent = 'Hide');
         showTip();
-        updateStrength(passwordInput.value);
+        updatePasswordRequirements(newPassword);
+        updateStrength(newPassword);
         // Clear any prior validation error
         passwordError.classList.add('hidden');
         passwordInput.classList.remove('border-red-400');
@@ -185,15 +263,35 @@
       }
 
       function validatePassword() {
-        const password = passwordInput.value;
-        if (!password) {
-          showError(passwordInput, passwordError, 'Password is required');
+        const password = passwordInput.value.trim();
+        const requirements = {
+          length: password.length >= 12,
+          hasUpper: /[A-Z]/.test(password),
+          hasLower: /[a-z]/.test(password),
+          hasNumber: /\d/.test(password),
+          hasSpecial: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]/.test(password)
+        };
+
+        // Update requirement indicators
+        document.getElementById('req-length').querySelector('span').textContent = 
+          requirements.length ? '✓' : '○';
+        document.getElementById('req-uppercase').querySelector('span').textContent = 
+          requirements.hasUpper ? '✓' : '○';
+        document.getElementById('req-lowercase').querySelector('span').textContent = 
+          requirements.hasLower ? '✓' : '○';
+        document.getElementById('req-number').querySelector('span').textContent = 
+          requirements.hasNumber ? '✓' : '○';
+        document.getElementById('req-special').querySelector('span').textContent = 
+          requirements.hasSpecial ? '✓' : '○';
+
+        // Check all requirements
+        const isValid = Object.values(requirements).every(Boolean);
+        
+        if (!isValid) {
+          showError(passwordInput, passwordError, 'Please meet all password requirements');
           return false;
         }
-        if (password.length < 6) {
-          showError(passwordInput, passwordError, 'Password must be at least 6 characters');
-          return false;
-        }
+        
         hideError(passwordInput, passwordError);
         return true;
       }

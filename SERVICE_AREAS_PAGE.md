@@ -75,7 +75,6 @@ All 23 suburbs displayed in **alphabetical order** with:
 ### Dependencies
 - **Leaflet.js 1.9.4** (loaded via CDN)
 - **Leaflet CSS** (loaded via CDN)
-- **Tailwind CSS** (already in use)
 
 ### Responsive Design
 - Map height: 500px on all devices

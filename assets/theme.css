@@ -259,8 +259,8 @@ html { scroll-behavior: smooth; }
 }
 
 /* SECONDARY
-   Outline / neutral fill, used for Login, WhatsApp, header Sign Up
-   on dark backgrounds it reads modern & Tailwind-y */
+   Outline / neutral fill, used for Login, WhatsApp, and header Sign Up
+   Designed to look modern and readable on dark backgrounds */
 .btn-secondary {
   background-color: transparent !important;
   color: #f9fafb !important;                            /* near-white */
@@ -311,7 +311,7 @@ html { scroll-behavior: smooth; }
   font-size: 0.95rem;
 }
 
-/* Beat Tailwind utilities if present on the element */
+/* Ensure custom hover styling always overrides any inline or external utilities */
 .btn.btn-primary:hover:not(.btn-cta):not(.btn-cta-lg) { background-image: none !important; }
 
 /* Size variant */

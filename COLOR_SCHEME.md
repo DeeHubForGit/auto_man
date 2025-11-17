@@ -1,8 +1,8 @@
 # Auto-Man Driving School - Color Scheme
 
 ## Primary Colors
-- **Brand Blue**: `#3b82f6` (Tailwind: `blue-500`)
-- **Hover Blue**: `#2563eb` (Tailwind: `blue-600`)
+- **Brand Blue**: `#3b82f6` (`blue-500`)
+- **Hover Blue**: `#2563eb` (`blue-600`)
 
 ## Button Colors
 **All buttons use the same lighter blue for consistency:**

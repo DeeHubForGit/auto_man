@@ -105,5 +105,4 @@ Modal.error('Authentication is not configured. Please contact support.');
 ```
 
 ## Styling
-
-The modal automatically adapts to your site's dark theme and uses Tailwind CSS classes for consistent styling.
+The modal automatically adapts to the site's theme and uses the custom CSS styles defined in theme.css.

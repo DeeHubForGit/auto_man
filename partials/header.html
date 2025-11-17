@@ -446,13 +446,21 @@ window.performLogout = async function performLogout() {
       window.__headerAuthBound = true;
       console.log('[header-debug] initHeaderAuthOnce: binding listeners');
 
-      // Wait for the auth bootstrap to finish its getSession() call
-      if (window.authReady) {
-        console.log('[header-debug] waiting for authReady promise');
-        try { await window.authReady; } catch(e) { console.warn('[header-debug] authReady error:', e); }
+      // Wait up to 2000ms for authReady, then continue anyway
+      if (window.authReady && typeof window.authReady.then === 'function') {
+        console.log('[header-debug] waiting up to 2000ms for authReady');
+        try {
+          await Promise.race([
+            window.authReady,
+            new Promise(resolve => setTimeout(() => resolve('timeout'), 2000))
+          ]);
+        } catch (e) {
+          console.warn('[header-debug] authReady rejected:', e);
+        }
       } else {
         console.log('[header-debug] no authReady present');
       }
+      console.log('[header-debug] authReady done or timed out, continuing');
 
       const run = () => {
         console.log('[header-debug] run() called; hasSupabaseClient =', !!window.supabaseClient);

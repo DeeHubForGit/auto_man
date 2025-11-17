@@ -15,7 +15,7 @@ To enable Sign Up and Login functionality, you need to configure your Supabase c
 
 ### 2. Configure Your Local Environment
 
-1. Open the file: `assets/js/config.local.js`
+1. Open the file: `assets/js/config.js`
 2. Replace the placeholder values with your actual Supabase credentials:
 
 ```javascript
@@ -38,7 +38,7 @@ window.SUPABASE_ANON_KEY = 'your-anon-key-here';
 This means your Supabase credentials are not set up correctly.
 
 **Solution:**
-1. Check that `assets/js/config.local.js` exists and has valid credentials
+1. Check that `assets/js/config.js` exists and has valid credentials
 2. Make sure the Supabase URL and anon key are correct
 3. Clear your browser cache and reload
 
@@ -53,4 +53,4 @@ This means your Supabase credentials are not set up correctly.
 
 - ✅ The **anon key** is safe to expose in the browser
 - ❌ **Never** use the service_role key in browser code
-- The `config.local.js` file is gitignored to keep your credentials private
+

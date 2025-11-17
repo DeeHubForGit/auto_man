@@ -50,7 +50,6 @@ Commit and push your changes. The site will now work in production!
 
 ## Files to Keep Secret
 
-- `assets/js/config.local.js` - Already in `.gitignore` ✅
 - Any file with `SERVICE_ROLE_KEY`
 - Backend API keys (Google Calendar, etc.)
 

@@ -11,10 +11,10 @@ This happens when the Supabase credentials are not configured in your local envi
 Copy the template to create your local config:
 
 ```bash
-copy assets\js\config.local.TEMPLATE.js assets\js\config.local.js
+copy assets\js\config.js
 ```
 
-Or manually create: `assets/js/config.local.js`
+Or manually create: `assets/js/config.js`
 
 ### 2. Get your Supabase credentials
 
@@ -25,9 +25,9 @@ Or manually create: `assets/js/config.local.js`
    - **Project URL** (e.g., `https://abcdefghijklmnop.supabase.co`)
    - **anon/public key** (the long JWT token starting with `eyJ...`)
 
-### 3. Add credentials to config.local.js
+### 3. Add credentials to config.js
 
-Edit `assets/js/config.local.js` and replace the placeholders:
+Edit `assets/js/config.js` and replace the placeholders:
 
 ```javascript
 // Set as direct globals (for supabaseClient.js)
@@ -77,7 +77,6 @@ If you see "relation does not exist" errors, run the migration:
 
 ## Security Notes
 
-- ✅ `config.local.js` is gitignored - never commit it
 - ✅ The anon key is safe to use in frontend code (it's public)
 - ✅ Row Level Security (RLS) policies protect sensitive data
 - ✅ Admin access is controlled by `ADMIN_EMAILS` list
@@ -86,7 +85,7 @@ If you see "relation does not exist" errors, run the migration:
 
 **Still seeing "Supabase not connected"?**
 - Check browser console for errors
-- Verify `config.local.js` exists in `assets/js/`
+- Verify `config.js` exists in `assets/js/`
 - Verify credentials are correct (no typos, no quotes inside the strings)
 - Hard refresh the page (Ctrl+Shift+R)
 
@@ -95,5 +94,5 @@ If you see "relation does not exist" errors, run the migration:
 - Check if RLS is enabled on tables (can disable for testing)
 
 **"You do not have access to this page"?**
-- Add your email to `ADMIN_EMAILS` in `config.local.js`
+- Add your email to `ADMIN_EMAILS` in `config.js`
 - Make sure you're logged in (click Login button)

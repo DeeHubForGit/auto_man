@@ -277,8 +277,15 @@ window.performLogout = async function performLogout() {
 };
 
 (function() {
+  console.log('[header-debug] wrapper IIFE starting');
+
   // Wait for everything to be ready before initializing
   function waitForReady() {
+    console.log('[header-debug] waitForReady:', {
+      readyState: document.readyState,
+      hasSupabaseClient: !!window.supabaseClient
+    });
+
     // Check if all dependencies are ready
     if (document.readyState === 'loading' || !window.supabaseClient) {
       setTimeout(waitForReady, 100);
@@ -288,9 +295,19 @@ window.performLogout = async function performLogout() {
   }
 
   function init() {
+    console.log('[header-debug] init() called');
+
     // ---------- Auth state (await authReady + bind once) ----------
     function setVisible(el, show) {
       if (!el) return;
+      const id = el.id || '(no id)';
+      console.log('[header-debug] setVisible BEFORE:', {
+        id,
+        show,
+        classList: Array.from(el.classList),
+        display: el.style.display
+      });
+
       if (show) {
         // Remove hidden class and restore display
         el.classList.remove('hidden');
@@ -304,9 +321,17 @@ window.performLogout = async function performLogout() {
         el.style.display = 'none';
         el.setAttribute('aria-hidden', 'true');
       }
+
+      console.log('[header-debug] setVisible AFTER:', {
+        id,
+        show,
+        classList: Array.from(el.classList),
+        display: el.style.display
+      });
     }
 
     async function updateHeaderAuth() {
+      console.log('[header-debug] updateHeaderAuth() start');
       const signupBtn        = document.getElementById('signupBtn');
       const loginBtn         = document.getElementById('loginBtn');
       const portalBtnHeader  = document.getElementById('portalBtnHeader');
@@ -320,6 +345,7 @@ window.performLogout = async function performLogout() {
       const adminBtnMobile         = document.getElementById('adminBtnMobile');
 
       function applyLoggedOut() {
+        console.log('[header-debug] applyLoggedOut()');
         // Desktop
         setVisible(signupBtn, true);
         setVisible(loginBtn,  true);
@@ -336,6 +362,7 @@ window.performLogout = async function performLogout() {
       }
 
       function applyLoggedIn(isAdmin) {
+        console.log('[header-debug] applyLoggedIn()', { isAdmin });
         // Desktop
         setVisible(signupBtn, false);
         setVisible(loginBtn,  false);
@@ -353,7 +380,7 @@ window.performLogout = async function performLogout() {
 
       // If Supabase is not ready, force logged-out UI (safe default)
       if (!window.supabaseClient) {
-        console.warn('[header] supabaseClient not available - defaulting to logged-out UI');
+        console.warn('[header-debug] supabaseClient not available - defaulting to logged-out UI');
         applyLoggedOut();
         return;
       }
@@ -361,6 +388,11 @@ window.performLogout = async function performLogout() {
       try {
         const { data: { session } } = await window.supabaseClient.auth.getSession();
         const loggedIn = !!(session && session.user);
+        console.log('[header-debug] session result:', {
+          hasSession: !!session,
+          userEmail: session?.user?.email || null,
+          loggedIn
+        });
 
         if (!loggedIn) {
           applyLoggedOut();
@@ -371,17 +403,19 @@ window.performLogout = async function performLogout() {
         let isAdmin = false;
         try {
           const email = session.user.email;
+          console.log('[header-debug] checking is_admin for', email);
           const { data: client, error } = await window.supabaseClient
             .from('client')
             .select('is_admin')
             .eq('email', email)
             .single();
 
+          console.log('[header-debug] is_admin query result:', { client, error });
           if (!error && client) {
             isAdmin = client.is_admin === true;
           }
         } catch (e) {
-          console.warn('[header] error checking is_admin, treating as non-admin', e);
+          console.warn('[header-debug] error checking is_admin, treating as non-admin', e);
         }
 
         applyLoggedIn(isAdmin);
@@ -395,7 +429,7 @@ window.performLogout = async function performLogout() {
         wireLogout(logoutBtnMobileHeader);
 
       } catch (err) {
-        console.error('[header] error checking auth state, defaulting to logged-out UI:', err);
+        console.error('[header-debug] error in updateHeaderAuth(), defaulting to logged-out UI:', err);
         applyLoggedOut();
       }
     }
@@ -405,31 +439,58 @@ window.performLogout = async function performLogout() {
 
     // Bind exactly once and wait for authReady before first render
     (async function initHeaderAuthOnce() {
-      if (window.__headerAuthBound) return;
+      if (window.__headerAuthBound) {
+        console.log('[header-debug] initHeaderAuthOnce: already bound, skipping');
+        return;
+      }
       window.__headerAuthBound = true;
+      console.log('[header-debug] initHeaderAuthOnce: binding listeners');
 
       // Wait for the auth bootstrap to finish its getSession() call
       if (window.authReady) {
-        try { await window.authReady; } catch(e) { console.warn('[header] authReady error:', e); }
+        console.log('[header-debug] waiting for authReady promise');
+        try { await window.authReady; } catch(e) { console.warn('[header-debug] authReady error:', e); }
+      } else {
+        console.log('[header-debug] no authReady present');
       }
 
-      const run = () => window.supabaseClient && updateHeaderAuth();
+      const run = () => {
+        console.log('[header-debug] run() called; hasSupabaseClient =', !!window.supabaseClient);
+        if (window.supabaseClient) {
+          updateHeaderAuth();
+        }
+      };
 
       if (document.readyState === 'loading') {
+        console.log('[header-debug] document still loading; adding DOMContentLoaded listener for run()');
         document.addEventListener('DOMContentLoaded', run, { once: true });
       } else {
+        console.log('[header-debug] document ready; calling run() immediately');
         run();
       }
+
       // Subscribe once to future auth changes
       if (window.supabaseClient && !window.__headerAuthSub) {
-        window.__headerAuthSub = window.supabaseClient.auth.onAuthStateChange((_event, _session) => run());
+        console.log('[header-debug] subscribing to auth.onAuthStateChange');
+        window.__headerAuthSub = window.supabaseClient.auth.onAuthStateChange((_event, _session) => {
+          console.log('[header-debug] auth state change event:', _event);
+          run();
+        });
+      } else {
+        console.log('[header-debug] not subscribing to auth changes (supabaseClient? ', !!window.supabaseClient, ', existing sub? ', !!window.__headerAuthSub, ')');
       }
+
       // If your include loader fires a custom event after partials load, re-check
-      window.addEventListener('partialsLoaded', () => run());
+      window.addEventListener('partialsLoaded', () => {
+        console.log('[header-debug] partialsLoaded event received; calling run()');
+        run();
+      });
+
       // Fallback: also try after a short delay to catch any missed timing issues
       setTimeout(() => {
+        console.log('[header-debug] 1s fallback timeout; hasSupabaseClient =', !!window.supabaseClient);
         if (window.supabaseClient) run();
-        else console.warn('[header] supabaseClient still not available after 1s');
+        else console.warn('[header-debug] supabaseClient still not available after 1s');
       }, 1000);
     })();
 

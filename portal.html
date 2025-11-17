@@ -308,12 +308,12 @@
     setTimeout(initializePortalScripts, 1000);
 
     function initializePortalScripts() {
-      console.log('Initializing portal scripts...');
+      // Initializing portal scripts
       
       // Initialize form validation (only if on My Details section)
       const form = document.getElementById('clientDetailsForm');
       if (form) {
-        console.log('Setting up form validation');
+        // Setting up form validation
         setupFormValidation();
         // Load cached form data (if any) after a short delay to let DB data load first
         setTimeout(() => {
@@ -362,12 +362,12 @@
       try {
         console.log('Waiting for bookings partial to load...');
         await waitForEl('#upcoming-list');
-        console.log('Bookings partial loaded, waiting for auth...');
+        // Bookings partial loaded, waiting for auth
         await waitForReady();
-        console.log('Auth ready, loading bookings...');
+        // Auth ready, loading bookings
         loadBookings();
       } catch (e) {
-        console.warn('Init bookings failed:', e.message);
+        console.warn('Failed to initialize bookings');
         const list = document.getElementById('upcoming-list');
         if (list) {
           list.innerHTML = `
@@ -397,18 +397,17 @@
     function setupBookingRealtime() {
       // Only subscribe once per page load
       if (window.__bookingRealtime) {
-        console.log('[realtime] Already subscribed to booking changes');
         return;
       }
 
       // Wait for clientData to be available
       if (!window.clientData?.id) {
-        console.log('[realtime] Waiting for clientData before subscribing...');
+        // Waiting for clientData before subscribing...
         setTimeout(setupBookingRealtime, 500);
         return;
       }
 
-      console.log('[realtime] Setting up booking subscription for client:', window.clientData.id);
+      // Setting up booking subscription for client
 
       window.__bookingRealtime = window.supabaseClient
         .channel('booking-realtime')
@@ -421,7 +420,7 @@
             filter: `client_id=eq.${window.clientData.id}` 
           },
           (payload) => {
-            console.log('[realtime] Booking change detected:', payload);
+            // Booking change detected
             
             // Cheap merge and re-render; avoids a full page fetch most of the time
             const b = payload.new || payload.old;
@@ -431,20 +430,20 @@
             
             if (payload.eventType === 'DELETE') {
               if (idx !== -1) {
-                console.log('[realtime] Removing deleted booking:', b.id);
+                // Removing deleted booking
                 allBookings.splice(idx, 1);
               }
             } else if (payload.eventType === 'INSERT') {
               if (idx === -1) {
-                console.log('[realtime] Adding new booking:', b.id);
+                // Adding new booking
                 allBookings.push(payload.new);
               }
             } else if (payload.eventType === 'UPDATE') {
               if (idx !== -1) {
-                console.log('[realtime] Updating booking:', b.id);
+                // Updating booking
                 allBookings[idx] = { ...allBookings[idx], ...payload.new };
               } else {
-                console.log('[realtime] Adding updated booking (not in local list):', b.id);
+                // Adding updated booking (not in local list)
                 allBookings.push(payload.new);
               }
             }
@@ -453,17 +452,17 @@
           }
         )
         .subscribe((status) => {
-          console.log('[realtime] Booking channel status:', status);
+          // Booking channel status update
         });
     }
 
     async function loadBookings() {
       if (!window.supabaseClient || !window.currentUser) {
-        console.log('Cannot load bookings: supabaseClient or currentUser not available');
+        console.error('Cannot load bookings: supabaseClient or currentUser not available');
         return;
       }
       
-      console.log('Loading bookings for user:', window.currentUser.email);
+      // Loading bookings for user
 
       let slowId, hardId, finished = false;
 
@@ -502,12 +501,12 @@
             </div>`;
         }, 10000); // 10s hard timeout
 
-        console.log('Querying bookings table...');
+        // Querying bookings table...
         
         // Wait for clientData to be available (with timeout)
         let retries = 0;
         while (!window.clientData?.id && retries < 20) {
-          console.warn('No clientData yet; waiting... (attempt', retries + 1, ')');
+          // Waiting for clientData...
           await new Promise(r => setTimeout(r, 200));
           retries++;
         }
@@ -534,11 +533,11 @@
           throw error;
         }
 
-        console.log('Bookings loaded:', data?.length || 0);
+        // Bookings loaded
         allBookings = data || [];
         renderBookings();
       } catch (err) {
-        console.error('Error loading bookings:', err);
+        console.error('Error loading bookings');
         const list = document.getElementById('upcoming-list');
         if (list) {
           list.innerHTML = `
@@ -568,7 +567,7 @@
       const validBookings = allBookings.filter(b => b && b.id && b.start_time && b.end_time);
       
       if (validBookings.length < allBookings.length) {
-        console.warn('Filtered out', allBookings.length - validBookings.length, 'invalid bookings');
+        // Filtered out invalid bookings
       }
       
       const upcoming = validBookings.filter(b => new Date(b.start_time) >= now && b.status !== 'cancelled');

@@ -18,6 +18,7 @@
         autoRefreshToken: true,
         detectSessionInUrl: true,
         storage: window.localStorage,
+        debug: false,  // Disable auth debug logging
         storageKey: 'sb-automansite-auth',
       },
     });

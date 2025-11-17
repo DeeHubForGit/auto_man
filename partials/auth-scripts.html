@@ -32,7 +32,9 @@ if (!window.__authBootstrapped) {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
-        storageKey: 'sb-automansite-auth'
+        storage: window.localStorage,
+        storageKey: 'sb-automansite-auth',
+        debug: false  // Disable auth debug logging
       }
     });
 
@@ -42,33 +44,14 @@ if (!window.__authBootstrapped) {
         window.location.href = '/reset-password.html';
       }
     });
-  })();
 
-  // 3) Expose a single promise that resolves when:
-  //    - partials are injected
-  //    - supabase client exists
-  //    - current session has been fetched
-  window.authReady = (async () => {
-    // Wait for other partials to finish loading (header, etc.)
-    await window.whenIncludesDone;
-
-    // Wait for client
-    let tries = 20;
-    while (!window.supabaseClient && tries-- > 0) {
-      await new Promise(r => setTimeout(r, 25));
-    }
-    if (!window.supabaseClient) {
-      console.error('[auth] Supabase client missing after wait');
-      return { session: null, user: null };
+    // 3) Set up auth state change listener
+    function handleAuthStateChange(event, session) {
+      // The actual state change handling is done in the header's updateHeaderAuth()
     }
 
-    // Ask Supabase for current session
-    const { data, error } = await window.supabaseClient.auth.getSession();
-    if (error) console.warn('[auth] getSession error:', error);
-    const session = data?.session || null;
-    const user = session?.user || null;
-
-    return { session, user };
+    // Set up the auth state change listener
+    window.supabaseClient.auth.onAuthStateChange(handleAuthStateChange);
   })();
 }
 </script>

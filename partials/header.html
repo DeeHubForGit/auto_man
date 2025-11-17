@@ -120,7 +120,7 @@
       <!-- Admin - mobile, hidden by default -->
       <a href="admin.html" 
         id="adminBtnMobile" 
-        class="lg:hidden text-white hover:text-blue-300 transition-colors">
+        class="hidden lg:hidden text-white hover:text-blue-300 transition-colors">
         Admin
       </a>
       
@@ -307,68 +307,96 @@ window.performLogout = async function performLogout() {
     }
 
     async function updateHeaderAuth() {
+      const signupBtn        = document.getElementById('signupBtn');
+      const loginBtn         = document.getElementById('loginBtn');
+      const portalBtnHeader  = document.getElementById('portalBtnHeader');
+      const logoutBtnHeader  = document.getElementById('logoutBtnHeader');
+      const adminBtn         = document.getElementById('adminBtn');
+
+      const signupBtnMobile        = document.getElementById('signupBtnMobile');
+      const loginBtnMobile2        = document.getElementById('loginBtnMobile2');
+      const portalBtnMobileHeader  = document.getElementById('portalBtnMobileHeader');
+      const logoutBtnMobileHeader  = document.getElementById('logoutBtnMobileHeader');
+      const adminBtnMobile         = document.getElementById('adminBtnMobile');
+
+      function applyLoggedOut() {
+        // Desktop
+        setVisible(signupBtn, true);
+        setVisible(loginBtn,  true);
+        setVisible(portalBtnHeader, false);
+        setVisible(logoutBtnHeader, false);
+        setVisible(adminBtn, false);
+
+        // Mobile
+        setVisible(signupBtnMobile, true);
+        setVisible(loginBtnMobile2, true);
+        setVisible(portalBtnMobileHeader, false);
+        setVisible(logoutBtnMobileHeader, false);
+        setVisible(adminBtnMobile, false);
+      }
+
+      function applyLoggedIn(isAdmin) {
+        // Desktop
+        setVisible(signupBtn, false);
+        setVisible(loginBtn,  false);
+        setVisible(portalBtnHeader, !isAdmin); // hide My Account for admins
+        setVisible(logoutBtnHeader, true);
+        setVisible(adminBtn, isAdmin);
+
+        // Mobile
+        setVisible(signupBtnMobile, false);
+        setVisible(loginBtnMobile2, false);
+        setVisible(portalBtnMobileHeader, !isAdmin);
+        setVisible(logoutBtnMobileHeader, true);
+        setVisible(adminBtnMobile, isAdmin);
+      }
+
+      // If Supabase is not ready, force logged-out UI (safe default)
       if (!window.supabaseClient) {
-        console.warn('[header] supabaseClient not available');
+        console.warn('[header] supabaseClient not available - defaulting to logged-out UI');
+        applyLoggedOut();
         return;
       }
+
       try {
         const { data: { session } } = await window.supabaseClient.auth.getSession();
-
-        const signupBtn        = document.getElementById('signupBtn');
-        const loginBtn         = document.getElementById('loginBtn');
-        const portalBtn        = document.getElementById('portalBtn');
-        const portalBtnHeader  = document.getElementById('portalBtnHeader');
-        const logoutBtnHeader  = document.getElementById('logoutBtnHeader');
-        const adminBtn         = document.getElementById('adminBtn');
-
-        const signupBtnMobile  = document.getElementById('signupBtnMobile');
-        const loginBtnMobile2  = document.getElementById('loginBtnMobile2');
-        const portalBtnMobileHeader  = document.getElementById('portalBtnMobileHeader');
-        const logoutBtnMobileHeader  = document.getElementById('logoutBtnMobileHeader');
-        const adminBtnMobile   = document.getElementById('adminBtnMobile');
-
         const loggedIn = !!(session && session.user);
 
-        // Check if user is admin
+        if (!loggedIn) {
+          applyLoggedOut();
+          return;
+        }
+
+        // Logged in: check is_admin flag
         let isAdmin = false;
-        if (loggedIn) {
+        try {
           const email = session.user.email;
-          const { data: client } = await window.supabaseClient
+          const { data: client, error } = await window.supabaseClient
             .from('client')
             .select('is_admin')
             .eq('email', email)
             .single();
-          isAdmin = client?.is_admin === true;
+
+          if (!error && client) {
+            isAdmin = client.is_admin === true;
+          }
+        } catch (e) {
+          console.warn('[header] error checking is_admin, treating as non-admin', e);
         }
 
-        // Desktop
-        setVisible(signupBtn, !loggedIn);
-        setVisible(loginBtn,  !loggedIn);
-        setVisible(portalBtn, loggedIn && !isAdmin); // Hide for admins
-        setVisible(portalBtnHeader, loggedIn && !isAdmin); // Hide for admins
-        setVisible(logoutBtnHeader, loggedIn);
-        setVisible(adminBtn, loggedIn && isAdmin);
+        applyLoggedIn(isAdmin);
 
-        // Mobile header buttons
-        setVisible(signupBtnMobile, !loggedIn);
-        setVisible(loginBtnMobile2,  !loggedIn);
-        setVisible(portalBtnMobileHeader, loggedIn && !isAdmin); // Hide for admins
-        setVisible(logoutBtnMobileHeader, loggedIn);
-        
-        // Admin buttons (desktop and mobile header)
-        setVisible(adminBtnMobile, loggedIn && isAdmin);
-
-        // Wire logout handlers - use the global headerLogout function
+        // Wire logout buttons
         const wireLogout = (btn) => {
           if (!btn) return;
           btn.onclick = () => window.headerLogout();
         };
-        if (loggedIn) {
-          wireLogout(logoutBtnHeader);
-          wireLogout(logoutBtnMobileHeader);
-        }
+        wireLogout(logoutBtnHeader);
+        wireLogout(logoutBtnMobileHeader);
+
       } catch (err) {
-        console.error('[header] ❌ Error checking auth state:', err);
+        console.error('[header] error checking auth state, defaulting to logged-out UI:', err);
+        applyLoggedOut();
       }
     }
 

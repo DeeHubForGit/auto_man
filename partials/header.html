@@ -279,6 +279,16 @@ window.performLogout = async function performLogout() {
 (function() {
   console.log('[header-debug] wrapper IIFE starting');
 
+    let headerHasRendered = false;
+
+    function revealHeaderOnce() {
+      if (headerHasRendered) return;
+      headerHasRendered = true;
+
+      const hc = document.getElementById('header-container');
+      if (hc) hc.classList.remove('hydrating');
+    }
+
   // Wait for everything to be ready before initializing
   function waitForReady() {
     console.log('[header-debug] waitForReady:', {
@@ -359,6 +369,9 @@ window.performLogout = async function performLogout() {
         setVisible(portalBtnMobileHeader, false);
         setVisible(logoutBtnMobileHeader, false);
         setVisible(adminBtnMobile, false);
+
+        // After first render, reveal header
+        revealHeaderOnce();
       }
 
       function applyLoggedIn(isAdmin) {
@@ -376,6 +389,9 @@ window.performLogout = async function performLogout() {
         setVisible(portalBtnMobileHeader, !isAdmin);
         setVisible(logoutBtnMobileHeader, true);
         setVisible(adminBtnMobile, isAdmin);
+
+        // After first render, reveal header
+        revealHeaderOnce();
       }
 
       // If Supabase is not ready, force logged-out UI (safe default)

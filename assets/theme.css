@@ -698,6 +698,18 @@ header #nav-services-menu a:hover { color: #ffffff !important; }
   );
 }
 
+/* Header hydration styles */
+#header-container.hydrating {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease-in-out;
+}
+
+#header-container {
+  transition: opacity 0.3s ease-in-out;
+  opacity: 1;
+}
+
 /* Larger, clearer caret in mobile menu */
 #mobileServicesBtn [data-caret] {
   font-size: 1rem;   /* about 20 px — smaller than before */

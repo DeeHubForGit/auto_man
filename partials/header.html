@@ -136,9 +136,10 @@
         📱 {{PHONE}}
       </a>
 
-      <!-- WhatsApp button - always show icon, text on XL -->
-      <a href="https://wa.me/61403632313" target="_blank" rel="noopener noreferrer"
-        class="btn btn-secondary whitespace-nowrap flex items-center gap-1">
+      <!-- WhatsApp button - opens app on mobile, web on desktop -->
+      <a href="#" onclick="window.openWhatsApp(); return false;" 
+        class="btn btn-secondary whitespace-nowrap flex items-center gap-1"
+        aria-label="Chat on WhatsApp">
         <i class="fa-brands fa-whatsapp text-lg" aria-hidden="true"></i>
         <span class="hidden xl:inline">WhatsApp</span>
       </a>
@@ -200,6 +201,20 @@
 </header>
 
 <script>
+// WhatsApp launcher function
+window.openWhatsApp = function() {
+  const phone = "61403632313";
+  const isMobile = /Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
+
+  if (isMobile) {
+    // Mobile → try to open WhatsApp app directly
+    window.location.href = `whatsapp://send?phone=${phone}`;
+  } else {
+    // Desktop → go straight to WhatsApp Web chat
+    window.open(`https://web.whatsapp.com/send?phone=${phone}`, '_blank');
+  }
+};
+
 // Anti-flicker: disable transitions on first paint
 document.documentElement.classList.add('loading');
 addEventListener('DOMContentLoaded', () =>

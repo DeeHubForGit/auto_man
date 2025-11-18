@@ -305,6 +305,11 @@ html { scroll-behavior: smooth; }
   transform: translateY(-1px);
 }
 
+/* Force all header buttons to use standard rounded rectangle (not pill) */
+header .btn {
+  border-radius: 0.5rem !important;
+}
+
 /* (Optional) size variant */
 .btn-lg {
   padding: 0.7rem 1.8rem;

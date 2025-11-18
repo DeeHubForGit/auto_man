@@ -724,3 +724,51 @@ header #nav-services-menu a:hover { color: #ffffff !important; }
     font-size: 1.4rem;     /* ≈22px */
   }
 }
+
+/* =========================
+   HERO BANNER - FINAL VERSION
+   ========================= */
+section.hero-banner {
+  width: 100%;
+  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%) !important;
+  color: #ffffff;
+  padding: 5rem 1.5rem;
+  text-align: center;
+  margin: 0;
+  box-sizing: border-box;
+  margin-top: -16px; /* Compensate for header height */
+}
+
+/* Remove page-spacer if it exists */
+.page-spacer {
+  display: none;
+}
+
+section.hero-banner h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem 0;
+  line-height: 1.2;
+}
+
+section.hero-banner p {
+  font-size: 1.25rem;
+  margin: 0;
+  opacity: 0.9;
+}
+
+/* Bigger text on larger screens */
+@media (min-width: 768px) {
+  section.hero-banner {
+    padding: 6rem 1.5rem;
+  }
+
+  section.hero-banner h1 {
+    font-size: 3rem;
+  }
+
+  section.hero-banner p {
+    font-size: 1.5rem;
+  }
+}
+

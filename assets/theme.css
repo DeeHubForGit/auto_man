@@ -305,6 +305,21 @@ html { scroll-behavior: smooth; }
   transform: translateY(-1px);
 }
 
+/* Outline blue – transparent with blue border (for calendar + light backgrounds) */
+.btn-outline-blue {
+  background-color: transparent !important;
+  color: #2563eb !important;                 /* blue-600 text */
+  border: 1px solid #2563eb !important;      /* blue-600 border */
+  box-shadow: none !important;
+  transition: all 0.18s ease;
+}
+
+.btn-outline-blue:hover {
+  background-color: rgba(37,99,235,0.06) !important;  /* faint blue wash */
+  color: #1d4ed8 !important;                          /* slightly deeper blue */
+  border-color: #1d4ed8 !important;
+}
+
 /* Force all header buttons to use standard rounded rectangle (not pill) */
 header .btn {
   border-radius: 0.5rem !important;

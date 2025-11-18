@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Image Credits - Auto-Man Driving School</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Image credits and attributions for Auto-Man Driving School website">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="assets/theme.css" rel="stylesheet">
+  <!-- Load config first, synchronously, before anything else -->
+  <script src="assets/config.js"></script>
+  <script src="assets/render-helpers.js"></script>
+  <script src="assets/include.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/js/supabaseClient.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <!-- Shared Header -->
+  <div id="header-container" style="min-height: 70px;">
+    <div data-include="partials/header.html"></div>
+  </div>
+
+  <main class="container mx-auto px-4 py-16 max-w-4xl">
+    <h1 class="credits-title">Image Credits</h1>
+    <p class="credits-intro">
+      The following images are used on this site under the 
+      <a href="https://www.freepik.com" target="_blank" rel="noopener" class="underline hover:opacity-80">
+        Freepik Free License
+      </a>
+      and include required attribution to the original photographers.
+    </p>
+
+    <div class="credits-grid">
+      <div class="credit-item">
+        <div class="credit-thumb">
+          <img src="images/beginner-driver.jpg" alt="Beginner Drivers service image" loading="lazy">
+        </div>
+        <h3>Beginner Drivers</h3>
+        <p>Photo by pvproductions<br>
+          Sourced from <a href="https://www.freepik.com" target="_blank" rel="noopener">Freepik</a>.
+        </p>
+      </div>
+
+      <div class="credit-item">
+        <div class="credit-thumb">
+          <img src="images/driving-test.jpg" alt="Driving Test Package service image" loading="lazy">
+        </div>
+        <h3>Driving Test Package</h3>
+        <p>Photo by Freepik<br>
+          Sourced from <a href="https://www.freepik.com" target="_blank" rel="noopener">Freepik</a>.
+        </p>
+      </div>
+
+      <div class="credit-item">
+        <div class="credit-thumb">
+          <img src="images/overseas-driver.jpg" alt="Overseas Licence Conversion service image" loading="lazy">
+        </div>
+        <h3>Overseas Licence Conversion</h3>
+        <p>Photo by jcomp<br>
+          Sourced from <a href="https://www.freepik.com" target="_blank" rel="noopener">Freepik</a>.
+        </p>
+      </div>
+
+      <div class="credit-item">
+        <div class="credit-thumb">
+          <img src="images/nervous-driver.jpg" alt="Nervous Drivers service image" loading="lazy">
+        </div>
+        <h3>Nervous Drivers</h3>
+        <p>Photo by Freepik<br>
+          Sourced from <a href="https://www.freepik.com" target="_blank" rel="noopener">Freepik</a>.
+        </p>
+      </div>
+
+      <div class="credit-item">
+        <div class="credit-thumb">
+          <img src="images/older-driver.jpg" alt="Senior Driver Retests service image" loading="lazy">
+        </div>
+        <h3>Senior Driver Retests</h3>
+        <p>Photo by karlyukav<br>
+          Sourced from <a href="https://www.freepik.com" target="_blank" rel="noopener">Freepik</a>.
+        </p>
+      </div>
+
+      <div class="credit-item">
+        <div class="credit-thumb">
+          <img src="images/medium-shot-smiley-woman-car.jpg" alt="Special Requirements service image" loading="lazy">
+        </div>
+        <h3>Special Requirements</h3>
+        <p>Photo by Freepik<br>
+          Sourced from <a href="https://www.freepik.com" target="_blank" rel="noopener">Freepik</a>.
+        </p>
+      </div>
+    </div>
+
+    <div class="credits-note">
+      We gratefully acknowledge the photographers and designers who made these images available.
+    </div>
+
+  </main>
+
+  <!-- Shared Footer -->
+  <div data-include="partials/footer.html"></div>
+
+  <script>
+    // Initialize any included components
+    document.addEventListener('DOMContentLoaded', function() {
+      // Set current year in footer
+      const yearElement = document.getElementById('year');
+      if (yearElement) {
+        yearElement.textContent = new Date().getFullYear();
+      }
+    });
+  </script>
+</body>
+</html>

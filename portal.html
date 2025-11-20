@@ -64,6 +64,14 @@
               <span class="font-medium">My Details</span>
             </a>
 
+            <a href="#contacts" onclick="showSection('contacts')" id="nav-contacts" 
+               class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg" style="display: none;">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              <span class="font-medium">Contacts</span>
+            </a>
+
             <div class="pt-4 mt-4 border-t">
               <button onclick="handleLogout()" 
                  class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg w-full">
@@ -88,6 +96,11 @@
         <!-- Client Details Section -->
         <div id="section-details" class="section-content hidden">
           <div data-include="partials/portal-details.html"></div>
+        </div>
+
+        <!-- Contacts Section -->
+        <div id="section-contacts" class="section-content hidden">
+          <div data-include="partials/portal-contacts.html"></div>
         </div>
 
       </main>
@@ -177,9 +190,15 @@
         navDetails.style.display = '';
       }
       
-      // Show "Complete Intake" link only if intake is NOT completed
+      // Show "Contacts" menu always (doesn't interfere with intake)
+      const navContacts = document.getElementById('nav-contacts');
+      if (navContacts) {
+        navContacts.style.display = '';
+      }
+      
+      // Show "Complete Intake" link only if they have bookings AND intake is not completed
       const completeIntakeLink = document.getElementById('completeIntakeLink');
-      if (completeIntakeLink && client?.intake_completed !== true) {
+      if (completeIntakeLink && hasBookings && client?.intake_completed !== true) {
         completeIntakeLink.style.display = 'flex';
       }
       

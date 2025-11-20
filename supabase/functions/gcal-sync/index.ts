@@ -374,8 +374,8 @@ Deno.serve(async () => {
             const startTs = new Date(start).getTime();
             const isFuture = startTs > Date.now();
             const isConfirmed = (e.status ?? "confirmed") === "confirmed";
-            const wasInserted = row.inserted === true;
-            const hasSMS = row.sms_confirm_sent_at != null;
+            const wasInserted = row.was_inserted === true;  // Fixed: use was_inserted not inserted
+            const hasSMS = row.sms_sent_at != null;        // Fixed: use sms_sent_at not sms_confirm_sent_at
             const hasEmail = row.email_confirm_sent_at != null;
 
             console.log(`[gcal-sync]   → Notification check for booking ${bookingId}: inserted=${wasInserted}, has_sms=${hasSMS}, has_email=${hasEmail}, future=${isFuture}, confirmed=${isConfirmed}`);

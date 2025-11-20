@@ -240,7 +240,7 @@ Deno.serve(async () => {
     console.log(`[gcal-sync] Processing calendar: ${calendar_id}`);
     
     // Fetch all future events (removed updatedMin restriction)
-    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendar_id)}/events?singleEvents=true&timeMin=${new Date().toISOString()}&showDeleted=true`;
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendar_id)}/events?singleEvents=true&timeMin=${new Date().toISOString()}&showDeleted=true&eventTypes=default`;
     
     console.log(`[gcal-sync] Fetching events...`);
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
@@ -271,6 +271,17 @@ Deno.serve(async () => {
       }
 
       console.log(`[gcal-sync] Processing: ${e.id} | "${e.summary}" | ${start}`);
+
+      // Skip Google working-location "Home" events so they do not create junk rows
+      if (
+        e.eventType === "workingLocation" ||
+        e.workingLocationProperties ||
+        e.summary === "Home"
+      ) {
+        //console.log(`[gcal-sync]   → Skipping workingLocation event ${e.id} "${e.summary}"`);
+        skipped++;
+        continue;
+      }
 
       // Handle cancelled events
       if (e.status === "cancelled") {

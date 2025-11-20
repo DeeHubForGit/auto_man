@@ -378,7 +378,7 @@
               </svg>
               <p class="text-gray-600 mt-4">Still getting things ready…</p>
               <button onclick="(bookingsInit=false, initBookingsAfterPartial())"
-                      class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                      class="btn btn-primary mt-4 px-4 py-2">
                 Try Again
               </button>
             </div>`;
@@ -495,7 +495,7 @@
               </svg>
               <p class="text-gray-600 mt-4">Request timed out</p>
               <p class="text-gray-500 text-sm mt-2">The server is taking too long to respond.</p>
-              <button onclick="loadBookings()" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              <button onclick="loadBookings()" class="btn btn-primary mt-4 px-4 py-2">
                 Try Again
               </button>
             </div>`;
@@ -548,7 +548,7 @@
               </svg>
               <p class="text-red-600 mt-4">Could not load bookings</p>
               <p class="text-gray-500 text-sm mt-2">${err.message || 'Please try again'}</p>
-              <button onclick="loadBookings()" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              <button onclick="loadBookings()" class="btn btn-primary mt-4 px-4 py-2">
                 Retry
               </button>
             </div>`;

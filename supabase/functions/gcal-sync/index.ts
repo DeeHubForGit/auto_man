@@ -311,9 +311,13 @@ Deno.serve(async () => {
       const parsed = parseGcalEvent(e);
       const fields = extractFieldsFromEvent(e);
       const isBooking = isBookingEvent(e, fields);
-
-      console.log(`[gcal-sync]   → is_booking=${isBooking}, service=${parsed.service_code ?? inferServiceCode(e.summary, durationMinutes)}, pickup=${fields.pickup_location}`);
-
+      
+      // Convert Google Calendar ISO strings to UTC for PostgreSQL
+      // Google sends: "2025-11-23T15:00:00+11:00" (3 PM Melbourne)
+      // We need PostgreSQL to store: "2025-11-23T04:00:00Z" (4 AM UTC)
+      const startUTC = new Date(start).toISOString();
+      const endUTC = new Date(end).toISOString();
+      
       const payload = {
         p_google_event_id: e.id,
         p_calendar_id: calendar_id,
@@ -323,8 +327,8 @@ Deno.serve(async () => {
         p_mobile: fields.mobile,
         p_service_code: parsed.service_code ?? inferServiceCode(e.summary, durationMinutes),
         p_price_cents: parsed.price_cents ?? null,
-        p_start: start,
-        p_end: end,
+        p_start: startUTC,  // Send as proper UTC ISO string
+        p_end: endUTC,      // Send as proper UTC ISO string
         p_pickup: fields.pickup_location ?? parsed.pickup_location ?? null,
         p_extended: e,  // Store full event object for debugging/audit
         p_is_booking: isBooking,  // Simple booking detection

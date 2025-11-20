@@ -357,6 +357,8 @@
   function renderWeek(startDate) {
     weekStart = new Date(startDate);
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    // Set to start of day (midnight) to avoid timezone issues
+    weekStart.setHours(0, 0, 0, 0);
     const grid = document.getElementById('weekGrid');
     if (!grid) return;
     grid.innerHTML = '';
@@ -521,6 +523,9 @@
     bookings.forEach(booking => {
       const start = new Date(booking.start_time);
       const end = new Date(booking.end_time);
+      
+      // Database stores TIMESTAMPTZ which JavaScript converts to local browser time
+      // Use local time methods since the Date object is already in browser timezone
       const dayOfWeek = start.getDay();
       const hour = start.getHours();
       const key = `${dayOfWeek}-${hour}`;
@@ -542,8 +547,9 @@
       
       if (cell) {
         const bookingDiv = document.createElement('div');
-        const time = start.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
-        const endTime = end.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+        // JavaScript Date automatically converts to browser local time
+        const time = start.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: false });
+        const endTime = end.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: false });
         
         // Calculate exact pixel height based on duration
         // Each cell is 80px min-height on desktop, 48px on mobile

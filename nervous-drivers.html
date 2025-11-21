@@ -17,7 +17,7 @@
     .btn:hover{background:#2563eb;transform:translateY(-2px)}
     .page-spacer{height:16px}
     .info-box{background:#1e3a8a22;border:1px solid #3b82f655;border-radius:12px;padding:24px;margin:24px 0}
-    .two-col-layout{display:grid;grid-template-columns:1fr;gap:30px;margin-bottom:30px}
+    .two-col-layout{display:grid;grid-template-columns:1fr;gap:30px;margin-bottom:10px}
     @media(min-width:768px){.two-col-layout{grid-template-columns:1fr 400px}}
     .sidebar-booking{position:sticky;top:80px;align-self:start}
   </style>
@@ -68,7 +68,7 @@
             <li><strong>We will meet you at your chosen location</strong> – Convenient pick-up to commence your lesson and end the lesson at your selected location</li>
             <li><strong>Parents are welcome to come along to the lesson</strong> – Family support is encouraged</li>
             <li><strong>Choose the lesson duration that suits you</strong> – From 1 hr → 2 hrs</li>
-            <li><strong>Packages are also available for 1hr lessons</strong> – (scroll down for details)</li>
+            <!-- <li><strong>Packages are also available for 1hr lessons</strong> – (scroll down for details)</li> -->
           </ul>
         </div>
       </div>
@@ -81,11 +81,6 @@
           <h3 style="margin:0 0 16px 0;font-size:24px;font-weight:700">Book Now</h3>
           <div id="lesson-pricing-grid" style="display:grid;grid-template-columns:1fr;gap:12px;margin-top:20px">
             <!-- Pricing will be loaded from config -->
-          </div>
-          <div style="margin-top:24px">
-            <a href="tel:{{PHONE_LINK}}" class="btn btn-primary" style="font-size:16px;width:100%;justify-content:center">
-              📱 Call {{OWNER}} {{PHONE}}
-            </a>
           </div>
         </div>
       </div>

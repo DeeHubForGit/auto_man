@@ -1,13 +1,13 @@
 # Auto-Man Driving School
 
 Website for Auto-Man Driving School in Geelong and surrounding suburbs.  
-Provides lesson information, pricing packages, and online bookings via Calendly.
+Provides lesson information and online bookings via Google Calendar.
 
 ## Features
 - Responsive design using custom CSS (theme.css)
-- Clear lesson package pricing (3, 5, and 10 lessons)
 - Driving Test Package with warm-up and test-day car use
-- Embedded Calendly for easy online bookings
+- Google Calendar integration for bookings
+- Client portal with booking management
 - Contact information and links to social media
 
 ## Deployment

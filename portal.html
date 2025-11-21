@@ -692,6 +692,30 @@
       let statusBadge = renderStatusChip(booking.status);
       let cancelButton = '';
       
+      // Refund badge (only show if actually refunded)
+      let refundBadge = '';
+      if (booking.refunded && booking.refunded_at) {
+        const refundedDate = new Date(booking.refunded_at).toLocaleString('en-AU', {
+          day: '2-digit',
+          month: '2-digit',
+          year: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+        refundBadge = `
+          <div class="mt-2 pt-2 border-t border-gray-300">
+            <div class="flex items-center gap-2 text-sm">
+              <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="#065f46" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span style="color: #065f46 !important; font-weight: 600;">Refunded: ${refundedDate}</span>
+            </div>
+            <p class="text-xs mt-1 ml-6" style="color: #374151 !important;">Please allow 3-5 business days for the refund to appear in your account.</p>
+          </div>
+        `;
+      }
+      
       if (booking.status === 'confirmed' && isUpcoming) {
         // Cancel button in header for confirmed bookings
         cancelButton = `
@@ -764,6 +788,8 @@
                     </a>
                   </div>
                 ` : ''}
+                
+                ${refundBadge}
               </div>
             </div>
         </div>

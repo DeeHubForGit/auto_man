@@ -36,6 +36,10 @@
                class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors border-l-4 border-transparent">
               <span class="font-medium">Calendar</span>
             </a>
+            <a href="#cancellations" onclick="showSection('cancellations')" id="nav-cancellations"
+               class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors border-l-4 border-transparent">
+              <span class="font-medium">Cancellations</span>
+            </a>
             <a href="#progress" onclick="showSection('progress')" id="nav-progress"
                class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors border-l-4 border-transparent">
               <span class="font-medium">Client Progress</span>
@@ -56,6 +60,7 @@
       <div class="flex-1 min-w-0">
         <!-- Include all admin sections as partials -->
         <div data-include="partials/admin-calendar.html"></div>
+        <div data-include="partials/admin-cancellations.html"></div>
         <div data-include="partials/admin-progress.html"></div>
         <div data-include="partials/admin-messaging.html"></div>
         <div data-include="partials/admin-contacts.html"></div>

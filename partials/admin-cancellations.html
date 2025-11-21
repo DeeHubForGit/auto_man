@@ -1,0 +1,378 @@
+<!-- Admin Cancellations Section -->
+<style>
+  /* Custom scrollbar for cancellations */
+  #cancellationsScrollContainer {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+  }
+  
+  #cancellationsScrollContainer::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  #cancellationsScrollContainer::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+  }
+  
+  #cancellationsScrollContainer::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+  }
+  
+  #cancellationsScrollContainer::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+  
+  .cancellation-card {
+    background-color: #dbeafe !important;   /* match contact-card */
+    border: 2px solid #3b82f6 !important;   /* blue edge */
+    border-radius: 0.5rem !important;
+    color: #111827 !important;
+    box-shadow: none !important;
+    padding: 1rem !important;
+  }
+  
+  .cancellation-card * {
+    color: #111827 !important;
+  }
+  
+  .cancellation-card svg {
+    color: #4b5563 !important;
+  }
+</style>
+
+<section id="section-cancellations" class="section-content bg-white border rounded-2xl shadow-sm p-5 hidden">
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-3">
+      <h2 class="text-xl font-semibold">Cancelled Bookings</h2>
+      <span id="cancellationsCount" class="text-sm text-gray-600"></span>
+    </div>
+    <button id="reloadCancellations" class="btn btn-primary px-3 py-1.5">
+      <span id="reloadCancellationsText">Reload</span>
+      <span id="reloadCancellationsSpinner" class="hidden">
+        <svg class="animate-spin h-4 w-4 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      </span>
+    </button>
+  </div>
+  
+  <!-- Filters -->
+  <div class="flex flex-wrap items-center gap-3 mb-4">
+    <input 
+      id="cancellationSearch" 
+      type="text" 
+      placeholder="Search by name, email, or service..." 
+      class="flex-1 min-w-[150px] max-w-[300px] bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+    />
+    <select 
+      id="cancellationSort" 
+      class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[180px]"
+    >
+      <option value="newest">Newest first</option>
+      <option value="oldest">Oldest first</option>
+      <option value="booking-date">By booking date</option>
+    </select>
+    <select 
+      id="cancellationsPerPage" 
+      class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px]"
+    >
+      <option value="10" selected>10 per page</option>
+      <option value="25">25 per page</option>
+      <option value="50">50 per page</option>
+      <option value="100">100 per page</option>
+    </select>
+  </div>
+  
+  <!-- Scrollable Cancellations container -->
+  <div id="cancellationsScrollContainer" class="overflow-y-auto max-h-[600px] border border-gray-200 rounded-lg p-3 mb-4">
+    <div id="cancellationsList" class="space-y-3"></div>
+  </div>
+  
+  <!-- Pagination -->
+  <div id="cancellationsPagination" class="flex items-center justify-between">
+    <div class="text-sm text-gray-600">
+      <span id="cancellationPaginationInfo"></span>
+    </div>
+    <div class="flex items-center gap-3">
+      <button id="cancellationPrevPage" class="btn btn-secondary px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Previous page" aria-label="Previous page">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
+      <span id="cancellationPageNumbers" class="text-sm text-gray-700 font-medium min-w-[80px] text-center"></span>
+      <button id="cancellationNextPage" class="btn btn-primary px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed" title="Next page" aria-label="Next page">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </button>
+    </div>
+  </div>
+</section>
+
+<script>
+(function() {
+  // Cancellations - Store for filtering and pagination
+  let allCancellations = [];
+  let currentPage = 1;
+  
+  async function loadCancellations(){
+    const box = document.getElementById('cancellationsList');
+    const reloadBtn = document.getElementById('reloadCancellations');
+    const reloadText = document.getElementById('reloadCancellationsText');
+    const reloadSpinner = document.getElementById('reloadCancellationsSpinner');
+    
+    if (!box) {
+      console.error('[admin-cancellations] cancellationsList element not found');
+      return;
+    }
+    
+    if (!window.supabaseClient) {
+      console.error('[admin-cancellations] supabaseClient not available for loadCancellations');
+      box.innerHTML = '<div class="p-4 text-center text-gray-500">Supabase not connected</div>';
+      return;
+    }
+    
+    // Show loading spinner
+    if (reloadText) reloadText.classList.add('hidden');
+    if (reloadSpinner) reloadSpinner.classList.remove('hidden');
+    if (reloadBtn) reloadBtn.disabled = true;
+    
+    console.log('[admin-cancellations] Loading cancelled bookings...');
+    box.innerHTML = '<div class="p-8 text-center text-gray-500">Loading cancellations...</div>';
+    
+    try {
+      const { data, error, status, statusText } = await window.supabaseClient
+        .from('booking')
+        .select('*, service(name)')
+        .eq('status', 'cancelled')
+        .eq('is_booking', true)
+        .order('cancelled_at', { ascending: false })
+        .limit(500);
+      
+      console.log('[admin-cancellations] Cancelled bookings response:', { status, statusText, error, rowCount: data?.length });
+      
+      if (error) {
+        console.error('[admin-cancellations] Error loading cancellations:', error);
+        box.innerHTML = `<div class="p-4 text-center text-red-600">Error: ${error.message}</div>`;
+        return;
+      }
+      
+      allCancellations = Array.isArray(data) ? data : [];
+      currentPage = 1; // Reset to first page on reload
+      renderCancellations();
+      
+      console.log('[admin-cancellations] Loaded', allCancellations.length, 'cancelled bookings');
+    } catch (e) {
+      console.error('[admin-cancellations] Unexpected error loading cancellations:', e);
+      box.innerHTML = `<div class="p-4 text-center text-red-600">Error: ${e?.message || String(e)}</div>`;
+    } finally {
+      // Hide loading spinner
+      if (reloadText) reloadText.classList.remove('hidden');
+      if (reloadSpinner) reloadSpinner.classList.add('hidden');
+      if (reloadBtn) reloadBtn.disabled = false;
+    }
+  }
+  
+  function renderCancellations() {
+    const box = document.getElementById('cancellationsList');
+    const searchTerm = (document.getElementById('cancellationSearch')?.value || '').toLowerCase();
+    const sortOrder = document.getElementById('cancellationSort')?.value || 'newest';
+    const perPage = parseInt(document.getElementById('cancellationsPerPage')?.value || '10');
+    const cancellationsCount = document.getElementById('cancellationsCount');
+    const paginationInfo = document.getElementById('cancellationPaginationInfo');
+    const pageNumbers = document.getElementById('cancellationPageNumbers');
+    const prevBtn = document.getElementById('cancellationPrevPage');
+    const nextBtn = document.getElementById('cancellationNextPage');
+    
+    if (!box) return;
+    
+    // Filter cancellations
+    let filtered = allCancellations.filter(row => {
+      if (!searchTerm) return true;
+      const firstName = (row.first_name || '').toLowerCase();
+      const lastName = (row.last_name || '').toLowerCase();
+      const email = (row.email || '').toLowerCase();
+      const mobile = (row.mobile || '').toLowerCase();
+      const serviceCode = (row.service_code || '').toLowerCase();
+      return firstName.includes(searchTerm) || lastName.includes(searchTerm) || 
+             email.includes(searchTerm) || mobile.includes(searchTerm) ||
+             serviceCode.includes(searchTerm);
+    });
+    
+    // Sort cancellations
+    filtered.sort((a, b) => {
+      if (sortOrder === 'booking-date') {
+        const dateA = new Date(a.start_time).getTime();
+        const dateB = new Date(b.start_time).getTime();
+        return dateB - dateA;
+      } else {
+        const dateA = new Date(a.cancelled_at || a.updated_at).getTime();
+        const dateB = new Date(b.cancelled_at || b.updated_at).getTime();
+        return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+      }
+    });
+    
+    // Update total count
+    if (cancellationsCount) {
+      cancellationsCount.textContent = `(${filtered.length} total)`;
+    }
+    
+    // Calculate pagination
+    const totalPages = Math.ceil(filtered.length / perPage);
+    if (currentPage > totalPages && totalPages > 0) {
+      currentPage = totalPages;
+    }
+    if (currentPage < 1) currentPage = 1;
+    
+    const startIdx = (currentPage - 1) * perPage;
+    const endIdx = startIdx + perPage;
+    const paginatedCancellations = filtered.slice(startIdx, endIdx);
+    
+    // Update pagination info
+    if (paginationInfo) {
+      if (filtered.length === 0) {
+        paginationInfo.textContent = '';
+      } else if (totalPages <= 1) {
+        paginationInfo.textContent = `Showing all ${filtered.length}`;
+      } else {
+        const start = startIdx + 1;
+        const end = Math.min(endIdx, filtered.length);
+        if (start === end) {
+          paginationInfo.textContent = `Showing ${start} of ${filtered.length}`;
+        } else {
+          paginationInfo.textContent = `Showing ${start}-${end} of ${filtered.length}`;
+        }
+      }
+    }
+    
+    // Update page numbers
+    if (pageNumbers) {
+      pageNumbers.textContent = totalPages > 0 ? `Page ${currentPage} of ${totalPages}` : '';
+    }
+    
+    // Update prev/next buttons
+    if (prevBtn) {
+      prevBtn.disabled = currentPage <= 1;
+    }
+    if (nextBtn) {
+      nextBtn.disabled = currentPage >= totalPages;
+    }
+    
+    // Render
+    box.innerHTML = '';
+    
+    if (filtered.length === 0) {
+      const emptyMsg = searchTerm 
+        ? `<div class="p-8 text-center text-gray-500">No cancelled bookings match "${searchTerm}"</div>`
+        : '<div class="p-8 text-center text-gray-500">✅ No cancelled bookings</div>';
+      box.innerHTML = emptyMsg;
+      return;
+    }
+    
+    paginatedCancellations.forEach(row => {
+      const card = document.createElement('div');
+      card.className = 'cancellation-card mb-3';
+      
+      const firstName = row.first_name || '';
+      const lastName = row.last_name || '';
+      const fullName = `${firstName} ${lastName}`.trim() || 'Unknown';
+      const email = row.email || '';
+      const serviceName = row.service?.name || row.service_code || 'Unknown service';
+      
+      const bookingDate = new Date(row.start_time).toLocaleString('en-AU', {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      
+      const cancelledDate = row.cancelled_at ? new Date(row.cancelled_at).toLocaleString('en-AU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }) : 'Unknown';
+      
+      card.innerHTML = `
+        <div class="font-semibold mb-2">${fullName} (${email})</div>
+        <div class="text-sm mb-1"><strong>Service:</strong> ${serviceName}</div>
+        <div class="text-sm"><strong>Original booking:</strong> ${bookingDate} &nbsp;&nbsp; <strong style="color: #ef4444 !important;">Cancelled:</strong> <span style="color: #ef4444 !important;">${cancelledDate}</span></div>
+      `;
+      
+      box.appendChild(card);
+    });
+  }
+
+  // Wire up when partial loads
+  if (window.adminCancellationsReady) {
+    // Already initialized
+  } else {
+    window.adminCancellationsReady = true;
+    
+    const initCancellations = () => {
+      const reloadCancellationsBtn = document.getElementById('reloadCancellations');
+      if (reloadCancellationsBtn) reloadCancellationsBtn.onclick = loadCancellations;
+      
+      // Wire up search and sort filters
+      const cancellationSearch = document.getElementById('cancellationSearch');
+      if (cancellationSearch) {
+        cancellationSearch.addEventListener('input', () => {
+          currentPage = 1;
+          renderCancellations();
+        });
+      }
+      
+      const cancellationSort = document.getElementById('cancellationSort');
+      if (cancellationSort) {
+        cancellationSort.addEventListener('change', () => {
+          currentPage = 1;
+          renderCancellations();
+        });
+      }
+      
+      const cancellationsPerPage = document.getElementById('cancellationsPerPage');
+      if (cancellationsPerPage) {
+        cancellationsPerPage.addEventListener('change', () => {
+          currentPage = 1;
+          renderCancellations();
+        });
+      }
+      
+      // Pagination buttons
+      const prevPage = document.getElementById('cancellationPrevPage');
+      if (prevPage) {
+        prevPage.addEventListener('click', () => {
+          if (currentPage > 1) {
+            currentPage--;
+            renderCancellations();
+            document.getElementById('cancellationsScrollContainer')?.scrollTo(0, 0);
+          }
+        });
+      }
+      
+      const nextPage = document.getElementById('cancellationNextPage');
+      if (nextPage) {
+        nextPage.addEventListener('click', () => {
+          currentPage++;
+          renderCancellations();
+          document.getElementById('cancellationsScrollContainer')?.scrollTo(0, 0);
+        });
+      }
+      
+      loadCancellations();
+    };
+    
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initCancellations);
+    } else {
+      initCancellations();
+    }
+  }
+})();
+</script>

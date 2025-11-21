@@ -76,6 +76,22 @@
       <option value="booking-date">By booking date</option>
     </select>
     <select 
+      id="refundEligibilityFilter" 
+      class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[160px]"
+    >
+      <option value="all">All cancellations</option>
+      <option value="eligible">Refund eligible</option>
+      <option value="not-eligible">No refund (<24h)</option>
+    </select>
+    <select 
+      id="refundStatusFilter" 
+      class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px]"
+    >
+      <option value="all">All refunds</option>
+      <option value="refunded">Refunded</option>
+      <option value="not-refunded">Not refunded</option>
+    </select>
+    <select 
       id="cancellationsPerPage" 
       class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px]"
     >
@@ -180,6 +196,8 @@
     const box = document.getElementById('cancellationsList');
     const searchTerm = (document.getElementById('cancellationSearch')?.value || '').toLowerCase();
     const sortOrder = document.getElementById('cancellationSort')?.value || 'newest';
+    const refundEligibility = document.getElementById('refundEligibilityFilter')?.value || 'all';
+    const refundStatus = document.getElementById('refundStatusFilter')?.value || 'all';
     const perPage = parseInt(document.getElementById('cancellationsPerPage')?.value || '10');
     const cancellationsCount = document.getElementById('cancellationsCount');
     const paginationInfo = document.getElementById('cancellationPaginationInfo');
@@ -191,15 +209,38 @@
     
     // Filter cancellations
     let filtered = allCancellations.filter(row => {
-      if (!searchTerm) return true;
-      const firstName = (row.first_name || '').toLowerCase();
-      const lastName = (row.last_name || '').toLowerCase();
-      const email = (row.email || '').toLowerCase();
-      const mobile = (row.mobile || '').toLowerCase();
-      const serviceCode = (row.service_code || '').toLowerCase();
-      return firstName.includes(searchTerm) || lastName.includes(searchTerm) || 
-             email.includes(searchTerm) || mobile.includes(searchTerm) ||
-             serviceCode.includes(searchTerm);
+      // Text search filter
+      if (searchTerm) {
+        const firstName = (row.first_name || '').toLowerCase();
+        const lastName = (row.last_name || '').toLowerCase();
+        const email = (row.email || '').toLowerCase();
+        const mobile = (row.mobile || '').toLowerCase();
+        const serviceCode = (row.service_code || '').toLowerCase();
+        const matchesSearch = firstName.includes(searchTerm) || lastName.includes(searchTerm) || 
+               email.includes(searchTerm) || mobile.includes(searchTerm) ||
+               serviceCode.includes(searchTerm);
+        if (!matchesSearch) return false;
+      }
+      
+      // Refund eligibility filter (based on 24-hour policy)
+      if (refundEligibility !== 'all' && row.start_time && row.cancelled_at) {
+        const bookingTime = new Date(row.start_time).getTime();
+        const cancelledTime = new Date(row.cancelled_at).getTime();
+        const hoursNotice = (bookingTime - cancelledTime) / (1000 * 60 * 60);
+        const isEligible = hoursNotice >= 24;
+        
+        if (refundEligibility === 'eligible' && !isEligible) return false;
+        if (refundEligibility === 'not-eligible' && isEligible) return false;
+      }
+      
+      // Refund status filter
+      if (refundStatus !== 'all') {
+        const isRefunded = row.refunded === true;
+        if (refundStatus === 'refunded' && !isRefunded) return false;
+        if (refundStatus === 'not-refunded' && isRefunded) return false;
+      }
+      
+      return true;
     });
     
     // Sort cancellations
@@ -310,19 +351,41 @@
         const hoursNotice = (bookingTime - cancelledTime) / (1000 * 60 * 60);
         
         if (hoursNotice < 24) {
-          // Late cancellation - no refund (red badge to match cancelled styling)
+          // Late cancellation - no refund
           refundBadge = `<span style="display: inline-block; background-color: #fee2e2; color: #991b1b; border: 1px solid #ef4444; border-radius: 4px; padding: 2px 6px; font-size: 11px; font-weight: 600; margin-left: 8px;">❗ No refund (<24h)</span>`;
         } else {
-          // Sufficient notice - refund eligible (green badge)
+          // Sufficient notice - refund eligible
           refundBadge = `<span style="display: inline-block; background-color: #d1fae5; color: #065f46; border: 1px solid #10b981; border-radius: 4px; padding: 2px 6px; font-size: 11px; font-weight: 600; margin-left: 8px;">✓ Refund eligible</span>`;
         }
       }
+      
+      // Refund tracking checkbox and date
+      const refundedChecked = row.refunded ? 'checked' : '';
+      const refundedDate = row.refunded_at ? new Date(row.refunded_at).toLocaleString('en-AU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      }) : '';
+      const refundedDisplay = row.refunded ? `<span style="color: #065f46; font-weight: 500;">${refundedDate}</span>` : '<span style="color: #6b7280;">Not refunded</span>';
       
       card.innerHTML = `
         <div class="font-semibold mb-2">${fullName} (${email})</div>
         <div class="text-sm mb-1"><strong>Service:</strong> ${serviceName}</div>
         <div class="text-sm mb-1"><strong>Original booking:</strong> ${bookingDate}</div>
-        <div class="text-sm"><strong style="color: #ef4444 !important;">Cancelled:</strong> <span style="color: #ef4444 !important;">${cancelledDate}</span>${refundBadge}</div>
+        <div class="text-sm mb-2"><strong style="color: #ef4444 !important;">Cancelled:</strong> <span style="color: #ef4444 !important;">${cancelledDate}</span>${refundBadge}</div>
+        <div class="text-sm" style="border-top: 1px solid #e5e7eb; padding-top: 8px; margin-top: 4px;">
+          <label style="display: flex; align-items: center; cursor: pointer; user-select: none;">
+            <input type="checkbox" ${refundedChecked} 
+                   class="refund-checkbox" 
+                   data-booking-id="${row.id}"
+                   style="width: 16px; height: 16px; margin-right: 8px; cursor: pointer;">
+            <span style="font-weight: 500;">Refunded:</span>
+            <span style="margin-left: 6px;">${refundedDisplay}</span>
+          </label>
+        </div>
       `;
       
       box.appendChild(card);
@@ -339,6 +402,57 @@
       const reloadCancellationsBtn = document.getElementById('reloadCancellations');
       if (reloadCancellationsBtn) reloadCancellationsBtn.onclick = loadCancellations;
       
+      // Event delegation for refund checkboxes (handles dynamically added checkboxes)
+      const cancellationsList = document.getElementById('cancellationsList');
+      if (cancellationsList) {
+        cancellationsList.addEventListener('change', async function(e) {
+          if (e.target.classList.contains('refund-checkbox')) {
+            const checkbox = e.target;
+            const bookingId = checkbox.getAttribute('data-booking-id');
+            const isChecked = checkbox.checked;
+            
+            console.log(`[cancellations] Refund checkbox changed: booking ${bookingId}, checked=${isChecked}`);
+            
+            // Disable checkbox during update
+            checkbox.disabled = true;
+            const label = checkbox.closest('label');
+            const originalCursor = label.style.cursor;
+            label.style.cursor = 'wait';
+            
+            try {
+              const updateData = {
+                refunded: isChecked,
+                refunded_at: isChecked ? new Date().toISOString() : null
+              };
+              
+              const { error } = await window.supabaseClient
+                .from('booking')
+                .update(updateData)
+                .eq('id', bookingId);
+              
+              if (error) {
+                console.error('[cancellations] Error updating refund status:', error);
+                // Revert checkbox state
+                checkbox.checked = !isChecked;
+                alert('Failed to update refund status: ' + error.message);
+              } else {
+                console.log('[cancellations] ✅ Refund status updated successfully');
+                // Reload data and refresh the display to show the updated date
+                await loadCancellations();
+              }
+            } catch (err) {
+              console.error('[cancellations] Exception updating refund status:', err);
+              // Revert checkbox state
+              checkbox.checked = !isChecked;
+              alert('Failed to update refund status: ' + err.message);
+            } finally {
+              checkbox.disabled = false;
+              label.style.cursor = originalCursor;
+            }
+          }
+        });
+      }
+      
       // Wire up search and sort filters
       const cancellationSearch = document.getElementById('cancellationSearch');
       if (cancellationSearch) {
@@ -351,6 +465,22 @@
       const cancellationSort = document.getElementById('cancellationSort');
       if (cancellationSort) {
         cancellationSort.addEventListener('change', () => {
+          currentPage = 1;
+          renderCancellations();
+        });
+      }
+      
+      const refundEligibilityFilter = document.getElementById('refundEligibilityFilter');
+      if (refundEligibilityFilter) {
+        refundEligibilityFilter.addEventListener('change', () => {
+          currentPage = 1;
+          renderCancellations();
+        });
+      }
+      
+      const refundStatusFilter = document.getElementById('refundStatusFilter');
+      if (refundStatusFilter) {
+        refundStatusFilter.addEventListener('change', () => {
           currentPage = 1;
           renderCancellations();
         });

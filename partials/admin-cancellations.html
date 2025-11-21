@@ -280,29 +280,33 @@
       const lastName = row.last_name || '';
       const fullName = `${firstName} ${lastName}`.trim() || 'Unknown';
       const email = row.email || '';
-      const serviceName = row.service?.name || row.service_code || 'Unknown service';
+      // Remove "Driving Lesson" from service name for mobile-friendly display
+      const serviceName = (row.service?.name || row.service_code || 'Unknown service').replace(/Driving Lesson\s*—?\s*/i, '');
       
+      // Format dates as dd/mm/yy hh:mm am/pm
       const bookingDate = new Date(row.start_time).toLocaleString('en-AU', {
-        weekday: 'short',
         day: '2-digit',
-        month: 'short',
-        year: 'numeric',
+        month: '2-digit',
+        year: '2-digit',
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
+        hour12: true
       });
       
       const cancelledDate = row.cancelled_at ? new Date(row.cancelled_at).toLocaleString('en-AU', {
         day: '2-digit',
         month: '2-digit',
-        year: 'numeric',
+        year: '2-digit',
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
+        hour12: true
       }) : 'Unknown';
       
       card.innerHTML = `
         <div class="font-semibold mb-2">${fullName} (${email})</div>
         <div class="text-sm mb-1"><strong>Service:</strong> ${serviceName}</div>
-        <div class="text-sm"><strong>Original booking:</strong> ${bookingDate} &nbsp;&nbsp; <strong style="color: #ef4444 !important;">Cancelled:</strong> <span style="color: #ef4444 !important;">${cancelledDate}</span></div>
+        <div class="text-sm mb-1"><strong>Original booking:</strong> ${bookingDate}</div>
+        <div class="text-sm"><strong style="color: #ef4444 !important;">Cancelled:</strong> <span style="color: #ef4444 !important;">${cancelledDate}</span></div>
       `;
       
       box.appendChild(card);

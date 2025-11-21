@@ -295,6 +295,7 @@ Deno.serve(async () => {
           },
           body: JSON.stringify({
             p_google_event_id: e.id,
+            p_cancelled_at: e.updated || null,  // Use Google's event.updated timestamp
           }),
         });
         if (cancelRes.ok) {

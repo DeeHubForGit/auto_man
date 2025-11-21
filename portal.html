@@ -69,7 +69,7 @@
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
-              <span class="font-medium">Contacts</span>
+              <span class="font-medium">Contact Messages</span>
             </a>
 
             <div class="pt-4 mt-4 border-t">
@@ -98,7 +98,7 @@
           <div data-include="partials/portal-details.html"></div>
         </div>
 
-        <!-- Contacts Section -->
+        <!-- Contact Messages Section -->
         <div id="section-contacts" class="section-content hidden">
           <div data-include="partials/portal-contacts.html"></div>
         </div>
@@ -309,14 +309,22 @@
       window.location.hash = section;
     }
 
-    // Logout handler - uses the resilient headerLogout function
+    // Logout handler
     async function handleLogout() {
+      // Ensure Modal is available
+      if (!window.Modal || !window.Modal.confirm) {
+        if (confirm('Are you sure you want to log out?')) {
+          window.location.href = 'index.html';
+        }
+        return;
+      }
+      
       Modal.confirm(
         'Are you sure you want to log out?',
         function() {
-          // Use the resilient headerLogout from header.html
-          if (window.headerLogout) {
-            window.headerLogout();
+          // Call performLogout directly (already confirmed here, no need for second modal)
+          if (window.performLogout) {
+            window.performLogout();
           } else {
             // Fallback if header hasn't loaded yet
             window.location.href = 'index.html';

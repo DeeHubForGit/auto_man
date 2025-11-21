@@ -302,11 +302,27 @@
         hour12: true
       }) : 'Unknown';
       
+      // Check if cancellation was within 24 hours of booking (late cancellation = no refund)
+      let refundBadge = '';
+      if (row.start_time && row.cancelled_at) {
+        const bookingTime = new Date(row.start_time).getTime();
+        const cancelledTime = new Date(row.cancelled_at).getTime();
+        const hoursNotice = (bookingTime - cancelledTime) / (1000 * 60 * 60);
+        
+        if (hoursNotice < 24) {
+          // Late cancellation - no refund (red badge to match cancelled styling)
+          refundBadge = `<span style="display: inline-block; background-color: #fee2e2; color: #991b1b; border: 1px solid #ef4444; border-radius: 4px; padding: 2px 6px; font-size: 11px; font-weight: 600; margin-left: 8px;">❗ No refund (<24h)</span>`;
+        } else {
+          // Sufficient notice - refund eligible (green badge)
+          refundBadge = `<span style="display: inline-block; background-color: #d1fae5; color: #065f46; border: 1px solid #10b981; border-radius: 4px; padding: 2px 6px; font-size: 11px; font-weight: 600; margin-left: 8px;">✓ Refund eligible</span>`;
+        }
+      }
+      
       card.innerHTML = `
         <div class="font-semibold mb-2">${fullName} (${email})</div>
         <div class="text-sm mb-1"><strong>Service:</strong> ${serviceName}</div>
         <div class="text-sm mb-1"><strong>Original booking:</strong> ${bookingDate}</div>
-        <div class="text-sm"><strong style="color: #ef4444 !important;">Cancelled:</strong> <span style="color: #ef4444 !important;">${cancelledDate}</span></div>
+        <div class="text-sm"><strong style="color: #ef4444 !important;">Cancelled:</strong> <span style="color: #ef4444 !important;">${cancelledDate}</span>${refundBadge}</div>
       `;
       
       box.appendChild(card);

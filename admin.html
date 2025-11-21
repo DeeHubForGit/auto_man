@@ -13,6 +13,15 @@
   <script src="assets/js/modal.js"></script>
 </head>
 <body class="bg-gray-50 text-gray-900">
+  <style>
+    /* Prevent white background on notification icon buttons */
+    #refundAlertIcon:focus,
+    #refundAlertIcon:active,
+    #messageAlertIcon:focus,
+    #messageAlertIcon:active {
+      background-color: #f3f4f6 !important;
+    }
+  </style>
   <!-- Auth scripts -->
   <div data-include="partials/auth-scripts.html"></div>
   <!-- Shared Header - permanent container prevents layout shift -->
@@ -21,7 +30,28 @@
   </div>
 
   <main class="container mx-auto px-4 py-8">
-    <h1 class="text-3xl font-extrabold mb-6">Admin Dashboard</h1>
+    <div class="flex items-center gap-3 mb-6">
+      <h1 class="text-2xl sm:text-3xl font-extrabold whitespace-nowrap">Admin Dashboard</h1>
+      
+      <!-- Notification Icons -->
+      <div id="adminNotifications" class="flex items-center gap-3 flex-shrink-0">
+        <!-- Refund Alerts -->
+        <button id="refundAlertIcon" style="background-color: transparent !important;" class="hidden relative p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-all" onclick="showRefundAlerts()" title="Refund alerts" type="button">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-gray-900 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span id="refundAlertBadge" class="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-red-600 rounded-full min-w-[20px] pointer-events-none"></span>
+        </button>
+        
+        <!-- Unread Messages -->
+        <button id="messageAlertIcon" style="background-color: transparent !important;" class="hidden relative p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-all" onclick="showUnreadMessages()" title="Unread messages" type="button">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-gray-900 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          <span id="messageAlertBadge" class="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-red-600 rounded-full min-w-[20px] pointer-events-none"></span>
+        </button>
+      </div>
+    </div>
 
     <div id="notAdmin" class="hidden p-4 border rounded bg-amber-50 text-amber-800 mb-8">
       You do not have access to this page.
@@ -144,6 +174,83 @@
       const navItem = document.getElementById(`nav-${section}`);
       if (navItem) navItem.classList.add('is-active');
     }
+    
+    // Notification icon handlers
+    window.showRefundAlerts = function() {
+      console.log('[admin] showRefundAlerts called');
+      showSection('cancellations');
+      // Wait for section to be visible, then set filters
+      setTimeout(() => {
+        const eligibilityFilter = document.getElementById('refundEligibilityFilter');
+        const statusFilter = document.getElementById('refundStatusFilter');
+        console.log('[admin] Setting filters:', { eligibilityFilter: !!eligibilityFilter, statusFilter: !!statusFilter });
+        if (eligibilityFilter) {
+          eligibilityFilter.value = 'eligible';
+          eligibilityFilter.dispatchEvent(new Event('change'));
+        }
+        if (statusFilter) {
+          statusFilter.value = 'not-refunded';
+          statusFilter.dispatchEvent(new Event('change'));
+        }
+      }, 200);
+    };
+    
+    window.showUnreadMessages = function() {
+      showSection('contacts');
+      // Set filter to unread and load
+      if (window.adminContactsLoadAndFilter) {
+        window.adminContactsLoadAndFilter('unread');
+      }
+    };
+    
+    // Update notification badges
+    window.updateNotificationBadges = async function() {
+      if (!window.supabaseClient) return;
+      
+      try {
+        // Count unrefunded cancellations that are refund eligible
+        const { data: cancellations, error: cancelError } = await window.supabaseClient
+          .from('booking')
+          .select('id, refunded, refund_eligible')
+          .eq('status', 'cancelled')
+          .eq('is_booking', true)
+          .eq('refund_eligible', true);
+        
+        const refundCount = cancellations?.filter(b => !b.refunded).length || 0;
+        
+        // Get unread messages count
+        const { data: messageData, error: messageError } = await window.supabaseClient
+          .from('contact_messages')
+          .select('id')
+          .eq('is_read', false);
+        
+        const messageCount = messageData?.length || 0;
+        
+        // Update refund alert
+        const refundIcon = document.getElementById('refundAlertIcon');
+        const refundBadge = document.getElementById('refundAlertBadge');
+        if (refundCount > 0) {
+          if (refundIcon) refundIcon.classList.remove('hidden');
+          if (refundBadge) refundBadge.textContent = refundCount;
+        } else {
+          if (refundIcon) refundIcon.classList.add('hidden');
+        }
+        
+        // Update message alert
+        const messageIcon = document.getElementById('messageAlertIcon');
+        const messageBadge = document.getElementById('messageAlertBadge');
+        if (messageCount > 0) {
+          if (messageIcon) messageIcon.classList.remove('hidden');
+          if (messageBadge) messageBadge.textContent = messageCount;
+        } else {
+          if (messageIcon) messageIcon.classList.add('hidden');
+        }
+        
+        console.log('[admin] Notification badges updated:', { refundCount, messageCount });
+      } catch (error) {
+        console.error('[admin] Error updating notification badges:', error);
+      }
+    };
 
 
     // Wire up
@@ -175,6 +282,14 @@
       }
       
       const ok = await ensureAdmin();
+      
+      if (ok) {
+        // Update notification badges on load
+        await window.updateNotificationBadges();
+        
+        // Refresh notification badges every 30 seconds
+        setInterval(window.updateNotificationBadges, 30000);
+      }
       
       // Show first section by default
       showSection('calendar');

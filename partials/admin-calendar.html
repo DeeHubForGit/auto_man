@@ -791,7 +791,7 @@
       console.log('[mobile] Found', cards.length, 'booking cards');
       
       if (cards.length === 0) {
-        console.warn('[mobile] No booking cards found to attach listeners to');
+        // No cards yet - calendar may still be loading, this is normal
         return;
       }
       

@@ -23,6 +23,35 @@
   #contactsScrollContainer::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
   }
+  
+  .contact-card {
+    background-color: #dbeafe !important;
+    border: 2px solid #3b82f6 !important;
+    border-radius: 0.5rem !important;
+    color: #111827 !important;
+    box-shadow: none !important;
+    padding: 1rem !important;
+    transition: all 0.2s ease !important;
+  }
+  
+  .contact-card.unread {
+    border-color: #3b82f6 !important;
+    border-width: 3px !important;
+    box-shadow: 0 0 0 1px #3b82f6 !important;
+  }
+  
+  .contact-card.read {
+    background-color: #f3f4f6 !important;
+    border-color: #9ca3af !important;
+  }
+  
+  .contact-card * {
+    color: #111827 !important;
+  }
+  
+  .contact-card svg {
+    color: #4b5563 !important;
+  }
 </style>
 
 <section id="section-contacts" class="section-content bg-white border rounded-2xl shadow-sm p-5 hidden">
@@ -50,6 +79,14 @@
       placeholder="Search by name, email, or message..." 
       class="flex-1 min-w-[200px] bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
     />
+    <select 
+      id="contactReadFilter" 
+      class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+    >
+      <option value="all">All Messages</option>
+      <option value="unread">Unread Only</option>
+      <option value="read">Read Only</option>
+    </select>
     <select 
       id="contactSort" 
       class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -122,7 +159,6 @@
     if (reloadSpinner) reloadSpinner.classList.remove('hidden');
     if (reloadBtn) reloadBtn.disabled = true;
     
-    console.log('[admin-contacts] Loading contact messages...');
     box.innerHTML = '<div class="p-8 text-center text-gray-500">Loading messages...</div>';
     
     try {
@@ -131,8 +167,6 @@
         .select('*')
         .order('created_at', { ascending: false })
         .limit(100);
-      
-      console.log('[admin-contacts] Contact messages response:', { status, statusText, error, rowCount: data?.length });
       
       if (error) {
         console.error('[admin-contacts] Error loading contacts:', error);
@@ -144,7 +178,6 @@
       currentPage = 1; // Reset to first page on reload
       renderContactMessages();
       
-      console.log('[admin-contacts] Loaded', allContactMessages.length, 'contact messages');
     } catch (e) {
       console.error('[admin-contacts] Unexpected error loading contacts:', e);
       box.innerHTML = `<div class="p-4 text-center text-red-600">Error: ${e?.message || String(e)}</div>`;
@@ -159,6 +192,7 @@
   function renderContactMessages() {
     const box = document.getElementById('contactsList');
     const searchTerm = (document.getElementById('contactSearch')?.value || '').toLowerCase();
+    const readFilter = document.getElementById('contactReadFilter')?.value || 'all';
     const sortOrder = document.getElementById('contactSort')?.value || 'newest';
     const perPage = parseInt(document.getElementById('contactsPerPage')?.value || '10');
     const contactsCount = document.getElementById('contactsCount');
@@ -171,6 +205,11 @@
     
     // Filter messages
     let filtered = allContactMessages.filter(row => {
+      // Read status filter
+      if (readFilter === 'unread' && row.is_read) return false;
+      if (readFilter === 'read' && !row.is_read) return false;
+      
+      // Search filter
       if (!searchTerm) return true;
       const name = (row.name || '').toLowerCase();
       const email = (row.email || '').toLowerCase();
@@ -234,7 +273,6 @@
     if (nextBtn) {
       nextBtn.disabled = currentPage >= totalPages;
     }
-    
     // Render
     box.innerHTML = '';
     
@@ -248,7 +286,12 @@
     
     paginatedMessages.forEach(row => {
       const card = document.createElement('div');
-      card.className = 'contact-card mb-3 cursor-pointer';
+      // Add visual indicator for unread messages - unread gets bright blue border, read gets gray
+      const isRead = row.is_read;
+      const readClass = isRead ? 'read' : 'unread';
+      card.className = `contact-card ${readClass} mb-3 cursor-pointer`;
+      card.setAttribute('data-message-id', row.id);
+      card.setAttribute('data-is-read', isRead);
       
       const name = row.name || 'Anonymous';
       const email = row.email || '';
@@ -263,8 +306,14 @@
         second: '2-digit'
       });
       
+      // Unread badge
+      const unreadBadge = row.is_read ? '' : '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 ml-2">NEW</span>';
+      
       card.innerHTML = `
-        <div class="font-semibold mb-1">${name}</div>
+        <div class="font-semibold mb-1 flex items-center">
+          ${name}
+          ${unreadBadge}
+        </div>
 
         <div class="text-sm mb-1 flex items-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -291,6 +340,43 @@
       box.appendChild(card);
     });
   }
+  
+  // Mark message as read
+  async function markMessageAsRead(messageId) {
+    if (!window.supabaseClient) {
+      console.error('[admin-contacts] supabaseClient not available');
+      return;
+    }
+    
+    try {
+      const { data, error } = await window.supabaseClient
+        .from('contact_messages')
+        .update({ is_read: true })
+        .eq('id', messageId)
+        .select();
+      
+      if (error) {
+        console.error('[admin-contacts] Error marking message as read:', error);
+        return;
+      }
+      
+      // Update the message in our local array
+      const message = allContactMessages.find(m => m.id === messageId);
+      if (message) {
+        message.is_read = true;
+      }
+      
+      // Re-render to update UI
+      renderContactMessages();
+      
+      // Update notification badges if available
+      if (window.updateNotificationBadges) {
+        window.updateNotificationBadges();
+      }
+    } catch (error) {
+      console.error('[admin-contacts] Error marking message as read:', error);
+    }
+  }
 
   // Wire up when partial loads
   if (window.adminContactsReady) {
@@ -311,6 +397,14 @@
         });
       }
       
+      const contactReadFilter = document.getElementById('contactReadFilter');
+      if (contactReadFilter) {
+        contactReadFilter.addEventListener('change', () => {
+          currentPage = 1; // Reset to page 1 when filter changes
+          renderContactMessages();
+        });
+      }
+      
       const contactSort = document.getElementById('contactSort');
       if (contactSort) {
         contactSort.addEventListener('change', () => {
@@ -324,6 +418,24 @@
         contactsPerPage.addEventListener('change', () => {
           currentPage = 1; // Reset to page 1 when per-page changes
           renderContactMessages();
+        });
+      }
+      
+      // Click on message card to mark as read (like email clients)
+      const contactsList = document.getElementById('contactsList');
+      if (contactsList) {
+        contactsList.addEventListener('click', (e) => {
+          // Find the card element (could be clicking on child elements)
+          const card = e.target.closest('.contact-card');
+          if (card) {
+            const messageId = card.getAttribute('data-message-id');
+            const isRead = card.getAttribute('data-is-read') === 'true';
+            
+            // Only mark as read if currently unread
+            if (messageId && !isRead) {
+              markMessageAsRead(messageId);
+            }
+          }
         });
       }
       
@@ -351,6 +463,19 @@
       }
       
       loadContacts();
+    };
+    
+    // Expose functions globally for notification icons
+    window.adminContactsLoadAndFilter = function(readFilter) {
+      const filterDropdown = document.getElementById('contactReadFilter');
+      if (filterDropdown && readFilter) {
+        filterDropdown.value = readFilter;
+      }
+      loadContacts();
+    };
+    
+    window.adminContactsGetUnreadCount = function() {
+      return allContactMessages.filter(m => !m.is_read).length;
     };
     
     if (document.readyState === 'loading') {

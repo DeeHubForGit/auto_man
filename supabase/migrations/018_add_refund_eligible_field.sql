@@ -6,12 +6,20 @@
 ALTER TABLE booking 
 ADD COLUMN IF NOT EXISTS refund_eligible BOOLEAN DEFAULT NULL;
 
--- Step 2: Create a function to calculate refund eligibility
+-- Step 2: Drop any existing version of the function (in case of parameter type changes)
+DROP FUNCTION IF EXISTS calculate_refund_eligible(TIMESTAMPTZ, TIMESTAMPTZ, TEXT);
+DROP FUNCTION IF EXISTS calculate_refund_eligible(TIMESTAMPTZ, TIMESTAMPTZ, booking_status);
+
+-- Create the function to calculate refund eligibility
 CREATE OR REPLACE FUNCTION calculate_refund_eligible(
   p_start_time TIMESTAMPTZ,
   p_cancelled_at TIMESTAMPTZ,
-  p_status TEXT
-) RETURNS BOOLEAN AS $$
+  p_status booking_status
+) RETURNS BOOLEAN 
+LANGUAGE plpgsql 
+IMMUTABLE 
+STRICT
+AS $$
 BEGIN
   -- Only cancelled bookings can be refund eligible
   IF p_status != 'cancelled' OR p_cancelled_at IS NULL OR p_start_time IS NULL THEN
@@ -22,7 +30,7 @@ BEGIN
   -- If cancelled 24+ hours before the booking, eligible for refund
   RETURN (EXTRACT(EPOCH FROM (p_start_time - p_cancelled_at)) / 3600) >= 24;
 END;
-$$ LANGUAGE plpgsql IMMUTABLE;
+$$;
 
 -- Step 3: Create trigger function to auto-calculate refund_eligible
 CREATE OR REPLACE FUNCTION update_refund_eligible()
@@ -47,7 +55,7 @@ CREATE TRIGGER trigger_update_refund_eligible
 
 -- Step 5: Backfill existing cancelled bookings
 UPDATE booking
-SET refund_eligible = calculate_refund_eligible(start_time::TIMESTAMPTZ, cancelled_at::TIMESTAMPTZ, status::TEXT)
+SET refund_eligible = calculate_refund_eligible(start_time, cancelled_at, status)
 WHERE status = 'cancelled';
 
 -- Step 6: Create index for efficient queries

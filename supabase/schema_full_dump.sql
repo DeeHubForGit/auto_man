@@ -1,7 +1,7 @@
 -- =====================================================================
 -- AUTO MAN DRIVING SCHOOL - DATABASE SCHEMA (PUBLIC SCHEMA ONLY)
 -- =====================================================================
--- Generated FROM pg_dump, cleaned to include only public schema elements
+-- Generated from pg_dump, cleaned to include only public schema elements
 -- Excludes: auth, extensions, graphql, pgbouncer, realtime, storage, vault schemas
 -- =====================================================================
 
@@ -57,7 +57,7 @@ CREATE TABLE public.client (
     intake_completed boolean DEFAULT false
 );
 
-COMMENT ON COLUMN public.client.intake_completed IS 'Tracks whether client has completed the intake form (permit/licence AND medical conditions)';
+COMMENT ON COLUMN public.client.intake_completed IS 'Tracks whether client has completed the intake form (permit/licence and medical conditions)';
 
 -- Service table: defines available driving lesson services
 CREATE TABLE public.service (
@@ -131,8 +131,8 @@ CREATE TABLE public.booking (
 
 COMMENT ON COLUMN public.booking.refunded IS 'Whether a refund has been processed for this cancelled booking';
 COMMENT ON COLUMN public.booking.refunded_at IS 'Timestamp when the refund was marked as processed';
-COMMENT ON COLUMN public.booking.cancelled_by IS 'Email of person who cancelled (client email, admin email, OR NULL for unknown/Google sync)';
-COMMENT ON COLUMN public.booking.refund_eligible IS 'Automatically calculated: TRUE IF cancelled 24+ hours before start_time, FALSE IF <24h, NULL IF NOT cancelled';
+COMMENT ON COLUMN public.booking.cancelled_by IS 'Email of person who cancelled (client email, admin email, or NULL for unknown/Google sync)';
+COMMENT ON COLUMN public.booking.refund_eligible IS 'Automatically calculated: TRUE if cancelled 24+ hours before start_time, FALSE if <24h, NULL if not cancelled';
 
 -- Client credit table: tracks lesson package credits
 CREATE TABLE public.client_credit (
@@ -324,85 +324,85 @@ CREATE FUNCTION public.handle_new_user() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO ''
     AS $$
-BEGIN
+begin
   -- Insert a new client record with the user's email
-  INSERT INTO public.client (id, email, created_at, updated_at)
-  VALUES (
+  insert into public.client (id, email, created_at, updated_at)
+  values (
     new.id,   -- Use the same UUID as auth.users for easy linking
     new.email,
     now(),
     now()
   )
-  ON CONFLICT (email) DO NOTHING;  -- Skip IF email already exists
+  on conflict (email) do nothing;  -- Skip if email already exists
   
-  RETURN new;
-END;
+  return new;
+end;
 $$;
 
 COMMENT ON FUNCTION public.handle_new_user() IS 'Automatically creates a client record when a new user signs up via Supabase Auth';
 
--- Function: Check IF current user is admin
+-- Function: Check if current user is admin
 CREATE FUNCTION public.is_admin() RETURNS boolean
     LANGUAGE sql SECURITY DEFINER
     SET search_path TO ''
     AS $$
-  SELECT COALESCE(auth.jwt()->>'email', '') 
+  select coalesce(auth.jwt()->>'email', '') 
   in ('darren@automandrivingschool.com.au');
 $$;
 
--- Function: SET updated_at timestamp
+-- Function: Set updated_at timestamp
 CREATE FUNCTION public.set_updated_at() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO ''
     AS $$
-BEGIN
+begin
   new.updated_at = now();
-  RETURN new;
-END;
+  return new;
+end;
 $$;
 
--- Function: SET client progress updated timestamp
+-- Function: Set client progress updated timestamp
 CREATE FUNCTION public.set_client_progress_updated() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO ''
     AS $$
-BEGIN
+begin
   new.updated_at = now();
-  RETURN new;
-END;
+  return new;
+end;
 $$;
 
--- Function: UPDATE credits remaining
+-- Function: Update credits remaining
 CREATE FUNCTION public.update_credits_remaining() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO ''
     AS $$
-BEGIN
+begin
   new.credits_remaining := new.credits_total - new.credits_used;
-  RETURN new;
-END;
+  return new;
+end;
 $$;
 
--- Function: SET booking start date
+-- Function: Set booking start date
 CREATE FUNCTION public.booking_set_start_date() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO ''
     AS $$
-BEGIN
+begin
   new.start_date := (new.start_time at time zone 'Australia/Melbourne')::date;
-  RETURN new;
-END;
+  return new;
+end;
 $$;
 
--- Function: SET booking start minute
+-- Function: Set booking start minute
 CREATE FUNCTION public.booking_set_start_minute() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO ''
     AS $$
-BEGIN
+begin
   new.start_minute := date_trunc('minute', new.start_time);
-  RETURN new;
-END;
+  return new;
+end;
 $$;
 
 -- Function: Calculate refund eligibility
@@ -420,7 +420,7 @@ BEGIN
 END;
 $$;
 
--- Function: UPDATE refund eligibility
+-- Function: Update refund eligibility
 CREATE FUNCTION public.update_refund_eligible() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
@@ -445,7 +445,7 @@ BEGIN
     cancelled_at = COALESCE(cancelled_at, p_cancelled_at, NOW()),  -- Use provided timestamp, fallback to NOW()
     updated_at = NOW()
   WHERE google_event_id = p_google_event_id
-    AND status != 'cancelled';  -- Only UPDATE IF NOT already cancelled
+    AND status != 'cancelled';  -- Only update if not already cancelled
 END;
 $$;
 
@@ -453,100 +453,100 @@ $$;
 CREATE FUNCTION public.mark_past_bookings_completed() RETURNS void
     LANGUAGE plpgsql
     AS $$
-BEGIN
-  UPDATE public.booking
-  SET
+begin
+  update public.booking
+  set
     status = 'completed',
     updated_at = now()
-  WHERE
+  where
     status = 'confirmed'
-    AND end_time < now();  -- end_time is timestamptz, so this is safe
-END;
+    and end_time < now();  -- end_time is timestamptz, so this is safe
+end;
 $$;
 
--- Function: Map service code FROM Google Calendar event
+-- Function: Map service code from Google Calendar event
 CREATE FUNCTION public.map_service_code(p_summary text, p_minutes integer) RETURNS text
     LANGUAGE plpgsql
     SET search_path TO ''
     AS $$
-DECLARE
+declare
   v_code      text;
   v_is_senior boolean := false;
   v_is_manual boolean := false;
   v_is_auto   boolean := false;
   v_mins      int     := p_minutes;
   v_num       text;
-BEGIN
+begin
   -- 1) Prefer explicit [code] in title, e.g. "Automatic 1h [auto_60]"
-  IF p_summary ~ '\[[A-Za-z0-9_]+\]' THEN
+  if p_summary ~ '\[[A-Za-z0-9_]+\]' then
     v_code := regexp_replace(p_summary, '.*\[(\w+)\].*', '\1');
-    RETURN v_code;
-  end IF;
+    return v_code;
+  end if;
 
-  -- 2) Extract flags FROM keywords
-  v_is_senior := p_summary ILIKE '%senior%';
-  v_is_manual := p_summary ILIKE '%manual%';
-  v_is_auto   := p_summary ILIKE '%automatic%' OR (NOT v_is_manual);  -- default to auto IF NOT manual
+  -- 2) Extract flags from keywords
+  v_is_senior := p_summary ilike '%senior%';
+  v_is_manual := p_summary ilike '%manual%';
+  v_is_auto   := p_summary ilike '%automatic%' or (not v_is_manual);  -- default to auto if not manual
 
-  -- 3) IF minutes NOT provided, try to parse (e.g., "1.5", "1.5h", "2 hour")
-  IF v_mins is null OR v_mins <= 0 THEN
+  -- 3) If minutes not provided, try to parse (e.g., "1.5", "1.5h", "2 hour")
+  if v_mins is null or v_mins <= 0 then
     -- get the first number like 1, 1.5, 2, 2.0
-    SELECT (regexp_matches(p_summary, '(\d+(?:\.\d+)?)', 'i'))[1]
-      INTO v_num;
+    select (regexp_matches(p_summary, '(\d+(?:\.\d+)?)', 'i'))[1]
+      into v_num;
 
-    IF v_num is NOT null THEN
-      v_mins := CEIL((v_num)::numeric * 60)::int;  -- '1.5' => 90
-    end IF;
-  end IF;
+    if v_num is not null then
+      v_mins := ceil((v_num)::numeric * 60)::int;  -- '1.5' => 90
+    end if;
+  end if;
 
-  -- 4) Normalize minutes INTO our SKUs
-  IF v_mins BETWEEN 1 AND 70 THEN
+  -- 4) Normalize minutes into our SKUs
+  if v_mins between 1 and 70 then
     v_mins := 60;
-  ELSIF v_mins BETWEEN 71 AND 105 THEN
+  elsif v_mins between 71 and 105 then
     v_mins := 90;
-  ELSE
+  else
     v_mins := 120;
-  end IF;
+  end if;
 
   -- 5) Compose code
-  IF v_is_senior AND v_is_manual THEN
-    RETURN FORMAT('senior_manual_%s', v_mins);
-  ELSIF v_is_senior THEN
-    RETURN FORMAT('senior_auto_%s', v_mins);
-  ELSIF v_is_manual THEN
-    RETURN FORMAT('manual_%s', v_mins);
-  ELSE
-    RETURN FORMAT('auto_%s', v_mins);
-  end IF;
-END;
+  if v_is_senior and v_is_manual then
+    return format('senior_manual_%s', v_mins);
+  elsif v_is_senior then
+    return format('senior_auto_%s', v_mins);
+  elsif v_is_manual then
+    return format('manual_%s', v_mins);
+  else
+    return format('auto_%s', v_mins);
+  end if;
+end;
 $$;
 
--- Function: Upsert booking FROM Google Calendar
+-- Function: Upsert booking from Google Calendar
 CREATE FUNCTION public.upsert_booking_from_google(p_google_event_id text, p_calendar_id text, p_client_email text, p_first_name text, p_last_name text, p_mobile text, p_service_code text, p_price_cents integer, p_start timestamp without time zone, p_end timestamp without time zone, p_pickup text, p_extended jsonb, p_is_booking boolean, p_title text) RETURNS TABLE(booking_id uuid, was_inserted boolean, sms_sent_at timestamp with time zone)
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO ''
     AS $$
-DECLARE
+declare
   v_client_id    uuid;
   v_booking_id   uuid;
   v_was_inserted boolean;
   v_sms_sent_at  timestamptz;
   v_xmax         xid;
-BEGIN
-  -- Upsert client (only IF email is provided)
-  IF p_client_email is NOT null THEN
-    INSERT INTO public.client (email, first_name, last_name, mobile)
-    VALUES (p_client_email, p_first_name, p_last_name, p_mobile)
-    ON CONFLICT (email) DO UPDATE
-      SET first_name = COALESCE(EXCLUDED.first_name, public.client.first_name),
-          last_name  = COALESCE(EXCLUDED.last_name,  public.client.last_name),
-          mobile     = COALESCE(EXCLUDED.mobile,     public.client.mobile),
+begin
+  -- Upsert client (only if email is provided)
+  if p_client_email is not null then
+    insert into public.client (email, first_name, last_name, mobile)
+    values (p_client_email, p_first_name, p_last_name, p_mobile)
+    on conflict (email) do update
+      set first_name = coalesce(excluded.first_name, public.client.first_name),
+          last_name  = coalesce(excluded.last_name,  public.client.last_name),
+          mobile     = coalesce(excluded.mobile,     public.client.mobile),
           updated_at = now()
-    RETURNING id INTO v_client_id;
-  end IF;
+    returning id into v_client_id;
+  end if;
 
   -- Upsert booking
-  INSERT INTO public.booking (
+  insert into public.booking (
     client_id,
     google_event_id,
     google_calendar_id,
@@ -564,49 +564,49 @@ BEGIN
     email,
     mobile
   )
-  VALUES (
+  values (
     v_client_id,
     p_google_event_id,
     p_calendar_id,
     'google',
-    COALESCE(p_is_booking, true),
+    coalesce(p_is_booking, true),
     p_service_code,
     p_price_cents,
     p_start,
     p_end,
     p_pickup,
-    COALESCE(p_extended, '{}'::jsonb),
+    coalesce(p_extended, '{}'::jsonb),
     p_title,
     p_first_name,
     p_last_name,
     p_client_email,
     p_mobile
   )
-  ON CONFLICT (google_event_id) DO UPDATE
-    SET client_id          = COALESCE(EXCLUDED.client_id, public.booking.client_id),
-        google_calendar_id = EXCLUDED.google_calendar_id,
-        is_booking         = COALESCE(EXCLUDED.is_booking, public.booking.is_booking),
-        service_code       = EXCLUDED.service_code,
-        price_cents        = EXCLUDED.price_cents,
-        start_time         = EXCLUDED.start_time,
-        end_time           = EXCLUDED.end_time,
-        pickup_location    = COALESCE(EXCLUDED.pickup_location, public.booking.pickup_location),
-        extended           = COALESCE(EXCLUDED.extended, '{}'::jsonb),
-        event_title        = COALESCE(EXCLUDED.event_title, public.booking.event_title),
-        first_name         = COALESCE(EXCLUDED.first_name, public.booking.first_name),
-        last_name          = COALESCE(EXCLUDED.last_name, public.booking.last_name),
-        email              = COALESCE(EXCLUDED.email, public.booking.email),
-        mobile             = COALESCE(EXCLUDED.mobile, public.booking.mobile),
+  on conflict (google_event_id) do update
+    set client_id          = coalesce(excluded.client_id, public.booking.client_id),
+        google_calendar_id = excluded.google_calendar_id,
+        is_booking         = coalesce(excluded.is_booking, public.booking.is_booking),
+        service_code       = excluded.service_code,
+        price_cents        = excluded.price_cents,
+        start_time         = excluded.start_time,
+        end_time           = excluded.end_time,
+        pickup_location    = coalesce(excluded.pickup_location, public.booking.pickup_location),
+        extended           = coalesce(excluded.extended, '{}'::jsonb),
+        event_title        = coalesce(excluded.event_title, public.booking.event_title),
+        first_name         = coalesce(excluded.first_name, public.booking.first_name),
+        last_name          = coalesce(excluded.last_name, public.booking.last_name),
+        email              = coalesce(excluded.email, public.booking.email),
+        mobile             = coalesce(excluded.mobile, public.booking.mobile),
         updated_at         = now()
-  RETURNING public.booking.id,
+  returning public.booking.id,
             public.booking.sms_confirm_sent_at,
             (xmax = 0)
-    INTO v_booking_id, v_sms_sent_at, v_was_inserted;
+    into v_booking_id, v_sms_sent_at, v_was_inserted;
 
-  -- RETURN the result with all required fields
-  RETURN query
-    SELECT v_booking_id, v_was_inserted, v_sms_sent_at;
-END;
+  -- Return the result with all required fields
+  return query
+    select v_booking_id, v_was_inserted, v_sms_sent_at;
+end;
 $$;
 
 -- Function: Log Google Calendar event action
@@ -614,11 +614,11 @@ CREATE FUNCTION public.log_gcal_event_action(p_sync_log_id bigint, p_calendar_id
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO ''
     AS $$
-BEGIN
-  INSERT INTO public.gcal_sync_event_log (
+begin
+  insert into public.gcal_sync_event_log (
     sync_log_id, calendar_id, event_id, booking_id, action, message
   )
-  VALUES (
+  values (
     p_sync_log_id,
     p_calendar_id,
     p_event_id,
@@ -626,7 +626,7 @@ BEGIN
     p_action,
     p_message
   );
-END;
+end;
 $$;
 
 -- =====================================================================
@@ -639,43 +639,43 @@ CREATE TRIGGER on_auth_user_created
     FOR EACH ROW 
     EXECUTE FUNCTION public.handle_new_user();
 
--- Trigger: UPDATE timestamp on client changes
+-- Trigger: Update timestamp on client changes
 CREATE TRIGGER t_client_updated 
     BEFORE UPDATE ON public.client 
     FOR EACH ROW 
     EXECUTE FUNCTION public.set_updated_at();
 
--- Trigger: UPDATE timestamp on booking changes
+-- Trigger: Update timestamp on booking changes
 CREATE TRIGGER t_booking_updated 
     BEFORE UPDATE ON public.booking 
     FOR EACH ROW 
     EXECUTE FUNCTION public.set_updated_at();
 
--- Trigger: UPDATE timestamp on client progress changes
+-- Trigger: Update timestamp on client progress changes
 CREATE TRIGGER t_client_progress_updated 
     BEFORE UPDATE ON public.client_progress 
     FOR EACH ROW 
     EXECUTE FUNCTION public.set_client_progress_updated();
 
--- Trigger: UPDATE remaining credits on client_credit changes
+-- Trigger: Update remaining credits on client_credit changes
 CREATE TRIGGER t_client_credit_remaining 
     BEFORE INSERT OR UPDATE ON public.client_credit 
     FOR EACH ROW 
     EXECUTE FUNCTION public.update_credits_remaining();
 
--- Trigger: SET booking start date
+-- Trigger: Set booking start date
 CREATE TRIGGER trg_booking_set_start_date 
     BEFORE INSERT OR UPDATE OF start_time ON public.booking 
     FOR EACH ROW 
     EXECUTE FUNCTION public.booking_set_start_date();
 
--- Trigger: SET booking start minute
+-- Trigger: Set booking start minute
 CREATE TRIGGER trg_booking_set_start_minute 
     BEFORE INSERT OR UPDATE OF start_time ON public.booking 
     FOR EACH ROW 
     EXECUTE FUNCTION public.booking_set_start_minute();
 
--- Trigger: UPDATE refund eligibility
+-- Trigger: Update refund eligibility
 CREATE TRIGGER trigger_update_refund_eligible 
     BEFORE INSERT OR UPDATE OF start_time, cancelled_at, status ON public.booking 
     FOR EACH ROW 
@@ -908,7 +908,7 @@ CREATE POLICY contact_messages_select ON public.contact_messages FOR SELECT TO a
 CREATE POLICY "Allow admin to read contact messages" ON public.contact_messages FOR SELECT TO authenticated 
     USING ((EXISTS ( SELECT 1 FROM public.client WHERE ((client.id = auth.uid()) AND (client.is_admin = true)))));
 
-CREATE POLICY "Allow authenticated to UPDATE contact messages" ON public.contact_messages FOR UPDATE TO authenticated 
+CREATE POLICY "Allow authenticated to update contact messages" ON public.contact_messages FOR UPDATE TO authenticated 
     USING (true) WITH CHECK (true);
 
 CREATE POLICY "Service role full access contact_messages" ON public.contact_messages TO service_role 
@@ -983,4 +983,3 @@ CREATE POLICY slot_select_free ON public.availability_slot_old FOR SELECT
 -- =====================================================================
 -- END OF SCHEMA
 -- =====================================================================
-

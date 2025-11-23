@@ -44,16 +44,15 @@
   /* Cancellation card header layout */
   .cancelled-card-header {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 0.5rem;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 0.75rem;
     margin-bottom: 0.5rem;
   }
   
   .cancelled-card-title {
     font-weight: 600;
     font-size: 1rem;
-    flex: 1;
   }
   
   /* Container – keeps $ + text on one line */
@@ -477,6 +476,9 @@
     // Already initialized
   } else {
     window.adminCancellationsReady = true;
+    
+    // Expose renderCancellations globally for filter reset from admin.html
+    window.renderCancellations = renderCancellations;
     
     const initCancellations = () => {
       const reloadCancellationsBtn = document.getElementById('reloadCancellations');

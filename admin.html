@@ -158,7 +158,7 @@
     }
 
     // Section navigation like portal.html
-    function showSection(section) {
+    function showSection(section, source = 'sidebar') {
       // Hide all sections
       document.querySelectorAll('.section-content').forEach(el => el.classList.add('hidden'));
 
@@ -173,12 +173,34 @@
 
       const navItem = document.getElementById(`nav-${section}`);
       if (navItem) navItem.classList.add('is-active');
+      
+      // Reset filters to default when navigating to cancellations from sidebar
+      if (section === 'cancellations' && source === 'sidebar') {
+        setTimeout(() => {
+          const searchInput = document.getElementById('cancellationSearch');
+          const sortSelect = document.getElementById('cancellationSort');
+          const eligibilityFilter = document.getElementById('refundEligibilityFilter');
+          const statusFilter = document.getElementById('refundStatusFilter');
+          const perPageSelect = document.getElementById('cancellationsPerPage');
+          
+          if (searchInput) searchInput.value = '';
+          if (sortSelect) sortSelect.value = 'newest';
+          if (eligibilityFilter) eligibilityFilter.value = 'all';
+          if (statusFilter) statusFilter.value = 'all';
+          if (perPageSelect) perPageSelect.value = '10';
+          
+          // Trigger render with reset filters
+          if (window.renderCancellations) {
+            window.renderCancellations();
+          }
+        }, 50);
+      }
     }
     
     // Notification icon handlers
     window.showRefundAlerts = function() {
       console.log('[admin] showRefundAlerts called');
-      showSection('cancellations');
+      showSection('cancellations', 'alert');
       // Wait for section to be visible, then set filters
       setTimeout(() => {
         const eligibilityFilter = document.getElementById('refundEligibilityFilter');

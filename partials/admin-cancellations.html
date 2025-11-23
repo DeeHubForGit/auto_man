@@ -105,6 +105,17 @@
   .refund-eligibility--eligible .refund-status-text {
     color: #166534 !important;
   }
+  
+  /* Cancelled date styling based on eligibility */
+  .cancelled--not-eligible {
+    color: #dc2626 !important;
+    font-weight: 600;
+  }
+  
+  .cancelled--eligible {
+    color: #166534 !important;
+    font-weight: 600;
+  }
 </style>
 
 <section id="section-cancellations" class="section-content bg-white border rounded-2xl shadow-sm p-5 hidden">
@@ -434,6 +445,9 @@
       }) : '';
       const refundedDisplay = row.refunded ? `<span style="color: #065f46; font-weight: 500;">${refundedDate}</span>` : '<span style="color: #6b7280;">Not refunded</span>';
       
+      // Determine cancelled date class based on eligibility
+      const cancelledClass = row.refund_eligible ? 'cancelled--eligible' : 'cancelled--not-eligible';
+      
       card.innerHTML = `
         <div class="cancelled-card-header">
           <div class="cancelled-card-title">${fullName}</div>
@@ -441,7 +455,7 @@
         </div>
         <div class="text-sm mb-1"><strong>Service:</strong> ${serviceName}</div>
         <div class="text-sm mb-1"><strong>Original booking:</strong> ${bookingDate}</div>
-        <div class="text-sm mb-2"><strong style="color: #ef4444 !important;">Cancelled:</strong> <span style="color: #ef4444 !important;">${cancelledDate}</span></div>
+        <div class="text-sm mb-2 ${cancelledClass}"><strong>Cancelled:</strong> ${cancelledDate}</div>
         <div class="text-sm" style="border-top: 1px solid #e5e7eb; padding-top: 8px; margin-top: 4px;">
           <label style="display: flex; align-items: center; cursor: pointer; user-select: none;">
             <input type="checkbox" ${refundedChecked} 

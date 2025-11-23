@@ -40,6 +40,71 @@
   .cancellation-card svg {
     color: #4b5563 !important;
   }
+  
+  /* Cancellation card header layout */
+  .cancelled-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .cancelled-card-title {
+    font-weight: 600;
+    font-size: 1rem;
+    flex: 1;
+  }
+  
+  /* Container – keeps $ + text on one line */
+  .refund-eligibility {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  
+  /* The $ icon in a small pill */
+  .refund-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 9999px;
+    border-width: 1px;
+    border-style: solid;
+    font-weight: 600;
+  }
+  
+  /* Text next to it */
+  .refund-status-text {
+    font-weight: 600;
+  }
+  
+  /* ===== Colour variants ===== */
+  
+  /* Not eligible – red theme */
+  .refund-eligibility--not-eligible .refund-icon {
+    background-color: #fee2e2 !important;
+    border-color: #dc2626;
+    color: #b91c1c !important;
+  }
+  .refund-eligibility--not-eligible .refund-status-text {
+    color: #b91c1c !important;
+  }
+  
+  /* Eligible – green/teal theme */
+  .refund-eligibility--eligible .refund-icon {
+    background-color: #dcfce7 !important;
+    border-color: #16a34a;
+    color: #166534 !important;
+  }
+  .refund-eligibility--eligible .refund-status-text {
+    color: #166534 !important;
+  }
 </style>
 
 <section id="section-cancellations" class="section-content bg-white border rounded-2xl shadow-sm p-5 hidden">
@@ -317,7 +382,6 @@
       const firstName = row.first_name || '';
       const lastName = row.last_name || '';
       const fullName = `${firstName} ${lastName}`.trim() || 'Unknown';
-      const email = row.email || '';
       // Remove "Driving Lesson" from service name for mobile-friendly display
       const serviceName = (row.service?.name || row.service_code || 'Unknown service').replace(/Driving Lesson\s*—?\s*/i, '');
       
@@ -344,10 +408,18 @@
       let refundBadge = '';
       if (row.refund_eligible === true) {
         // Sufficient notice - refund eligible
-        refundBadge = `<span style="display: inline-block; background-color: #d1fae5; color: #065f46; border: 1px solid #10b981; border-radius: 4px; padding: 2px 6px; font-size: 11px; font-weight: 600; margin-left: 8px;">✓ Refund eligible</span>`;
+        refundBadge = `<div class="refund-eligibility refund-eligibility--eligible" 
+          title="Cancelled more than 24 hours before lesson start. Eligible for refund.">
+          <span class="refund-icon">$</span>
+          <span class="refund-status-text">Eligible</span>
+        </div>`;
       } else if (row.refund_eligible === false) {
         // Late cancellation - no refund
-        refundBadge = `<span style="display: inline-block; background-color: #fee2e2; color: #991b1b; border: 1px solid #ef4444; border-radius: 4px; padding: 2px 6px; font-size: 11px; font-weight: 600; margin-left: 8px;">❗ No refund (<24h)</span>`;
+        refundBadge = `<div class="refund-eligibility refund-eligibility--not-eligible"
+          title="Cancelled less than 24 hours before lesson start. Not eligible for refund.">
+          <span class="refund-icon">$</span>
+          <span class="refund-status-text">Not eligible</span>
+        </div>`;
       }
       
       // Refund tracking checkbox and date
@@ -363,10 +435,13 @@
       const refundedDisplay = row.refunded ? `<span style="color: #065f46; font-weight: 500;">${refundedDate}</span>` : '<span style="color: #6b7280;">Not refunded</span>';
       
       card.innerHTML = `
-        <div class="font-semibold mb-2">${fullName} (${email})</div>
+        <div class="cancelled-card-header">
+          <div class="cancelled-card-title">${fullName}</div>
+          ${refundBadge}
+        </div>
         <div class="text-sm mb-1"><strong>Service:</strong> ${serviceName}</div>
         <div class="text-sm mb-1"><strong>Original booking:</strong> ${bookingDate}</div>
-        <div class="text-sm mb-2"><strong style="color: #ef4444 !important;">Cancelled:</strong> <span style="color: #ef4444 !important;">${cancelledDate}</span>${refundBadge}</div>
+        <div class="text-sm mb-2"><strong style="color: #ef4444 !important;">Cancelled:</strong> <span style="color: #ef4444 !important;">${cancelledDate}</span></div>
         <div class="text-sm" style="border-top: 1px solid #e5e7eb; padding-top: 8px; margin-top: 4px;">
           <label style="display: flex; align-items: center; cursor: pointer; user-select: none;">
             <input type="checkbox" ${refundedChecked} 

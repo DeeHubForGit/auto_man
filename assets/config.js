@@ -32,7 +32,8 @@ const SITE_CONFIG = {
       duration: '1 hour', // Default lesson duration
       cost: '$85', // Base price
       costDescription: '$85 per hour', // Full description for service cards
-      priceAlt: 'or $76 per hour in a package', // Alternative pricing text
+      // priceAlt: 'or $76 per hour in a package', // Alternative pricing text  PACKAGES LATER
+      priceAlt: 'or $82.50 per hour for a 2 hour lesson',
       costNote: null
     },
     {
@@ -60,7 +61,8 @@ const SITE_CONFIG = {
       duration: '1 hour',
       cost: '$85', // Base price
       costDescription: '$85 per hour', // Full description for service cards
-      priceAlt: 'or $76 per hour in a package',
+      //priceAlt: 'or $76 per hour in a package',  PACKAGES LATER
+      priceAlt: 'or $82.50 per hour for a 2 hour lesson',
       costNote: null
     },
     {
@@ -74,7 +76,8 @@ const SITE_CONFIG = {
       duration: '1 hour',
       cost: '$85', // Base price
       costDescription: '$85 per hour', // Full description for service cards
-      priceAlt: 'or $76 per hour in a package',
+      // priceAlt: 'or $76 per hour in a package',  PACKAGES LATER
+      priceAlt: 'or $82.50 per hour for a 2 hour lesson',
       costNote: null
     },
     {

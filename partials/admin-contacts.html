@@ -40,17 +40,56 @@
     box-shadow: 0 0 0 1px #3b82f6 !important;
   }
   
+  /* Read: softer, slightly duller blue instead of grey */
   .contact-card.read {
-    background-color: #f3f4f6 !important;
-    border-color: #9ca3af !important;
+    background-color: #e5edff !important;   /* soft blue-tinted grey */
+    border-color: #94a3b8 !important;       /* slate-400 */
   }
   
-  .contact-card * {
-    color: #111827 !important;
+  /* Only colour normal text, not buttons */
+  .contact-card p,
+  .contact-card span,
+  .contact-card div,
+  .contact-card strong,
+  .contact-card em {
+    color: #111827;
   }
   
   .contact-card svg {
     color: #4b5563 !important;
+  }
+  
+  /* Contact card header layout */
+  .contact-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+  }
+  
+  .mark-unread-btn {
+    background: #e0edff !important;        /* soft blue */
+    border: 1px solid #3b82f6 !important;   /* blue outline */
+    border-radius: 6px;
+    color: #1e40af !important;              /* darker blue text */
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 3px 10px;
+    white-space: nowrap;
+    transition: all 0.2s;
+  }
+
+  .mark-unread-btn:hover {
+    background-color: transparent !important;
+    border-color: #3b82f6 !important;   /* bright blue-500 */
+    color: #3b82f6 !important;           /* same bright blue */
+    transform: none !important;
+    box-shadow: none !important;
+  }
+
+  .contact-card-name {
+    font-weight: 600;
   }
 </style>
 
@@ -307,12 +346,18 @@
       });
       
       // Unread badge
-      const unreadBadge = row.is_read ? '' : '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 ml-2">NEW</span>';
+      const unreadBadge = '';
+      
+      // Mark as unread button (only show for read messages)
+      const markUnreadBtn = row.is_read 
+        ? `<button class="btn mark-unread-btn" type="button">Mark as unread</button>`
+        : '';
       
       card.innerHTML = `
-        <div class="font-semibold mb-1 flex items-center">
-          ${name}
+        <div class="contact-card-header">
+          <span class="contact-card-name">${name}</span>
           ${unreadBadge}
+          ${markUnreadBtn}
         </div>
 
         <div class="text-sm mb-1 flex items-center gap-2">
@@ -377,12 +422,52 @@
       console.error('[admin-contacts] Error marking message as read:', error);
     }
   }
+  
+  // Mark message as unread
+  async function markMessageAsUnread(messageId) {
+    if (!window.supabaseClient) {
+      console.error('[admin-contacts] supabaseClient not available');
+      return;
+    }
+    
+    try {
+      const { data, error } = await window.supabaseClient
+        .from('contact_messages')
+        .update({ is_read: false })
+        .eq('id', messageId)
+        .select();
+      
+      if (error) {
+        console.error('[admin-contacts] Error marking message as unread:', error);
+        return;
+      }
+      
+      // Update the message in our local array
+      const message = allContactMessages.find(m => m.id === messageId);
+      if (message) {
+        message.is_read = false;
+      }
+      
+      // Re-render to update UI
+      renderContactMessages();
+      
+      // Update notification badges if available
+      if (window.updateNotificationBadges) {
+        window.updateNotificationBadges();
+      }
+    } catch (error) {
+      console.error('[admin-contacts] Error marking message as unread:', error);
+    }
+  }
 
   // Wire up when partial loads
   if (window.adminContactsReady) {
     // Already initialized
   } else {
     window.adminContactsReady = true;
+    
+    // Expose function globally for onclick handler
+    window.markContactAsUnread = markMessageAsUnread;
     
     const initContacts = () => {
       const reloadContactsBtn = document.getElementById('reloadContacts');
@@ -425,6 +510,23 @@
       const contactsList = document.getElementById('contactsList');
       if (contactsList) {
         contactsList.addEventListener('click', (e) => {
+          // Handle "Mark as unread" button clicks
+          const unreadBtn = e.target.closest('.mark-unread-btn');
+          if (unreadBtn) {
+            e.stopPropagation();
+            const card = unreadBtn.closest('.contact-card');
+            const messageId = card ? card.getAttribute('data-message-id') : null;
+            
+            console.log('[admin-contacts] Mark as unread clicked, card:', card, 'messageId:', messageId);
+            
+            if (messageId) {
+              markMessageAsUnread(messageId);
+            } else {
+              console.error('[admin-contacts] Could not find message ID');
+            }
+            return;
+          }
+          
           // Find the card element (could be clicking on child elements)
           const card = e.target.closest('.contact-card');
           if (card) {

@@ -195,6 +195,15 @@
           }
         }, 50);
       }
+      
+      // Reset filter to unread when navigating to contacts from sidebar
+      if (section === 'contacts' && source === 'sidebar') {
+        setTimeout(() => {
+          if (window.adminContactsLoadAndFilter) {
+            window.adminContactsLoadAndFilter('unread');
+          }
+        }, 50);
+      }
     }
     
     // Notification icon handlers
@@ -218,7 +227,7 @@
     };
     
     window.showUnreadMessages = function() {
-      showSection('contacts');
+      showSection('contacts', 'alert');
       // Set filter to unread and load
       if (window.adminContactsLoadAndFilter) {
         window.adminContactsLoadAndFilter('unread');

@@ -172,10 +172,10 @@ function renderLessonPricing(containerId = 'lesson-pricing-grid') {
 
   if (!Array.isArray(lessons) || !lessons.length) return;
 
-  // Build booking URL - if googleCalendarUrl exists, embed it in google-booking.html
+  // Build booking URL - if googleCalendarUrl exists, open it directly in a new tab
   const bookingUrl = (lesson) => {
     if (lesson?.googleCalendarUrl) {
-      return `google-booking.html?bookingUrl=${encodeURIComponent(lesson.googleCalendarUrl)}`;
+      return lesson.googleCalendarUrl;
     }
     return 'booking.html';
   };
@@ -184,6 +184,8 @@ function renderLessonPricing(containerId = 'lesson-pricing-grid') {
     .map(
       (lesson) => `
         <a href="${bookingUrl(lesson)}"
+           target="_blank"
+           rel="noopener noreferrer"
            style="display:block;padding:12px;background:#1e3a8a22;border:1px solid #3b82f655;
                   border-radius:8px;text-decoration:none;transition:all .2s;cursor:pointer"
            onmouseover="this.style.background='#1e3a8a44';this.style.borderColor='#3b82f6'"

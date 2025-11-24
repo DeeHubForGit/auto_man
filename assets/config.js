@@ -218,7 +218,7 @@ const SITE_CONFIG = {
   
   // Discounted pricing (e.g. senior) - used on senior-drivers.html
   LESSON_PRICING_DISCOUNTED: [
-    { duration: '1 hour', durationShort: '1hr', price: 75, googleCalendarUrl: 'https://calendar.app.google/vvE6utyXe4aa7BQb9', note: 'Incl pensioner discount' }
+    { duration: '1 hour', durationShort: '1hr', price: 75, googleCalendarUrl: 'https://calendar.app.google/vvE6utyXe4aa7BQb9', note: 'Including pensioner discount' }
   ],
 
   // Lesson packages

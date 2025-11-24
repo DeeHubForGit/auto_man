@@ -22,6 +22,13 @@
     .two-col-layout{display:grid;grid-template-columns:1fr;gap:30px;margin-bottom:30px}
     @media(min-width:768px){.two-col-layout{grid-template-columns:1fr 400px}}
     .sidebar-booking{position:sticky;top:80px;align-self:start}
+    .no-card-hover:hover {
+      box-shadow: none !important;
+      transform: none !important;
+    }
+    .price-amount {
+      pointer-events: none;
+    }
   </style>
   <script src="assets/config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -49,7 +56,7 @@
     <div class="two-col-layout">
       <!-- Left Column - Main Content -->
       <div>
-        <div class="card">
+        <div class="card" style="margin-bottom:0">
           <h2 style="margin-top:0;font-size:28px;margin-bottom:20px">Includes Pre-Test Lesson, Use of Vehicle and Accompanying You for Your Test</h2>
           
           <p style="font-size:18px;line-height:1.8;margin-bottom:24px">
@@ -59,7 +66,7 @@
 
           <ul class="feature-list">
             <li><strong>Suitable for any student wanting to feel prepared and confident for their Driving Test</strong> – Whether it's your first attempt or you're retaking the test</li>
-            <li><strong>We cater the lesson to your level of experience and ability</strong> – Personalized instruction focused on your specific needs</li>
+            <li><strong>We cater the lesson to your level of experience and ability</strong> – Personalised instruction focused on your specific needs</li>
             <li><strong>Modern, well-maintained vehicles</strong> – Learn in safe, reliable cars with dual controls</li>
             <li><strong>We will meet you at your preferred location</strong> – Convenient pick-up for your pre-test lesson</li>
             <li><strong>Parents are welcome to come along to the lesson</strong> – Family support is encouraged</li>
@@ -69,13 +76,19 @@
 
       <!-- Right Column - Booking Sidebar -->
       <div class="sidebar-booking">
-        <div class="card">
+        <div class="card" style="margin-bottom:0">
           <img src="images/driving-test.jpg" alt="Driving Test" style="width:100%;height:200px;object-fit:cover;border-radius:12px;margin-bottom:20px">
           
           <h3 style="margin:0 0 16px 0;font-size:24px;font-weight:700">Contact Us to Book Your Driving Test Package</h3>
           
-          <div style="margin:20px 0;padding:16px;background:rgba(59,130,246,0.1);border-left:4px solid var(--brand);border-radius:8px">
-            <h4 style="margin:0;font-size:28px;font-weight:700;color:var(--brand)" data-service-price="driving-test-package">$250*</h4>
+          <div class="card no-card-hover"
+              style="margin:20px 0;padding:16px;background:rgba(59,130,246,0.1);
+                      border-left:4px solid var(--brand);border-radius:8px">
+            <h4 class="text-blue-dark price-amount"
+                style="margin:0;font-size:28px;font-weight:700"
+                data-service-price="driving-test-package">
+              $300*
+            </h4>
           </div>
           
           <p style="font-size:14px;line-height:1.6;margin-bottom:16px;color:var(--muted)">
@@ -105,7 +118,7 @@
         </div>
         <div>
           <h3 class="text-blue-dark" style="margin-bottom:10px">Use of Instructor Vehicle</h3>
-          <p style="color:var(--muted);line-height:1.6">Take your test in our certified, well-maintained automatic transmission vehicle</p>
+          <p style="color:var(--muted);line-height:1.6">Take your test in our certified, well-maintained vehicle</p>
         </div>
         <div>
           <h3 class="text-blue-dark" style="margin-bottom:10px">Test Day Support</h3>
@@ -168,7 +181,8 @@
         </a>
       </div>
       <p style="margin-top:24px;font-size:14px;color:var(--muted)">
-        <strong>Area covered:</strong> Geelong and surrounding suburbs<br>
+        <strong>Area covered:</strong> 
+        <a href="service-areas.html" class="text-blue-dark">See Service Areas</a><br>
         <strong>Hours:</strong> Flexible scheduling to match your test time
       </p>
     </div>

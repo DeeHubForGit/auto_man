@@ -15,6 +15,9 @@ const SITE_CONFIG = {
   PHONE_NUMBER_DISPLAY: '0403 632 313', // For display (with spaces)
   EMAIL: 'info@automandrivingschool.com.au',
   
+  // Business hours
+  WORKING_HOURS: '10 am to 5 pm on weekends',
+  
   // Social media
   FACEBOOK_URL: 'https://www.facebook.com/auto.man.driving',
   FACEBOOK_HANDLE: '@auto.man.driving',
@@ -365,7 +368,7 @@ window.SITE_CONFIG.loadFromAPI = async function(apiUrl) {
     const phoneNodesToReplace = [];
     let node;
     while (node = walkerPhone.nextNode()) {
-      if (node.textContent.includes('{{PHONE}}') || node.textContent.includes('{{OWNER}}') || node.textContent.includes('{{EMAIL}}')) {
+      if (node.textContent.includes('{{PHONE}}') || node.textContent.includes('{{OWNER}}') || node.textContent.includes('{{EMAIL}}') || node.textContent.includes('{{HOURS}}')) {
         phoneNodesToReplace.push(node);
       }
     }
@@ -374,7 +377,8 @@ window.SITE_CONFIG.loadFromAPI = async function(apiUrl) {
       n.textContent = n.textContent
         .replace(/\{\{PHONE\}\}/g, SITE_CONFIG.PHONE_NUMBER_DISPLAY)
         .replace(/\{\{OWNER\}\}/g, SITE_CONFIG.OWNER_NAME)
-        .replace(/\{\{EMAIL\}\}/g, SITE_CONFIG.EMAIL);
+        .replace(/\{\{EMAIL\}\}/g, SITE_CONFIG.EMAIL)
+        .replace(/\{\{HOURS\}\}/g, SITE_CONFIG.WORKING_HOURS);
     });
 
     // Replace {{PHONE_LINK}} in href attributes
@@ -407,6 +411,7 @@ window.SITE_CONFIG.loadFromAPI = async function(apiUrl) {
       ['{{EMAIL}}', SITE_CONFIG.EMAIL],
       ['{{PHONE}}', SITE_CONFIG.PHONE_NUMBER_DISPLAY || ''],
       ['{{FACEBOOK}}', SITE_CONFIG.FACEBOOK_HANDLE || ''],
+      ['{{HOURS}}', SITE_CONFIG.WORKING_HOURS || ''],
     ]);
     const walkerTokens = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
     const textNodes = [];

@@ -727,11 +727,13 @@
       if (booking.status === 'confirmed' && isUpcoming) {
         // Cancel button in header for confirmed bookings
         cancelButton = `
-          <button 
-            onclick="handleCancelBooking('${booking.id}', '${booking.google_event_id || ''}', this)" 
-            class="p-0.5" title="Cancel Booking" aria-label="Cancel Booking">
-            <i class="fa-solid fa-xmark text-2xl" style="color:#FF0000 !important;"></i>
-          </button>`;
+        <button 
+          onclick="handleCancelBooking('${booking.id}', '${booking.google_event_id || ''}', this)" 
+          class="cancel-btn" 
+          title="Cancel Booking" 
+          aria-label="Cancel Booking">
+          Cancel
+        </button>`;
       }
 
       // Service name
@@ -806,14 +808,14 @@
 
     function getServiceName(serviceCode) {
       const serviceNames = {
-        'auto_60': 'Automatic Lesson - 1 hour',
-        'auto_90': 'Automatic Lesson - 1.5 hours',
-        'auto_120': 'Automatic Lesson - 2 hours',
-        'manual_60': 'Manual Lesson - 1 hour',
-        'manual_90': 'Manual Lesson - 1.5 hours',
-        'manual_120': 'Manual Lesson - 2 hours',
-        'senior_auto_60': 'Senior Automatic Lesson - 1 hour',
-        'senior_manual_60': 'Senior Manual Lesson - 1 hour'
+        'auto_60': 'Automatic - 1 hour',
+        'auto_90': 'Automatic - 1.5 hours',
+        'auto_120': 'Automatic - 2 hours',
+        'manual_60': 'Manual - 1 hour',
+        'manual_90': 'Manual - 1.5 hours',
+        'manual_120': 'Manual - 2 hours',
+        'senior_auto_60': 'Senior Automatic - 1 hour',
+        'senior_manual_60': 'Senior Manual - 1 hour'
       };
       return serviceNames[serviceCode] || 'Driving Lesson';
     }

@@ -10,10 +10,10 @@
     color: #111827 !important;             /* gray-900 text */
   }
 
-  /* Ensure base colour applies only to normal text, not status */
-  #upcoming-list .booking-card *:not(.status-label):not(.status-label *),
-  #past-list .booking-card *:not(.status-label):not(.status-label *),
-  #cancelled-list .booking-card *:not(.status-label):not(.status-label *) {
+  /* Ensure base colour applies only to normal text, not status or buttons */
+  #upcoming-list .booking-card *:not(.status-label):not(.status-label *):not(button):not(.cancel-btn):not(.cancel-btn *),
+  #past-list .booking-card *:not(.status-label):not(.status-label *):not(button):not(.cancel-btn):not(.cancel-btn *),
+  #cancelled-list .booking-card *:not(.status-label):not(.status-label *):not(button):not(.cancel-btn):not(.cancel-btn *) {
     color: #111827 !important;
   }
 
@@ -101,6 +101,33 @@
     transform: translateY(-0.5px); /* micro-adjust for perfect centering */
     box-shadow: inset 0 1px 2px rgba(255,255,255,0.6),
                 0 1px 3px rgba(0,0,0,0.25);
+  }
+  
+  /* ------------------------------
+   Cancel Button (Portal Bookings)
+   ------------------------------ */
+  .cancel-btn {
+    padding: 2px 10px;                 /* px-2.5 py-0.5 */
+    font-size: 0.875rem;               /* text-sm */
+    font-weight: 500;                  /* font-medium */
+    color: #dc2626;                    /* red-600 */
+    border: 1px solid #dc2626;         /* red-600 border */
+    border-radius: 6px;                /* rounded-md */
+    background: transparent;
+    cursor: pointer;
+    transition: 
+      color 0.2s ease,
+      border-color 0.2s ease,
+      border-width 0.2s ease,
+      background-color 0.2s ease;
+  }
+  
+  /* Hover — stronger but consistent visual signal */
+  .cancel-btn:hover {
+    background-color: rgba(220, 38, 38, 0.10); /* red-600 @ 10% */
+    color: #b91c1c;                            /* red-700 */
+    border-color: #b91c1c;                     /* red-700 */
+    border-width: 2px;                         /* stronger outline */
   }
 </style>
 

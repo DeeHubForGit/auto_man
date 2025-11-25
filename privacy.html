@@ -11,10 +11,10 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/js/supabaseClient.js"></script>
   <script src="assets/include.js" defer></script>
-  <!-- Google Analytics -->
-  <div data-include="partials/analytics.html"></div>
 </head>
 <body class="bg-gray-50 text-gray-900">
+  <!-- Google Analytics -->
+  <div data-include="partials/analytics.html"></div>
   <!-- Auth scripts -->
   <div data-include="partials/auth-scripts.html"></div>
   <!-- Shared Header - permanent container prevents layout shift -->
@@ -66,26 +66,13 @@
           Online Bookings
         </h2>
         <p class="text-lg text-gray-700 leading-relaxed mb-4">
-          When you create an account with us to book your lesson, we need to collect personal information from you including name, address, phone number and email address.
+          When you make a booking with us, we collect essential information such as your name, email address, mobile number and pickup location. This information is required so we can manage your booking and contact you about your lesson.
         </p>
         <p class="text-lg text-gray-700 leading-relaxed mb-4">
-          We may contact you at the email address which you provide to us in order to:
+          Before your first lesson you will need to complete an intake form. This form collects information that instructors must have before conducting a driving lesson, including your licence or learner permit number, any medical conditions that may affect your driving and details about your driving experience or preferences.
         </p>
-        <ul class="space-y-2 ml-6 mb-4">
-          <li class="text-gray-700 flex items-start">
-            <span class="text-blue-600 mr-2 font-bold">•</span>
-            <span>Provide you with updated information about our website; or</span>
-          </li>
-          <li class="text-gray-700 flex items-start">
-            <span class="text-blue-600 mr-2 font-bold">•</span>
-            <span>Provide you with other information about our services which you may enjoy.</span>
-          </li>
-        </ul>
         <p class="text-lg text-gray-700 leading-relaxed mb-4">
-          If you are receiving promotional information and do not wish to receive this information any longer, you may remove your name either by clicking the unsubscribe button at the bottom of a promotional email or e-mailing us.
-        </p>
-        <p class="text-lg text-gray-700 leading-relaxed">
-          Please allow 5 business days for this request to be processed.
+          Your information is used only for managing your lessons and providing a safe and suitable learning experience.
         </p>
       </div>
 
@@ -108,41 +95,6 @@
         </p>
       </div>
 
-      <!-- Facebook Pixel -->
-      <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
-        <h2 class="text-3xl font-bold mb-6 text-gray-900 flex items-center gap-3">
-          <svg class="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-          </svg>
-          Facebook Pixel
-        </h2>
-        <p class="text-lg text-gray-700 leading-relaxed mb-4">
-          Conversion tracking helps us measure the return on investment of Facebook Ads by reporting on the actions people take after viewing those ads. We create pixels that track conversions, add them to the pages of our website where the conversions happen, and then track these conversions back to ads we are running on Facebook.
-        </p>
-        <p class="text-lg text-gray-700 leading-relaxed mb-4">
-          No personal information is contained in or collected as a result of using these cookies or pixels.
-        </p>
-        <p class="text-lg text-gray-700 leading-relaxed">
-          To opt-out from Facebook's interest-based ads follow <a href="https://www.facebook.com/help/568137493302217" target="_blank" class="text-blue-600 hover:underline">these instructions from Facebook</a>.
-        </p>
-      </div>
-
-      <!-- Aggregation of Data -->
-      <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
-        <h2 class="text-3xl font-bold mb-6 text-gray-900 flex items-center gap-3">
-          <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-          </svg>
-          Aggregation of Data
-        </h2>
-        <p class="text-lg text-gray-700 leading-relaxed mb-4">
-          We may collect data, including personal information from our customers. This may be used to generate reports, statistics, and other data, to which we retain all intellectual property rights. You grant to us a royalty-free, worldwide, non-exclusive licence to aggregate that data with other data, including from other customers, as long as your information remains anonymous and you cannot be identified.
-        </p>
-        <p class="text-lg text-gray-700 leading-relaxed">
-          Please note the section on Cookies above which details the limited circumstances in which your information may be aggregated and used in connection with your identity. In all use of data, we comply with, and your rights are protected by, the Privacy Act 1988.
-        </p>
-      </div>
-
       <!-- Payment Information -->
       <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
         <h2 class="text-3xl font-bold mb-6 text-gray-900 flex items-center gap-3">
@@ -152,26 +104,10 @@
           Payment Information
         </h2>
         <p class="text-lg text-gray-700 leading-relaxed mb-4">
-          When you book a lesson with us online you will provide information such as your name and contact details. We use this information to identify and process your booking. When a booking is made through our website, customer credit card details are collected and stored by our payment provider which facilitates further use of your credit card at checkout.
+          When you book a lesson, any payment is processed securely through Google's booking system using Stripe. Auto-Man Driving School does not collect, store or have access to your credit card details at any time.
         </p>
         <p class="text-lg text-gray-700 leading-relaxed">
-          Only the first and last four digits of the card can be viewed by Auto-Man Driving School staff to assist in the identification of the customer.
-        </p>
-      </div>
-
-      <!-- Secure Online Payment -->
-      <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
-        <h2 class="text-3xl font-bold mb-6 text-gray-900 flex items-center gap-3">
-          <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-          </svg>
-          Secure Online Payment
-        </h2>
-        <p class="text-lg text-gray-700 leading-relaxed mb-4">
-          There are a number of payment methods you can use when making a booking on our website. If you are directed to a third-party website, their privacy policy will govern the use of your information.
-        </p>
-        <p class="text-lg text-gray-700 leading-relaxed">
-          The payment process through our website is protected by industry-standard encryption. The payment process is protected by industry-standard encryption between the customers' browser and our website, and again between our website and the payment gateway. This prevents transaction information from being intercepted as it travels between the respective servers/computers.
+          All payment information is handled directly by Stripe, a certified PCI-compliant payment provider. Stripe processes and secures the transaction. Auto-Man Driving School does not receive any payment details, transaction data, or notifications from Stripe and cannot access your card number or any other sensitive information.
         </p>
       </div>
 
@@ -185,7 +121,7 @@
           Access to Information
         </h2>
         <p class="text-lg text-gray-700 leading-relaxed mb-4">
-          If at any time you want to know exactly what personal information we hold about you, you are welcome to access this by e-mailing us.
+          If at any time you want to know what personal information we hold about you, please contact us by email.
         </p>
         <p class="text-lg text-gray-700 leading-relaxed">
           This information will be made available to you within 5 business days.
@@ -201,7 +137,10 @@
           Changing and Deleting Information We Hold
         </h2>
         <p class="text-lg text-gray-700 leading-relaxed">
-          If at any time you wish to change personal information, please contact us by e-mailing us and we will amend this record. If you wish to have your personal information deleted, please email us and we will take all reasonable steps to delete it unless we need to keep it for legal reasons.
+          If you need to update any personal information, please email us and we will make the necessary changes.
+        </p>
+        <p class="text-lg text-gray-700 leading-relaxed">
+          If you wish to have your personal information deleted, please email us and we will take all reasonable steps to delete it unless we are required to keep it for legal reasons.
         </p>
       </div>
 
@@ -214,7 +153,10 @@
           Storage of Your Information
         </h2>
         <p class="text-lg text-gray-700 leading-relaxed">
-          We will endeavour to take all reasonable steps to keep secure any information that we hold about you, and to keep this information accurate and up to date. Your information is stored on secure servers that are protected in controlled facilities. We require our employees and data processors to respect the confidentiality of any personal information held by us.
+          We take reasonable steps to keep your personal information secure and up to date. All information is stored on secure cloud servers provided by Supabase, which maintains industry-standard security protections.
+        </p>
+        <p class="text-lg text-gray-700 leading-relaxed">
+          Access to your information is limited to authorised Auto-Man Driving School staff who require it to manage your bookings and lessons.
         </p>
       </div>
 
@@ -227,7 +169,7 @@
           Password and Login
         </h2>
         <p class="text-lg text-gray-700 leading-relaxed">
-          If we provide you with a username and password you are responsible for the security of your password and log-in information. You take responsibility to ensure the confidentiality of this information.
+          When you create an account on our website you use your email address and choose your own password. You are responsible for keeping your password confidential and ensuring that your login details are not shared with anyone. Auto-Man Driving School cannot access your password and cannot recover it for you.
         </p>
       </div>
 
@@ -240,7 +182,7 @@
           Links to External Websites
         </h2>
         <p class="text-lg text-gray-700 leading-relaxed">
-          Our website may have links to external websites. These linked sites are not under our control, and we are not responsible for the conduct of companies linked to our website. Before disclosing your personal information on any other website, we advise you to read the Privacy Policy and the Terms of Service of the website.
+          Our website may have links to external websites. These linked sites are not under our control, and we are not responsible for the conduct of companies linked to our website. Before disclosing your personal information on any other website, we advise you to read the Privacy Policy and Terms of Service of those websites.
         </p>
       </div>
 
@@ -256,17 +198,17 @@
           From time to time, our policies will be reviewed and may be revised. We reserve the right to change our Privacy Policy at any time and notify you by posting an updated version of the policy on our website.
         </p>
         <p class="text-lg text-gray-700 leading-relaxed">
-          By using our site, you consent to our Terms of Service, Terms and conditions of website use, payment terms, security policy and privacy policy.
+          By using our site, you consent to our Terms and Conditions and this Privacy Policy.
         </p>
       </div>
 
       <!-- Contact -->
-      <div class="bg-blue-50 rounded-xl p-8 text-center">
-        <h3 class="text-2xl font-bold mb-4 text-gray-900">Questions About Our Privacy Policy?</h3>
-        <p class="text-gray-700 mb-6">
+      <div class="bg-gradient-to-r from-blue-600 to-blue-500 rounded-2xl p-10 text-center text-white">
+        <h3 class="text-2xl font-bold mb-4">Questions About Our Privacy Policy?</h3>
+        <p class="mb-6">
           If you have any queries about any of our policies, please don't hesitate to contact us.
         </p>
-        <a href="contact.html" class="btn btn-primary px-8 py-3">
+        <a href="contact.html" class="btn btn-primary-light px-8 py-3">
           Contact Us
         </a>
       </div>

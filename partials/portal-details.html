@@ -136,6 +136,19 @@
         <label class="flex items-start gap-3 cursor-pointer">
           <input 
             type="checkbox" 
+            id="isBeginner" 
+            name="is_beginner"
+            class="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          />
+          <div>
+            <span class="text-sm font-medium text-gray-900">I am a complete beginner</span>
+            <p class="text-xs text-gray-500">We'll start with the basics and build your confidence</p>
+          </div>
+        </label>
+
+        <label class="flex items-start gap-3 cursor-pointer">
+          <input 
+            type="checkbox" 
             id="isAnxiousNervous" 
             name="is_anxious_nervous"
             class="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
@@ -149,41 +162,39 @@
         <label class="flex items-start gap-3 cursor-pointer">
           <input 
             type="checkbox" 
-            id="isBeginner" 
-            name="is_beginner"
-            class="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-          />
-          <div>
-            <span class="text-sm font-medium text-gray-900">I am a complete beginner</span>
-            <p class="text-xs text-gray-500">We'll start with the basics</p>
-          </div>
-        </label>
-
-        <label class="flex items-start gap-3 cursor-pointer">
-          <input 
-            type="checkbox" 
             id="isSenior" 
             name="is_senior"
             class="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
           />
           <div>
             <span class="text-sm font-medium text-gray-900">I am a senior driver</span>
-            <p class="text-xs text-gray-500">Preparing for retest or refresher</p>
+            <p class="text-xs text-gray-500">We'll provide help and support as you prepare for a retest</p>
           </div>
         </label>
       </div>
 
       <div class="mt-4">
-        <label class="block text-sm font-medium text-gray-700 mb-2" for="learningNeedsOther">
-          Other Learning Needs or Preferences
+        <label class="flex items-start gap-3 cursor-pointer">
+          <input 
+            type="checkbox" 
+            id="hasOtherLearningNeeds" 
+            name="has_other_learning_needs"
+            class="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            onchange="toggleOtherLearningNeeds()"
+          />
+          <div class="flex-1">
+            <span class="text-sm font-medium text-gray-900">I have other learning needs or preferences</span>
+            <p class="text-xs text-gray-500 mb-2">Please tell us anything else that would help us tailor your lessons</p>
+            <input 
+              type="text" 
+              id="learningNeedsOther" 
+              name="learning_needs_other"
+              disabled
+              placeholder="Please specify..."
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+            />
+          </div>
         </label>
-        <textarea 
-          id="learningNeedsOther" 
-          name="learning_needs_other"
-          rows="3"
-          placeholder="Any other information that would help us tailor your lessons"
-          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        ></textarea>
       </div>
     </div>
 
@@ -294,6 +305,19 @@
   sanitizePhoneInput(document.getElementById('mobile'), 'mobileError', isValidAuMobile);
   sanitizePhoneInput(document.getElementById('emergencyContactPhone'), 'emergencyContactPhoneError', isValidAuPhone);
 
+  // Toggle other learning needs text input
+  function toggleOtherLearningNeeds() {
+    const checkbox = document.getElementById('hasOtherLearningNeeds');
+    const textbox = document.getElementById('learningNeedsOther');
+    textbox.disabled = !checkbox.checked;
+    if (checkbox.checked) {
+      textbox.focus();
+    } else {
+      textbox.value = '';
+    }
+  }
+  window.toggleOtherLearningNeeds = toggleOtherLearningNeeds;
+
   // Per-field validation on blur
   document.getElementById('mobile').addEventListener('blur', function(){
     const v = this.value.trim();
@@ -331,7 +355,13 @@
     document.getElementById('isAnxiousNervous').checked = data.is_anxious_nervous || false;
     document.getElementById('isBeginner').checked = data.is_beginner || false;
     document.getElementById('isSenior').checked = data.is_senior || false;
+    
+    // Handle other learning needs checkbox and text
+    const hasOther = data.learning_needs_other ? true : false;
+    document.getElementById('hasOtherLearningNeeds').checked = hasOther;
     document.getElementById('learningNeedsOther').value = data.learning_needs_other || '';
+    document.getElementById('learningNeedsOther').disabled = !hasOther;
+    
     document.getElementById('notes').value = data.notes || '';
   }
 
@@ -427,12 +457,10 @@
       is_anxious_nervous: document.getElementById('isAnxiousNervous').checked,
       is_beginner: document.getElementById('isBeginner').checked,
       is_senior: document.getElementById('isSenior').checked,
-      learning_needs_other: document.getElementById('learningNeedsOther').value.trim() || null,
+      learning_needs_other: document.getElementById('hasOtherLearningNeeds').checked ? document.getElementById('learningNeedsOther').value.trim() : null,
       notes: document.getElementById('notes').value.trim() || null,
       updated_at: new Date().toISOString()
     };
-
-
     
     console.log('Validation passed, saving data...');
 

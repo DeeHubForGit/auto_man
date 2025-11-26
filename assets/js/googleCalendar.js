@@ -75,10 +75,11 @@ window.GoogleCalendar = (function() {
    * Cancel a booking (updates database and Google Calendar)
    * @param {string} bookingId - The booking ID
    * @param {string} googleEventId - The Google Calendar event ID (optional)
+   * @param {string} cancelledBy - Email of person who cancelled (optional)
    * @returns {Promise<{success: boolean, error?: string}>}
    */
-  async function cancelBooking(bookingId, googleEventId) {
-    console.log('[GoogleCalendar] Starting booking cancellation:', { bookingId, googleEventId });
+  async function cancelBooking(bookingId, googleEventId, cancelledBy = null) {
+    console.log('[GoogleCalendar] Starting booking cancellation:', { bookingId, googleEventId, cancelledBy });
 
     try {
       // Step 1: Cancel in Google Calendar first (if event ID exists)
@@ -102,12 +103,19 @@ window.GoogleCalendar = (function() {
         throw new Error('Supabase client not available');
       }
 
+      const updateData = { 
+        status: 'cancelled',
+        cancelled_at: new Date().toISOString()
+      };
+      
+      // Add cancelled_by if provided
+      if (cancelledBy) {
+        updateData.cancelled_by = cancelledBy;
+      }
+
       const { error: dbError } = await window.supabaseClient
         .from('booking')
-        .update({ 
-          status: 'cancelled',
-          cancelled_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', bookingId);
 
       if (dbError) {

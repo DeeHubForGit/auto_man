@@ -1,11 +1,11 @@
 <!-- Admin Calendar Section -->
-<script src="assets/js/googleCalendar.js"></script>
+<script src="assets/js/googleCalendar.js?v=3"></script>
 <style>
   /* Scoped styles for calendar bookings */
   #section-calendar .booking-card {
     cursor: pointer;
     transition: all 0.2s ease;
-    overflow: hidden;
+    overflow: visible;
   }
   
   #section-calendar .booking-card .booking-time {
@@ -46,6 +46,40 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  
+  /* Cancel button styling */
+  #section-calendar .booking-cancel-btn {
+    float: right;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    padding: 2px;
+    border: none;
+    background: transparent;
+    color: #dc2626;
+    border-radius: 3px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+  }
+  
+  #section-calendar .booking-cancel-btn:hover {
+    background: transparent;
+    color: #d44949
+  }
+  
+  #section-calendar .booking-cancel-btn svg {
+    display: block;
+  }
+  
+  /* Show cancel button always for now */
+  #section-calendar .booking-card .booking-cancel-btn {
+    display: inline-flex;
   }
   
   /* Ensure status dropdown is always visible in expanded state */
@@ -697,6 +731,13 @@
           }
           
           bookingDiv.innerHTML = `
+            <button class="booking-cancel-btn" data-booking-id="${booking.id}" data-google-event-id="${booking.google_event_id || ''}" title="Cancel booking" aria-label="Cancel booking">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="15" y1="9" x2="9" y2="15"></line>
+                <line x1="9" y1="9" x2="15" y2="15"></line>
+              </svg>
+            </button>
             <div class="booking-summary">
               ${summaryHTML}
             </div>
@@ -740,7 +781,7 @@
               'Are you sure you want to cancel this booking?',
               async () => {
                 // User confirmed - proceed with cancellation
-                await updateBookingStatus(this, bookingId, newStatus, originalStatus);
+                await handleBookingCancellation(this, bookingId, originalStatus);
               },
               () => {
                 // User cancelled - revert to original status
@@ -752,7 +793,7 @@
           } else {
             // Fallback to native confirm if Modal not loaded
             if (confirm('Are you sure you want to cancel this booking?')) {
-              await updateBookingStatus(this, bookingId, newStatus, originalStatus);
+              await handleBookingCancellation(this, bookingId, originalStatus);
             } else {
               this.value = originalStatus;
             }
@@ -760,6 +801,36 @@
         } else {
           // For other status changes, update immediately
           await updateBookingStatus(this, bookingId, newStatus, originalStatus);
+        }
+      });
+    });
+    
+    // Add event listeners to all cancel buttons
+    document.querySelectorAll('.booking-cancel-btn').forEach(btn => {
+      btn.addEventListener('click', async function(e) {
+        e.stopPropagation(); // Prevent card expansion on mobile
+        
+        const bookingId = this.getAttribute('data-booking-id');
+        const googleEventId = this.getAttribute('data-google-event-id');
+        
+        console.log(`[calendar] Cancel button clicked for booking ${bookingId}`);
+        
+        // Show confirmation modal
+        if (window.Modal && window.Modal.confirm) {
+          window.Modal.confirm(
+            'Are you sure you want to cancel this booking?',
+            async () => {
+              // User confirmed - proceed with cancellation
+              await handleBookingCancellation(this, bookingId, null, googleEventId);
+            },
+            null,
+            'Cancel Booking'
+          );
+        } else {
+          // Fallback to native confirm if Modal not loaded
+          if (confirm('Are you sure you want to cancel this booking?')) {
+            await handleBookingCancellation(this, bookingId, null, googleEventId);
+          }
         }
       });
     });
@@ -855,9 +926,10 @@
         card.dataset.mobileListenerAdded = 'true';
         card.addEventListener('click', (e) => {
           console.log('[mobile] Card clicked');
-          // Ignore clicks on the status dropdowns or close button
+          // Ignore clicks on the status dropdowns, close button, or cancel button
           if (e.target.closest('.booking-status-select')) return;
           if (e.target.closest('.booking-close-btn')) return;
+          if (e.target.closest('.booking-cancel-btn')) return;
 
           e.stopPropagation();
 
@@ -956,6 +1028,95 @@
       }, 100);
     });
     
+    // Helper function to get current admin email
+    async function getAdminEmail() {
+      if (!window.supabaseClient) {
+        console.error('[calendar] getAdminEmail: supabaseClient not available');
+        return null;
+      }
+      
+      try {
+        const { data: { session } } = await window.supabaseClient.auth.getSession();
+        return session?.user?.email || null;
+      } catch (error) {
+        console.error('[calendar] Error getting admin email:', error);
+        return null;
+      }
+    }
+    
+    // Helper function to handle booking cancellation (used by both cancel button and status change)
+    async function handleBookingCancellation(element, bookingId, originalStatus = null, googleEventId = null) {
+      // Get google event ID from element if not provided
+      if (!googleEventId && element.hasAttribute('data-google-event-id')) {
+        googleEventId = element.getAttribute('data-google-event-id');
+      }
+      
+      // Get admin email
+      const adminEmail = await getAdminEmail();
+      
+      // Disable the element while processing
+      const isDropdown = element.tagName === 'SELECT';
+      const originalBg = element.style.backgroundColor;
+      if (isDropdown) {
+        element.style.backgroundColor = '#fef3c7'; // yellow-100
+      }
+      element.disabled = true;
+      
+      try {
+        // Use the shared Google Calendar cancellation function
+        if (window.GoogleCalendar && window.GoogleCalendar.cancelBooking) {
+          const result = await window.GoogleCalendar.cancelBooking(bookingId, googleEventId, adminEmail);
+          
+          if (!result.success) {
+            throw new Error(result.error || 'Failed to cancel booking');
+          }
+          
+          console.log('[calendar] ✅ Booking cancelled successfully');
+          
+          // If this is a status dropdown, update its state
+          if (isDropdown) {
+            element.setAttribute('data-original-status', 'cancelled');
+            element.value = 'cancelled';
+            element.style.backgroundColor = '#d1fae5'; // green-100
+          }
+          
+          // Refresh the calendar after a short delay to show the updated state
+          setTimeout(() => {
+            console.log('[calendar] Refreshing calendar view after cancellation...');
+            renderWeek(weekStart);
+          }, 1500);
+        } else {
+          throw new Error('GoogleCalendar not available');
+        }
+      } catch (err) {
+        console.error('[calendar] Exception cancelling booking:', err);
+        
+        // If this is a status dropdown and we have an original status, revert to it
+        if (isDropdown && originalStatus) {
+          element.value = originalStatus;
+        }
+        
+        if (window.Modal && window.Modal.error) {
+          window.Modal.error('Failed to cancel booking: ' + err.message);
+        } else {
+          alert('Failed to cancel booking: ' + err.message);
+        }
+        
+        if (isDropdown) {
+          element.style.backgroundColor = '#fee2e2'; // red-100
+        }
+      } finally {
+        element.disabled = false;
+        
+        // Restore original background after delay (only for dropdowns)
+        if (isDropdown) {
+          setTimeout(() => {
+            element.style.backgroundColor = originalBg;
+          }, 2000);
+        }
+      }
+    }
+    
     // Helper function to update booking status
     async function updateBookingStatus(selectElement, bookingId, newStatus, originalStatus) {
       const originalBg = selectElement.style.backgroundColor;
@@ -963,76 +1124,32 @@
       selectElement.disabled = true;
       
       try {
-        // If cancelling, use Google Calendar integration
+        // If cancelling, use Google Calendar integration with admin email tracking
         if (newStatus === 'cancelled') {
           const googleEventId = selectElement.getAttribute('data-google-event-id');
-          
-          // Use the shared Google Calendar cancellation function
-          if (window.GoogleCalendar && window.GoogleCalendar.cancelBooking) {
-            const result = await window.GoogleCalendar.cancelBooking(bookingId, googleEventId);
-            
-            if (!result.success) {
-              throw new Error(result.error || 'Failed to cancel booking');
-            }
-            
-            console.log('[calendar] ✅ Booking cancelled successfully (including Google Calendar)');
-            selectElement.setAttribute('data-original-status', newStatus);
-            selectElement.style.backgroundColor = '#d1fae5'; // green-100
-            
-            // Refresh the calendar after a short delay to show the updated state
-            setTimeout(() => {
-              console.log('[calendar] Refreshing calendar view after cancellation...');
-              if (typeof renderWeek === 'function' && window.currentWeekStart) {
-                renderWeek(window.currentWeekStart);
-              } else {
-                // Fallback: reload the page
-                window.location.reload();
-              }
-            }, 1500);
-          } else {
-            // Fallback if GoogleCalendar not loaded - just update database
-            console.warn('[calendar] GoogleCalendar not available, updating database only');
-            const { error } = await window.supabaseClient
-              .from('booking')
-              .update({ status: newStatus })
-              .eq('id', bookingId);
-            
-            if (error) throw error;
-            
-            selectElement.setAttribute('data-original-status', newStatus);
-            selectElement.style.backgroundColor = '#d1fae5'; // green-100
-            
-            // Refresh the calendar after a short delay
-            setTimeout(() => {
-              console.log('[calendar] Refreshing calendar view after cancellation...');
-              if (typeof renderWeek === 'function' && window.currentWeekStart) {
-                renderWeek(window.currentWeekStart);
-              } else {
-                window.location.reload();
-              }
-            }, 1500);
-          }
+          await handleBookingCancellation(selectElement, bookingId, originalStatus, googleEventId);
+          return; // handleBookingCancellation manages the rest
+        }
+        
+        // For non-cancellation status changes, update database directly
+        const { error } = await window.supabaseClient
+          .from('booking')
+          .update({ status: newStatus })
+          .eq('id', bookingId);
+        
+        if (error) {
+          console.error('[calendar] Error updating status:', error);
+          selectElement.value = originalStatus;
+          alert('Failed to update booking status: ' + error.message);
+          selectElement.style.backgroundColor = '#fee2e2'; // red-100
         } else {
-          // For non-cancellation status changes, update database directly
-          const { error } = await window.supabaseClient
-            .from('booking')
-            .update({ status: newStatus })
-            .eq('id', bookingId);
+          console.log('[calendar] ✅ Status updated successfully');
+          selectElement.setAttribute('data-original-status', newStatus);
+          selectElement.style.backgroundColor = '#d1fae5'; // green-100
           
-          if (error) {
-            console.error('[calendar] Error updating status:', error);
-            selectElement.value = originalStatus;
-            alert('Failed to update booking status: ' + error.message);
-            selectElement.style.backgroundColor = '#fee2e2'; // red-100
-          } else {
-            console.log('[calendar] ✅ Status updated successfully');
-            selectElement.setAttribute('data-original-status', newStatus);
-            selectElement.style.backgroundColor = '#d1fae5'; // green-100
-            
-            setTimeout(() => {
-              selectElement.style.backgroundColor = originalBg;
-            }, 1000);
-          }
+          setTimeout(() => {
+            selectElement.style.backgroundColor = originalBg;
+          }, 1000);
         }
       } catch (err) {
         console.error('[calendar] Exception updating status:', err);

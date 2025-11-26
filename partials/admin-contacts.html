@@ -91,6 +91,26 @@
   .contact-card-name {
     font-weight: 600;
   }
+  
+  .reply-btn {
+    background: #e6efff !important;          /* light-blue background */
+    border: 1px solid #4f8df7 !important;    /* medium blue border */
+    border-radius: 6px;
+    color: #1d4ed8 !important;               /* blue text */
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 4px 12px;
+    white-space: nowrap;
+    transition: all 0.2s;
+    margin-left: auto;
+  }
+  
+  .reply-btn:hover {
+      background-color: #d4e5ff !important;    
+      border-color: #2563eb !important;        /* darker blue border */
+      color: #1e40af !important;               /* darker blue text */
+  }
 </style>
 
 <section id="section-contacts" class="section-content bg-white border rounded-2xl shadow-sm p-5 hidden">
@@ -353,11 +373,17 @@
         ? `<button class="btn mark-unread-btn" type="button">Mark as unread</button>`
         : '';
       
+      // Reply button
+      const replyBtn = email 
+        ? `<button class="btn reply-btn" type="button" data-email="${email}" data-name="${name.replace(/"/g, '&quot;')}">Reply</button>`
+        : '';
+      
       card.innerHTML = `
         <div class="contact-card-header">
           <span class="contact-card-name">${name}</span>
           ${unreadBadge}
           ${markUnreadBtn}
+          ${replyBtn}
         </div>
 
         <div class="text-sm mb-1 flex items-center gap-2">
@@ -459,6 +485,155 @@
       console.error('[admin-contacts] Error marking message as unread:', error);
     }
   }
+  
+  // Show reply modal
+  function showReplyModal(recipientEmail, recipientName) {
+    const firstName = recipientName.split(' ')[0]; // Get first name
+    
+    // Create modal HTML
+    const modalHTML = `
+      <div id="replyModal" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div class="p-6">
+            <h3 class="text-xl font-semibold text-gray-900 mb-4">Reply to Contact Message</h3>
+            
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">To:</label>
+                <input type="email" id="replyTo" value="${recipientEmail}" readonly class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50" />
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Subject:</label>
+                <input type="text" id="replySubject" value="Re: Your enquiry - Auto-Man Driving School" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Message:</label>
+                <textarea id="replyMessage" rows="12" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Write your reply...">Dear ${firstName},
+
+Thank you for contacting Auto-Man Driving School. 
+
+Kind regards,
+Darren
+Auto-Man Driving School
+📞 0403 632 313</textarea>
+              </div>
+            </div>
+            
+            <div class="mt-6 flex gap-3 justify-end">
+              <button id="replyCancelBtn" class="btn btn-secondary">Cancel</button>
+              <button id="replySendBtn" class="btn btn-primary">Send</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Remove existing modal if any
+    const existingModal = document.getElementById('replyModal');
+    if (existingModal) {
+      existingModal.remove();
+    }
+    
+    // Add modal to page
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    const modal = document.getElementById('replyModal');
+    const sendBtn = document.getElementById('replySendBtn');
+    const cancelBtn = document.getElementById('replyCancelBtn');
+    
+    function closeModal() {
+      modal.remove();
+    }
+    
+    // Send button handler
+    sendBtn.addEventListener('click', async () => {
+      const to = document.getElementById('replyTo')?.value;
+      const subject = document.getElementById('replySubject')?.value;
+      const message = document.getElementById('replyMessage')?.value;
+      
+      if (!to || !subject || !message) {
+        if (window.Modal && window.Modal.error) {
+          window.Modal.error('Please fill in all fields');
+        } else {
+          alert('Please fill in all fields');
+        }
+        return;
+      }
+      
+      // Disable button while sending
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Sending...';
+      
+      // Send email via Supabase function
+      try {
+        const supabaseUrl = window.SITE_CONFIG?.SUPABASE_URL || window.SUPABASE_URL;
+        const supabaseKey = window.SITE_CONFIG?.SUPABASE_ANON_KEY || window.SUPABASE_ANON_KEY;
+        
+        if (!supabaseUrl || !supabaseKey) {
+          throw new Error('Supabase configuration not found');
+        }
+        
+        const response = await fetch(`${supabaseUrl}/functions/v1/email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseKey}`,
+            'apikey': supabaseKey
+          },
+          body: JSON.stringify({
+            to: to,
+            subject: subject,
+            text: message,
+            html: message.replace(/\n/g, '<br>')
+          })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+        
+        closeModal();
+        
+        if (window.Modal && window.Modal.success) {
+          window.Modal.success('Email sent successfully!');
+        } else {
+          alert('Email sent successfully!');
+        }
+      } catch (error) {
+        console.error('[admin-contacts] Error sending email:', error);
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Send';
+        
+        if (window.Modal && window.Modal.error) {
+          window.Modal.error('Failed to send email: ' + error.message);
+        } else {
+          alert('Failed to send email: ' + error.message);
+        }
+      }
+    });
+    
+    // Cancel button handler
+    cancelBtn.addEventListener('click', closeModal);
+    
+    // Close on backdrop click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        closeModal();
+      }
+    });
+    
+    // Close on Escape key
+    function handleEscape(e) {
+      if (e.key === 'Escape') {
+        closeModal();
+        document.removeEventListener('keydown', handleEscape);
+      }
+    }
+    document.addEventListener('keydown', handleEscape);
+  }
 
   // Wire up when partial loads
   if (window.adminContactsReady) {
@@ -510,6 +685,18 @@
       const contactsList = document.getElementById('contactsList');
       if (contactsList) {
         contactsList.addEventListener('click', (e) => {
+          // Handle Reply button clicks
+          const replyBtn = e.target.closest('.reply-btn');
+          if (replyBtn) {
+            e.stopPropagation();
+            const email = replyBtn.getAttribute('data-email');
+            const name = replyBtn.getAttribute('data-name');
+            if (email) {
+              showReplyModal(email, name);
+            }
+            return;
+          }
+          
           // Handle "Mark as unread" button clicks
           const unreadBtn = e.target.closest('.mark-unread-btn');
           if (unreadBtn) {

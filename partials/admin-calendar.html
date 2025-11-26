@@ -269,6 +269,16 @@
       font-weight: 500;
     }
     
+    /* Hide cancel button in compact mobile view to prevent accidental presses */
+    #section-calendar .booking-card .booking-cancel-btn {
+      display: none !important;
+    }
+    
+    /* Show cancel button in expanded mobile popup */
+    #section-calendar .booking-card.booking-active .booking-cancel-btn {
+      display: inline-flex !important;
+    }
+    
     /* Text color set via inline styles */
     #section-calendar .booking-card .booking-name {
       /* Color inherited from parent */
@@ -803,8 +813,19 @@
           const eventTitle = booking.event_title || 'Appointment';
           
           bookingDiv.innerHTML = `
-            <div class="booking-time font-semibold" style="color:#374151;">${time} - ${endTime}</div>
-            <div style="color:#374151;">${eventTitle}</div>
+            <div class="booking-card-content">
+              <div class="booking-card-text">
+                <div class="font-semibold" style="color:#374151;">${eventTitle}</div>
+                <div class="booking-time" style="color:#374151;">${time} - ${endTime}</div>
+              </div>
+              <button class="booking-cancel-btn" data-booking-id="${booking.id}" data-google-event-id="${booking.google_event_id || ''}" data-event-title="${eventTitle}" title="Cancel event" aria-label="Cancel event">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="15" y1="9" x2="9" y2="15"></line>
+                  <line x1="9" y1="9" x2="15" y2="15"></line>
+                </svg>
+              </button>
+            </div>
           `;
         }
         
@@ -860,23 +881,32 @@
         
         const bookingId = this.getAttribute('data-booking-id');
         const googleEventId = this.getAttribute('data-google-event-id');
+        const eventTitle = this.getAttribute('data-event-title');
         
-        console.log(`[calendar] Cancel button clicked for booking ${bookingId}`);
+        // Check if this is a regular event (has event-title) or a booking
+        const isRegularEvent = !!eventTitle;
         
-        // Show confirmation modal
+        console.log(`[calendar] Cancel button clicked for ${isRegularEvent ? 'event' : 'booking'} ${bookingId}`);
+        
+        // Show confirmation modal with appropriate message
+        const confirmMessage = isRegularEvent 
+          ? `Are you sure you want to cancel "${eventTitle}"?`
+          : 'Are you sure you want to cancel this booking?';
+        const confirmTitle = isRegularEvent ? 'Cancel Event' : 'Cancel Booking';
+        
         if (window.Modal && window.Modal.confirm) {
           window.Modal.confirm(
-            'Are you sure you want to cancel this booking?',
+            confirmMessage,
             async () => {
               // User confirmed - proceed with cancellation
               await handleBookingCancellation(this, bookingId, null, googleEventId);
             },
             null,
-            'Cancel Booking'
+            confirmTitle
           );
         } else {
           // Fallback to native confirm if Modal not loaded
-          if (confirm('Are you sure you want to cancel this booking?')) {
+          if (confirm(confirmMessage)) {
             await handleBookingCancellation(this, bookingId, null, googleEventId);
           }
         }

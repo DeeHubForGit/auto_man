@@ -49,11 +49,12 @@
           <!-- Navigation Menu -->
           <nav class="space-y-1">
             <a href="#bookings" onclick="showSection('bookings')" id="nav-bookings"
-               class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg is-active">
+               class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg is-active relative">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
               <span class="font-medium">My Bookings</span>
+              <span id="validationBadge" class="hidden absolute top-2 left-2 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-red-600 rounded-full min-w-[20px]" title="Invalid fields in bookings"></span>
             </a>
 
             <a href="#details" onclick="showSection('details')" id="nav-details" 
@@ -554,7 +555,7 @@
         
         const { data, error } = await window.supabaseClient
           .from('booking')
-          .select('*')
+          .select('*, is_mobile_valid, is_pickup_location_valid, validation_checked_at')
           .eq('client_id', window.clientData.id)
           .order('start_time', { ascending: true });
 
@@ -612,6 +613,55 @@
       const upcoming = validBookings.filter(b => new Date(b.start_time) >= now && b.status !== 'cancelled');
       const past = validBookings.filter(b => new Date(b.start_time) < now && b.status !== 'cancelled');
       const cancelled = validBookings.filter(b => b.status === 'cancelled');
+
+      // Count invalid fields in upcoming confirmed bookings
+      const invalidCount = upcoming.reduce((count, b) => {
+        // Only count confirmed bookings
+        if (b.status?.toLowerCase() !== 'confirmed') return count;
+        
+        let invalid = 0;
+        // Check database validation flags OR empty required fields
+        if (b.is_mobile_valid === false || !b.mobile || b.mobile.trim() === '') invalid++;
+        if (b.is_pickup_location_valid === false || !b.pickup_location || b.pickup_location.trim() === '') invalid++;
+        return count + invalid;
+      }, 0);
+
+      // Update validation badge on My Bookings nav
+      const validationBadge = document.getElementById('validationBadge');
+      if (validationBadge) {
+        if (invalidCount > 0) {
+          validationBadge.textContent = invalidCount;
+          validationBadge.classList.remove('hidden');
+        } else {
+          validationBadge.classList.add('hidden');
+        }
+      }
+
+      // Show validation alert on bookings page too
+      const alertContainer = document.getElementById('validation-alert');
+      if (alertContainer) {
+        if (invalidCount > 0) {
+          alertContainer.innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+                <div class="flex-1">
+                  <h3 class="text-sm font-semibold text-red-800">Action Required</h3>
+                  <p class="text-sm text-red-700 mt-1">
+                    You have <strong>${invalidCount}</strong> invalid field${invalidCount > 1 ? 's' : ''} in your upcoming bookings. 
+                    Please update your mobile number and/or pickup address to ensure we can contact you.
+                  </p>
+                </div>
+              </div>
+            </div>
+          `;
+          alertContainer.classList.remove('hidden');
+        } else {
+          alertContainer.classList.add('hidden');
+        }
+      }
 
       renderBookingList('upcoming-list', upcoming, true);
       renderBookingList('past-list', past, false);
@@ -778,15 +828,80 @@
                   <span class="text-gray-900 break-words">${timeStr} - ${endTimeStr} (${duration} minutes)</span>
                 </div>
 
-                ${booking.pickup_location ? `
-                  <div class="flex items-start gap-2">
-                    <svg class="w-4 h-4 flex-shrink-0 text-gray-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <span class="text-gray-900 break-words">${booking.pickup_location}</span>
+                <div class="flex items-start gap-2" id="mobile-row-${booking.id}">
+                  <svg class="w-4 h-4 flex-shrink-0 text-gray-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                  <div class="flex-1 min-w-0">
+                      ${isUpcoming && booking.status?.toLowerCase() === 'confirmed' ? `
+                        <div class="flex items-center gap-2">
+                          <input 
+                            type="text" 
+                            value="${booking.mobile || ''}"
+                            data-booking-id="${booking.id}"
+                            data-field="mobile"
+                            data-original="${booking.mobile || ''}"
+                            data-is-invalid="${booking.is_mobile_valid === false}"
+                            oninput="validateBookingMobile(this)"
+                            onblur="saveBookingField(this)"
+                            onkeydown="if(event.key==='Enter') this.blur(); if(event.key==='Escape') { this.value=this.dataset.original; this.blur(); document.getElementById('mobile-error-${booking.id}').classList.add('hidden'); }"
+                            class="max-w-[280px] px-2 py-1 text-sm ${booking.is_mobile_valid === false || !booking.mobile || booking.mobile.trim() === '' ? 'text-red-600 border-red-400' : 'text-gray-900 border-gray-300'} border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="+61 or 04XX XXX XXX"
+                            id="mobile-input-${booking.id}"
+                        />
+                        ${booking.is_mobile_valid === false || !booking.mobile || booking.mobile.trim() === '' ? `
+                          <svg class="w-5 h-5 flex-shrink-0" fill="#dc2626" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                          </svg>
+                        ` : ''}
+                      </div>
+                      <div id="mobile-error-${booking.id}" class="text-xs text-red-600 mt-1 ${booking.is_mobile_valid === false || !booking.mobile || booking.mobile.trim() === '' ? '' : 'hidden'}">${!booking.mobile || booking.mobile.trim() === '' ? 'Mobile number is required' : 'Invalid mobile format - please update'}</div>
+                    ` : `
+                      <span class="${booking.is_mobile_valid === false ? 'text-red-600 font-medium' : 'text-gray-900'} break-words">${booking.mobile || 'No mobile number'}</span>
+                      ${booking.is_mobile_valid === false ? `
+                        <div class="text-xs text-red-600 mt-1">Invalid mobile format</div>
+                      ` : ''}
+                    `}
                   </div>
-                ` : ''}
+                </div>
+
+                <div class="flex items-start gap-2" id="pickup-row-${booking.id}">
+                  <svg class="w-4 h-4 flex-shrink-0 text-gray-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <div class="flex-1 min-w-0">
+                    ${isUpcoming && booking.status?.toLowerCase() === 'confirmed' ? `
+                      <div class="flex items-center gap-2">
+                        <input 
+                          type="text" 
+                          value="${booking.pickup_location || ''}"
+                          data-booking-id="${booking.id}"
+                          data-field="pickup_location"
+                          data-original="${booking.pickup_location || ''}"
+                          data-is-invalid="${booking.is_pickup_location_valid === false}"
+                          oninput="validateBookingAddress(this)"
+                          onblur="saveBookingField(this)"
+                          onkeydown="if(event.key==='Enter') this.blur(); if(event.key==='Escape') { this.value=this.dataset.original; this.blur(); document.getElementById('pickup-error-${booking.id}').classList.add('hidden'); }"
+                          class="max-w-[500px] px-2 py-1 text-sm ${booking.is_pickup_location_valid === false || !booking.pickup_location || booking.pickup_location.trim() === '' ? 'text-red-600 border-red-400' : 'text-gray-900 border-gray-300'} border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter full address"
+                          id="pickup-input-${booking.id}"
+                        />
+                        ${booking.is_pickup_location_valid === false || !booking.pickup_location || booking.pickup_location.trim() === '' ? `
+                          <svg class="w-5 h-5 flex-shrink-0" fill="#dc2626" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                          </svg>
+                        ` : ''}
+                      </div>
+                      <div id="pickup-error-${booking.id}" class="text-xs text-red-600 mt-1 ${booking.is_pickup_location_valid === false || !booking.pickup_location || booking.pickup_location.trim() === '' ? '' : 'hidden'}">${!booking.pickup_location || booking.pickup_location.trim() === '' ? 'Pickup address is required' : 'Please provide a valid address'}</div>
+                    ` : `
+                      <span class="${booking.is_pickup_location_valid === false ? 'text-red-600 font-medium' : 'text-gray-900'} break-words">${booking.pickup_location || 'No pickup address'}</span>
+                      ${booking.is_pickup_location_valid === false ? `
+                        <div class="text-xs text-red-600 mt-1">Please provide a valid address</div>
+                      ` : ''}
+                    `}
+                  </div>
+                </div>
 
                 ${booking.price_cents ? `
                   <div class="flex items-center gap-2">
@@ -937,6 +1052,305 @@
       }
     }
     // ===== END BOOKINGS MANAGEMENT =====
+
+    // Validation helpers for booking fields
+    function isValidAuMobileBooking(mobile) {
+      if (!mobile) return false;
+
+      const trimmed = mobile.trim();
+
+      // Only allow digits, spaces and optional leading +
+      if (!/^\+?\d[\d\s]*$/.test(trimmed)) {
+        return false;
+      }
+
+      const digits = trimmed.replace(/\D+/g, '');
+      return /^04\d{8}$/.test(digits) || /^614\d{8}$/.test(digits);
+    }
+
+    function isValidAddress(address) {
+      if (!address) return false;
+      const trimmed = address.trim();
+      if (trimmed.length < 5) return false;
+      if (!/[a-zA-Z]{2,}/.test(trimmed)) return false;
+      
+      // Only reject obvious placeholder data (at start or as whole value)
+      // Allow "Test Street" etc as real street names
+      const lowerAddress = trimmed.toLowerCase();
+      const invalidPatterns = [
+        /^test$/i,           // Just "test"
+        /^asdf/i,            // Starts with asdf
+        /^qwerty/i,          // Starts with qwerty
+        /^xxx/i,             // Starts with xxx
+        /^temp$/i,           // Just "temp"
+        /^sample$/i,         // Just "sample"
+        /^n\/?a$/i,          // n/a or na
+        /^tbd$/i,            // tbd
+        /^none$/i            // none
+      ];
+      
+      if (invalidPatterns.some(pattern => pattern.test(trimmed))) return false;
+      return true;
+    }
+
+    function validateBookingMobile(inputElement) {
+      const value = inputElement.value.trim();
+      const bookingId = inputElement.dataset.bookingId;
+      const errorElement = document.getElementById(`mobile-error-${bookingId}`);
+      const iconElement = inputElement.parentElement.querySelector('svg[fill="#dc2626"]');
+      
+      // Mobile is required - show error if empty
+      if (!value) {
+        inputElement.classList.add('border-red-400', 'text-red-600');
+        inputElement.classList.remove('border-gray-300', 'text-gray-900');
+        if (errorElement) {
+          errorElement.textContent = 'Mobile number is required';
+          errorElement.classList.remove('hidden');
+        }
+        if (iconElement) iconElement.style.display = 'block';
+        return false;
+      }
+      
+      // Validate format
+      if (!isValidAuMobileBooking(value)) {
+        inputElement.classList.add('border-red-400', 'text-red-600');
+        inputElement.classList.remove('border-gray-300', 'text-gray-900');
+        if (errorElement) {
+          errorElement.textContent = 'Enter a valid AU mobile (e.g. 04XX XXX XXX)';
+          errorElement.classList.remove('hidden');
+        }
+        if (iconElement) iconElement.style.display = 'block';
+        return false;
+      }
+      
+      // Valid
+      inputElement.classList.remove('border-red-400', 'text-red-600');
+      inputElement.classList.add('border-gray-300', 'text-gray-900');
+      if (errorElement) errorElement.classList.add('hidden');
+      if (iconElement) iconElement.style.display = 'none';
+      return true;
+    }
+
+    function validateBookingAddress(inputElement) {
+      const value = inputElement.value.trim();
+      const bookingId = inputElement.dataset.bookingId;
+      const errorElement = document.getElementById(`pickup-error-${bookingId}`);
+      const iconElement = inputElement.parentElement.querySelector('svg[fill="#dc2626"]');
+      
+      // Pickup location is required - show error if empty
+      if (!value) {
+        inputElement.classList.add('border-red-400', 'text-red-600');
+        inputElement.classList.remove('border-gray-300', 'text-gray-900');
+        if (errorElement) {
+          errorElement.textContent = 'Pickup address is required';
+          errorElement.classList.remove('hidden');
+        }
+        if (iconElement) iconElement.style.display = 'block';
+        return false;
+      }
+      
+      // Validate format
+      if (!isValidAddress(value)) {
+        inputElement.classList.add('border-red-400', 'text-red-600');
+        inputElement.classList.remove('border-gray-300', 'text-gray-900');
+        if (errorElement) {
+          errorElement.textContent = 'Please provide a valid address (minimum 5 characters)';
+          errorElement.classList.remove('hidden');
+        }
+        if (iconElement) iconElement.style.display = 'block';
+        return false;
+      }
+      
+      // Valid
+      inputElement.classList.remove('border-red-400', 'text-red-600');
+      inputElement.classList.add('border-gray-300', 'text-gray-900');
+      if (errorElement) errorElement.classList.add('hidden');
+      if (iconElement) iconElement.style.display = 'none';
+      return true;
+    }
+    window.validateBookingMobile = validateBookingMobile;
+    window.validateBookingAddress = validateBookingAddress;
+
+    // Save booking field (inline editing)
+    async function saveBookingField(inputElement) {
+      const bookingId = inputElement.dataset.bookingId;
+      const fieldName = inputElement.dataset.field;
+      const newValue = inputElement.value.trim();
+      const originalValue = inputElement.dataset.original;
+      
+      // No change
+      if (newValue === originalValue) {
+        return;
+      }
+      
+      // Validate for UI feedback only (don't block save)
+      let isValid = true;
+      if (fieldName === 'mobile') {
+        isValid = validateBookingMobile(inputElement);
+      } else if (fieldName === 'pickup_location') {
+        isValid = validateBookingAddress(inputElement);
+      }
+      
+      // Always save changes (auto-save), even if validation shows errors
+      // The validation is just for visual feedback to help the user
+      
+      // Save to database
+      try {
+        const updateData = { [fieldName]: newValue || null };
+        
+        // Set validation flags based on actual validity
+        if (fieldName === 'mobile') {
+          // Mobile is required - mark as false if empty or invalid, true if valid
+          if (!newValue) {
+            updateData.is_mobile_valid = false;
+            updateData.validation_checked_at = new Date().toISOString();
+          } else if (isValid) {
+            updateData.is_mobile_valid = true;
+            updateData.validation_checked_at = null;
+          } else {
+            // User entered something but it's invalid format
+            updateData.is_mobile_valid = false;
+            updateData.validation_checked_at = new Date().toISOString();
+          }
+        } else if (fieldName === 'pickup_location') {
+          // Pickup location is required - mark as false if empty or invalid, true if valid
+          if (!newValue) {
+            updateData.is_pickup_location_valid = false;
+            updateData.validation_checked_at = new Date().toISOString();
+          } else if (isValid) {
+            updateData.is_pickup_location_valid = true;
+            updateData.validation_checked_at = null;
+          } else {
+            // User entered something but it's invalid format
+            updateData.is_pickup_location_valid = false;
+            updateData.validation_checked_at = new Date().toISOString();
+          }
+        }
+
+        const { data: updateResult, error } = await window.supabaseClient
+          .from('booking')
+          .update(updateData)
+          .eq('id', bookingId)
+          .select();
+
+        if (error) throw error;
+
+        // Reload this booking from database to get the actual saved values
+        const { data: updatedBooking, error: fetchError } = await window.supabaseClient
+          .from('booking')
+          .select('*')
+          .eq('id', bookingId)
+          .single();
+
+        if (fetchError) {
+          console.error('[saveBookingField] Error fetching updated booking:', fetchError);
+        } else {
+          // Update in-memory list with fresh database data
+          const idx = allBookings.findIndex(b => b.id === bookingId);
+          if (idx !== -1) {
+            allBookings[idx] = updatedBooking;
+            // Update original value
+            inputElement.dataset.original = newValue;
+          }
+        }
+
+        // Visual feedback
+        inputElement.classList.add('bg-green-50');
+        setTimeout(() => {
+          inputElement.classList.remove('bg-green-50');
+        }, 500);
+        
+        // Update validation UI for this field only
+        const errorElement = fieldName === 'mobile' 
+          ? document.getElementById(`mobile-error-${bookingId}`)
+          : document.getElementById(`pickup-error-${bookingId}`);
+        const iconElement = inputElement.parentElement.querySelector('svg[fill="#dc2626"]');
+        
+        if (updatedBooking) {
+          const isFieldValid = fieldName === 'mobile' 
+            ? updatedBooking.is_mobile_valid
+            : updatedBooking.is_pickup_location_valid;
+          
+          // Hide icon and error if field is now valid
+          if (isFieldValid !== false) {
+            if (iconElement) iconElement.style.display = 'none';
+            if (errorElement) errorElement.classList.add('hidden');
+            inputElement.classList.remove('border-red-400', 'text-red-600');
+            inputElement.classList.add('border-gray-300', 'text-gray-900');
+          }
+        }
+        
+        // Update validation badge count and alert
+        const upcoming = allBookings.filter(b => {
+          if (!b.start_time) return false;
+          const bookingDate = new Date(b.start_time);
+          const now = new Date();
+          now.setHours(0, 0, 0, 0);
+          return bookingDate >= now;
+        });
+        
+        // Count invalid fields in upcoming confirmed bookings
+        const invalidCount = upcoming.reduce((count, b) => {
+          // Only count confirmed bookings
+          if (b.status?.toLowerCase() !== 'confirmed') return count;
+          
+          let invalid = 0;
+          // Check database validation flags OR empty required fields
+          if (b.is_mobile_valid === false || !b.mobile || b.mobile.trim() === '') invalid++;
+          if (b.is_pickup_location_valid === false || !b.pickup_location || b.pickup_location.trim() === '') invalid++;
+          return count + invalid;
+        }, 0);
+        
+        // Update badge
+        const validationBadge = document.getElementById('validationBadge');
+        if (validationBadge) {
+          if (invalidCount > 0) {
+            validationBadge.textContent = invalidCount;
+            validationBadge.classList.remove('hidden');
+          } else {
+            validationBadge.classList.add('hidden');
+          }
+        }
+        
+        // Update alert at top of bookings page
+        const alertContainer = document.getElementById('validation-alert');
+        if (alertContainer) {
+          if (invalidCount > 0) {
+            alertContainer.innerHTML = `
+              <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                <div class="flex items-start gap-3">
+                  <svg class="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                  </svg>
+                  <div class="flex-1">
+                    <h3 class="text-sm font-semibold text-red-800">Action Required</h3>
+                    <p class="text-sm text-red-700 mt-1">
+                      You have <strong>${invalidCount}</strong> invalid field${invalidCount > 1 ? 's' : ''} in your upcoming bookings. 
+                      Please update your mobile number and/or pickup address to ensure we can contact you.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            `;
+            alertContainer.classList.remove('hidden');
+          } else {
+            alertContainer.classList.add('hidden');
+          }
+        }
+
+        console.log(`✅ ${fieldName} updated for booking ${bookingId}:`, newValue || '(empty)');
+      } catch (err) {
+        console.error(`[portal] Error updating ${fieldName}:`, err);
+        inputElement.value = originalValue; // Revert on error
+        inputElement.classList.add('bg-red-50');
+        setTimeout(() => inputElement.classList.remove('bg-red-50'), 1000);
+        
+        if (window.Modal?.error) {
+          window.Modal.error(`Could not update. Please try again.`, 'Update Failed');
+        }
+      }
+    }
+    window.saveBookingField = saveBookingField;
 
     // Save form data to localStorage (auto-save on input)
     function saveFormDataToCache() {

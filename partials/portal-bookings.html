@@ -11,9 +11,9 @@
   }
 
   /* Ensure base colour applies only to normal text, not status or buttons */
-  #upcoming-list .booking-card *:not(.status-label):not(.status-label *):not(button):not(.cancel-btn):not(.cancel-btn *),
-  #past-list .booking-card *:not(.status-label):not(.status-label *):not(button):not(.cancel-btn):not(.cancel-btn *),
-  #cancelled-list .booking-card *:not(.status-label):not(.status-label *):not(button):not(.cancel-btn):not(.cancel-btn *) {
+  #upcoming-list .booking-card *:not(.status-label):not(.status-label *):not(button):not(.cancel-btn):not(.cancel-btn *):not(.text-red-600),
+  #past-list .booking-card *:not(.status-label):not(.status-label *):not(button):not(.cancel-btn):not(.cancel-btn *):not(.text-red-600),
+  #cancelled-list .booking-card *:not(.status-label):not(.status-label *):not(button):not(.cancel-btn):not(.cancel-btn *):not(.text-red-600) {
     color: #111827 !important;
   }
 
@@ -167,6 +167,9 @@
 
   <!-- Bookings Content -->
   <div class="p-3 sm:p-6">
+    
+    <!-- Validation Alert -->
+    <div id="validation-alert" class="hidden"></div>
     
     <!-- Upcoming Bookings -->
     <div id="upcoming-bookings" class="booking-content">

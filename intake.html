@@ -42,87 +42,22 @@
         <div id="progressBar" class="progress-bar bg-blue-500 h-2.5 rounded-full" style="width: 0%"></div>
       </div>
       <p class="text-center mt-3 text-sm font-semibold text-white">
-        <span id="stepIndicator">Step 1 of 5</span>
+        <span id="stepIndicator">Step 1 of 3</span>
       </p>
     </div>
 
     <!-- Wizard Container (Card) -->
     <div class="rounded-2xl shadow-2xl p-8 md:p-12" style="background-color: var(--card); border: 1px solid var(--border);">
       
-      <!-- Step 1: Name -->
+      <!-- Hidden fields for name and mobile (populated from booking data) -->
+      <input type="hidden" id="firstName" />
+      <input type="hidden" id="lastName" />
+      <input type="hidden" id="mobile" />
+      
+      <!-- Step 1: Licence/Permit Number -->
       <div class="wizard-step active" data-step="1">
         <div class="mb-8">
-          <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-3">Welcome! Let's get started 👋</h1>
-          <p class="text-lg text-gray-600">First, what's your name?</p>
-        </div>
-        
-        <div class="space-y-4 mb-8">
-          <div>
-            <label for="firstName" class="block text-sm font-medium text-gray-700 mb-2">First Name *</label>
-            <input 
-              type="text" 
-              id="firstName" 
-              required
-              class="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:border-blue-600 transition-colors text-black"
-              placeholder="Enter your first name"
-              autocomplete="given-name"
-            />
-          </div>
-          <div>
-            <label for="lastName" class="block text-sm font-medium text-gray-700 mb-2">Last Name *</label>
-            <input 
-              type="text" 
-              id="lastName" 
-              required
-              class="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:border-blue-600 transition-colors text-black"
-              placeholder="Enter your last name"
-              autocomplete="family-name"
-            />
-          </div>
-        </div>
-
-        <div class="flex justify-end">
-          <button onclick="nextStep()" class="btn btn-primary px-8 py-3">
-            Next →
-          </button>
-        </div>
-      </div>
-
-      <!-- Step 2: Mobile Number -->
-      <div class="wizard-step" data-step="2">
-        <div class="mb-8">
-          <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-3 flex items-center gap-3">📱 What's your contact number</h2>
-          <p class="text-lg text-gray-600">We'll use this to send you lesson reminders</p>
-        </div>
-        
-        <div class="mb-8">
-          <label for="mobile" class="block text-sm font-medium text-gray-700 mb-2">Mobile Number *</label>
-          <input 
-            type="tel" 
-            id="mobile" 
-            required
-            class="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:border-blue-600 transition-colors text-black"
-            placeholder="04XX XXX XXX"
-            autocomplete="tel"
-            pattern="[0-9\s\-\+\(\)]+"
-          />
-          <p class="text-sm text-gray-500 mt-2">Australian mobile format (e.g. 0412 345 678)</p>
-        </div>
-
-        <div class="flex justify-between mt-6">
-          <button onclick="prevStep()" class="btn btn-secondary px-6 py-3">
-            ← Back
-          </button>
-          <button onclick="nextStep()" class="btn btn-primary px-8 py-3">
-            Next →
-          </button>
-        </div>
-      </div>
-
-      <!-- Step 3: Licence/Permit Number -->
-      <div class="wizard-step" data-step="3">
-        <div class="mb-8">
-          <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-3 flex items-center gap-3">🪪 Your licence details</h2>
+          <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-3">Welcome! Let's complete your profile 👋</h1>
           <p class="text-lg text-gray-600">Enter your learner's permit or licence number</p>
         </div>
         
@@ -138,18 +73,15 @@
           <p class="text-sm text-gray-500 mt-2">You'll need to show this at your first lesson</p>
         </div>
 
-        <div class="flex justify-between mt-6">
-          <button onclick="prevStep()" class="btn btn-secondary px-6 py-3">
-            ← Back
-          </button>
+        <div class="flex justify-end mt-6">
           <button onclick="nextStep()" class="btn btn-primary px-8 py-3">
             Next →
           </button>
         </div>
       </div>
 
-      <!-- Step 4: Medical Conditions -->
-      <div class="wizard-step" data-step="4">
+      <!-- Step 2: Medical Conditions -->
+      <div class="wizard-step" data-step="2">
         <div class="mb-8">
           <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-3 flex items-center gap-3">🏥 Medical information</h2>
           <p class="text-lg text-gray-600">Do you have any medical conditions that may affect your driving?</p>
@@ -176,8 +108,8 @@
         </div>
       </div>
 
-      <!-- Step 5: Driver Profile -->
-      <div class="wizard-step" data-step="5">
+      <!-- Step 3: Driver Profile -->
+      <div class="wizard-step" data-step="3">
         <div class="mb-8">
           <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-3 flex items-center gap-3">🎯 Almost done!</h2>
           <p class="text-lg text-gray-600">Tell us about your driving experience</p>
@@ -277,7 +209,7 @@
 
   <script>
     let currentStep = 1;
-    const totalSteps = 5;
+    const totalSteps = 3;
     const CACHE_KEY = 'onboarding_form_data';
     const STEP_KEY = 'onboarding_current_step';
 
@@ -438,33 +370,14 @@
 
     function validateStep(step) {
       if (step === 1) {
-        const firstName = document.getElementById('firstName').value.trim();
-        const lastName = document.getElementById('lastName').value.trim();
-        if (!firstName || !lastName) {
-          Modal.error('Please enter both your first and last name');
-          return false;
-        }
-      }
-      if (step === 2) {
-        const mobile = document.getElementById('mobile').value.trim();
-        if (!mobile) {
-          Modal.error('Please enter your mobile number');
-          return false;
-        }
-        // Basic Australian mobile validation
-        const mobileClean = mobile.replace(/[\s\-\(\)]/g, '');
-        if (!/^(\+61|0)[4-5]\d{8}$/.test(mobileClean)) {
-          Modal.error('Please enter a valid Australian mobile number (e.g. 0412 345 678)');
-          return false;
-        }
-      }
-      if (step === 3) {
         const license = document.getElementById('licenseNumber').value.trim();
         if (!license) {
           Modal.error('Please enter your licence or permit number');
           return false;
         }
       }
+      // Step 2 (medical) is optional - no validation needed
+      // Step 3 (driver profile) is optional - no validation needed
       return true;
     }
 
@@ -495,9 +408,6 @@
       localStorage.removeItem(STEP_KEY);
       
       // Clear all form fields
-      document.getElementById('firstName').value = '';
-      document.getElementById('lastName').value = '';
-      document.getElementById('mobile').value = '';
       document.getElementById('licenseNumber').value = '';
       document.getElementById('medicalConditions').value = '';
       document.getElementById('isBeginner').checked = false;
@@ -510,8 +420,8 @@
       // Go back to step 1
       showStep(1);
       
-      alert('Form and cache cleared! Refresh the page (F5) to test auto-loading from booking data.');
-      document.getElementById('firstName').focus();
+      alert('Form and cache cleared!');
+      document.getElementById('licenseNumber').focus();
     }
 
     function toggleOtherText() {
@@ -635,39 +545,33 @@
       
       loadFromCache();
       
-      // If form is blank (no cached data), try to pre-populate from booking
+      // Pre-populate hidden fields from booking data (name and mobile come from booking)
       const firstNameInput = document.getElementById('firstName');
       const lastNameInput = document.getElementById('lastName');
       const mobileInput = document.getElementById('mobile');
       
       const isFormBlank = !firstNameInput.value && !lastNameInput.value && !mobileInput.value;
       
-      console.log('[intake] 📝 Form blank?', isFormBlank, {
-        firstName: firstNameInput.value,
-        lastName: lastNameInput.value,
-        mobile: mobileInput.value
-      });
+      console.log('[intake] 📝 Hidden fields blank?', isFormBlank);
       
       if (isFormBlank) {
-        console.log('[intake] 🔍 Attempting to fetch booking data...');
+        console.log('[intake] 🔍 Fetching name and mobile from booking data...');
         
         // Wait a bit for auth to initialize properly
         await new Promise(r => setTimeout(r, 500));
         
         const bookingData = await fetchBookingData();
         if (bookingData) {
-          console.log('[intake] ✅ Populating form with:', bookingData);
+          console.log('[intake] ✅ Populating hidden fields with:', bookingData);
           if (bookingData.firstName) firstNameInput.value = bookingData.firstName;
           if (bookingData.lastName) lastNameInput.value = bookingData.lastName;
           if (bookingData.mobile) mobileInput.value = bookingData.mobile;
         } else {
-          console.log('[intake] ⚠️ No booking data to populate (user may not be logged in)');
+          console.log('[intake] ⚠️ No booking data available');
         }
-      } else {
-        console.log('[intake] ℹ️ Form already has data, skipping booking fetch');
       }
       
-      firstNameInput.focus();
+      document.getElementById('licenseNumber').focus();
     });
   </script>
   <!-- Google Analytics -->

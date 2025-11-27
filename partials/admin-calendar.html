@@ -279,20 +279,12 @@
       display: inline-flex !important;
     }
     
-    /* Text color set via inline styles */
-    #section-calendar .booking-card .booking-name {
-      /* Color inherited from parent */
-    }
-    
     /* Show minimal info in compact view */
     #section-calendar .booking-card .booking-summary {
       display: block !important;
     }
     
-    /* Text color set via inline styles */
-    #section-calendar .booking-card .booking-summary > * {
-      /* Color inherited from inline styles */
-    }    /* Hide detailed info by default */
+    /* Hide detailed info by default */
     #section-calendar .booking-card .booking-details {
       display: none;
     }
@@ -515,10 +507,6 @@
   }
 
   async function fetchBookings(weekStart, dayCells) {
-    console.log('🔍 DEBUGGING: fetchBookings called');
-    console.log('🔍 weekStart:', weekStart);
-    console.log('🔍 supabaseClient exists:', !!window.supabaseClient);
-    
     if (!window.supabaseClient) {
       console.error('❌ Supabase client not initialized');
       const calendar = document.getElementById('calendar');
@@ -544,7 +532,6 @@
     }
     
     // Query bookings - exclude cancelled bookings
-    console.log('🚀 Fetching bookings...');
     const { data: bookings, error } = await window.supabaseClient
       .from('booking')
       .select('*')
@@ -555,14 +542,13 @@
 
     if (error) {
       console.error('❌ Error fetching bookings:', error);
-      console.log('🔍 Error details:', JSON.stringify(error, null, 2));
       const weekRange = document.getElementById('weekRange');
       if (weekRange) {
         weekRange.innerHTML = `<span class="text-red-600">⚠️ Error loading bookings: ${error.message}</span>`;
       }
       return;
     }
-
+    
     console.log(`✅ Found ${bookings?.length || 0} bookings for this week:`, bookings);
 
     if (!bookings || bookings.length === 0) {
@@ -840,33 +826,11 @@
         const originalStatus = this.getAttribute('data-original-status');
         const newStatus = this.value;
         
-        console.log(`[calendar] Status change: booking ${bookingId} from ${originalStatus} to ${newStatus}`);
-        
-        // If changing to cancelled, show confirmation modal
+        // Route to appropriate handler
         if (newStatus === 'cancelled') {
-          // Check if Modal is available
-          if (window.Modal && window.Modal.confirm) {
-            window.Modal.confirm(
-              'Are you sure you want to cancel this booking?',
-              async () => {
-                // User confirmed - proceed with cancellation
-                await handleBookingCancellation(this, bookingId, originalStatus);
-              },
-              () => {
-                // User cancelled - revert to original status
-                console.log('[calendar] Cancellation cancelled, reverting to:', originalStatus);
-                this.value = originalStatus;
-              },
-              'Cancel Booking'
-            );
-          } else {
-            // Fallback to native confirm if Modal not loaded
-            if (confirm('Are you sure you want to cancel this booking?')) {
-              await handleBookingCancellation(this, bookingId, originalStatus);
-            } else {
-              this.value = originalStatus;
-            }
-          }
+          // handleBookingCancellation will show confirmation via cancelWithConfirmation
+          const confirmMessage = 'Are you sure you want to cancel this booking? This action cannot be undone.';
+          await handleBookingCancellation(this, bookingId, originalStatus, null, confirmMessage);
         } else {
           // For other status changes, update immediately
           await updateBookingStatus(this, bookingId, newStatus, originalStatus);
@@ -886,45 +850,23 @@
         // Check if this is a regular event (has event-title) or a booking
         const isRegularEvent = !!eventTitle;
         
-        console.log(`[calendar] Cancel button clicked for ${isRegularEvent ? 'event' : 'booking'} ${bookingId}`);
-        
-        // Show confirmation modal with appropriate message
+        // Prepare confirmation message based on event type
         const confirmMessage = isRegularEvent 
           ? `Are you sure you want to cancel "${eventTitle}"?`
-          : 'Are you sure you want to cancel this booking?';
-        const confirmTitle = isRegularEvent ? 'Cancel Event' : 'Cancel Booking';
+          : 'Are you sure you want to cancel this booking? This action cannot be undone.';
         
-        if (window.Modal && window.Modal.confirm) {
-          window.Modal.confirm(
-            confirmMessage,
-            async () => {
-              // User confirmed - proceed with cancellation
-              await handleBookingCancellation(this, bookingId, null, googleEventId);
-            },
-            null,
-            confirmTitle
-          );
-        } else {
-          // Fallback to native confirm if Modal not loaded
-          if (confirm(confirmMessage)) {
-            await handleBookingCancellation(this, bookingId, null, googleEventId);
-          }
-        }
+        // handleBookingCancellation will show confirmation via cancelWithConfirmation
+        await handleBookingCancellation(this, bookingId, null, googleEventId, confirmMessage);
       });
     });
     
     // Wrap mobile setup in a function so it can be called on resize
     function setupMobileInteractions() {
       const isMobile = window.matchMedia('(max-width: 768px)').matches;
-      const viewportWidth = window.innerWidth;
-      console.log('[mobile] Viewport width:', viewportWidth, 'isMobile:', isMobile);
       
       if (!isMobile) {
-        console.log('[mobile] Not mobile, skipping mobile interactions setup');
         return;
       }
-      
-      console.log('[mobile] Setting up mobile interactions');
       
       // Create backdrop element
       let backdrop = document.getElementById('booking-backdrop');
@@ -933,11 +875,9 @@
         backdrop.id = 'booking-backdrop';
         backdrop.className = 'booking-backdrop';
         document.body.appendChild(backdrop);
-        console.log('[mobile] Created backdrop element');
       }
       
       const cards = document.querySelectorAll('#section-calendar .booking-card');
-      console.log('[mobile] Found', cards.length, 'booking cards');
       
       if (cards.length === 0) {
         // No cards yet - calendar may still be loading, this is normal
@@ -1123,7 +1063,7 @@
     }
     
     // Helper function to handle booking cancellation (used by both cancel button and status change)
-    async function handleBookingCancellation(element, bookingId, originalStatus = null, googleEventId = null) {
+    async function handleBookingCancellation(element, bookingId, originalStatus = null, googleEventId = null, confirmMessage = null) {
       // Get google event ID from element if not provided
       if (!googleEventId && element.hasAttribute('data-google-event-id')) {
         googleEventId = element.getAttribute('data-google-event-id');
@@ -1132,66 +1072,36 @@
       // Get admin email
       const adminEmail = await getAdminEmail();
       
-      // Disable the element while processing
-      const isDropdown = element.tagName === 'SELECT';
-      const originalBg = element.style.backgroundColor;
-      if (isDropdown) {
-        element.style.backgroundColor = '#fef3c7'; // yellow-100
-      }
-      element.disabled = true;
-      
-      try {
-        // Use the shared Google Calendar cancellation function
-        if (window.GoogleCalendar && window.GoogleCalendar.cancelBooking) {
-          const result = await window.GoogleCalendar.cancelBooking(bookingId, googleEventId, adminEmail);
-          
-          if (!result.success) {
-            throw new Error(result.error || 'Failed to cancel booking');
+      // Use the unified cancellation function
+      if (window.GoogleCalendar && window.GoogleCalendar.cancelWithConfirmation) {
+        await window.GoogleCalendar.cancelWithConfirmation({
+          bookingId: bookingId,
+          googleEventId: googleEventId,
+          cancelledBy: adminEmail,
+          triggerElement: element,
+          confirmMessage: confirmMessage, // Use custom message if provided
+          showSuccessMessage: false, // Admin calendar refresh provides visual feedback
+          onSuccess: async () => {
+            // Refresh the calendar after successful cancellation
+            console.log('[calendar] Refreshing calendar view...');
+            setTimeout(() => renderWeek(weekStart), 500);
+          },
+          onCancel: () => {
+            // User aborted - revert dropdown to original status
+            if (element.tagName === 'SELECT' && originalStatus) {
+              element.value = originalStatus;
+            }
+          },
+          onError: (error) => {
+            // If this is a status dropdown and we have an original status, revert to it
+            if (element.tagName === 'SELECT' && originalStatus) {
+              element.value = originalStatus;
+            }
           }
-          
-          console.log('[calendar] ✅ Booking cancelled successfully');
-          
-          // If this is a status dropdown, update its state
-          if (isDropdown) {
-            element.setAttribute('data-original-status', 'cancelled');
-            element.value = 'cancelled';
-            element.style.backgroundColor = '#d1fae5'; // green-100
-          }
-          
-          // Refresh the calendar after a short delay to show the updated state
-          setTimeout(() => {
-            console.log('[calendar] Refreshing calendar view after cancellation...');
-            renderWeek(weekStart);
-          }, 1500);
-        } else {
-          throw new Error('GoogleCalendar not available');
-        }
-      } catch (err) {
-        console.error('[calendar] Exception cancelling booking:', err);
-        
-        // If this is a status dropdown and we have an original status, revert to it
-        if (isDropdown && originalStatus) {
-          element.value = originalStatus;
-        }
-        
-        if (window.Modal && window.Modal.error) {
-          window.Modal.error('Failed to cancel booking: ' + err.message);
-        } else {
-          alert('Failed to cancel booking: ' + err.message);
-        }
-        
-        if (isDropdown) {
-          element.style.backgroundColor = '#fee2e2'; // red-100
-        }
-      } finally {
-        element.disabled = false;
-        
-        // Restore original background after delay (only for dropdowns)
-        if (isDropdown) {
-          setTimeout(() => {
-            element.style.backgroundColor = originalBg;
-          }, 2000);
-        }
+        });
+      } else {
+        console.error('[calendar] GoogleCalendar.cancelWithConfirmation not available');
+        alert('Cancellation feature not available. Please refresh the page.');
       }
     }
     

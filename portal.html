@@ -596,6 +596,8 @@
         clearTimeout(hardId);
       }
     }
+    // Expose loadBookings globally for retry buttons and callbacks
+    window.loadBookings = loadBookings;
 
     function renderBookings() {
       const now = new Date();
@@ -619,6 +621,11 @@
     function renderBookingList(containerId, bookings, isUpcoming) {
       const container = document.getElementById(containerId);
       
+      if (!container) return;
+      
+      // Clear existing content first
+      container.innerHTML = '';
+      
       if (bookings.length === 0) {
         const isCancelled = containerId === 'cancelled-list';
         const emptyMessage = isUpcoming ? 'No upcoming bookings' : isCancelled ? 'No cancelled bookings' : 'No past bookings';
@@ -629,11 +636,12 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
             <p class="text-gray-500 mt-4">${emptyMessage}</p>
-            ${isUpcoming ? '<a href="booking.html" class="inline-block mt-4 px-6 py-2 btn-primary rounded-lg transition-colors">Book a Lesson</a>' : ''}
+            ${isUpcoming ? '<a href="booking.html" class="inline-block mt-4 px-6 py-2 btn-primary rounded-lg transition-colors">Book Now</a>' : ''}
           </div>
         `;
       } else {
-        container.innerHTML = bookings.map(booking => renderBookingCard(booking, isUpcoming)).join('');
+        const cardsHtml = bookings.map(booking => renderBookingCard(booking, isUpcoming)).join('');
+        container.innerHTML = cardsHtml;
       }
       
       // Set aria-busy to false after rendering
@@ -841,7 +849,7 @@
 
     // Global function to handle booking cancellation from the UI
     async function handleCancelBooking(bookingId, googleEventId, buttonElement) {
-      console.log('[portal] handleCancelBooking called:', { bookingId, googleEventId });
+      console.log('[portal] Cancelling booking:', bookingId);
       
       // Show confirmation modal
       if (window.Modal && window.Modal.confirm) {
@@ -872,25 +880,35 @@
       }
 
       try {
-        // Step 1: Cancel in Google (if integration exists)
+        const cancelledBy = currentUser?.email || null;
+        
+        // Step 1: Cancel in Google and update database (GoogleCalendar.cancelBooking does both)
         if (window.GoogleCalendar?.cancelBooking) {
-          const result = await window.GoogleCalendar.cancelBooking(bookingId, googleEventId);
-          if (!result?.success) throw new Error(result?.error || 'Failed to cancel booking in Google');
+          const result = await window.GoogleCalendar.cancelBooking(bookingId, googleEventId, cancelledBy);
+          if (!result?.success) throw new Error(result?.error || 'Failed to cancel booking');
         } else {
-          console.warn('[portal] GoogleCalendar not available, skipping Google cancel');
+          // Fallback: Update DB directly if GoogleCalendar not available
+          console.warn('[portal] GoogleCalendar not available, updating database directly');
+          const { error: dbErr } = await window.supabaseClient
+            .from('booking')
+            .update({ 
+              status: 'cancelled', 
+              cancelled_at: new Date().toISOString(),
+              cancelled_by: cancelledBy
+            })
+            .eq('id', bookingId);
+          if (dbErr) throw dbErr;
         }
 
-        // Step 2: Update DB status (do this even if Google returned 404 => already gone)
-        const { error: dbErr } = await window.supabaseClient
-          .from('booking')
-          .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
-          .eq('id', bookingId);
-        if (dbErr) throw dbErr;
-
-        // Step 3: Optimistically update in-memory list (so the card disappears immediately)
+        // Step 2: Optimistically update in-memory list (so the card disappears immediately)
         const idx = allBookings.findIndex(b => b.id === bookingId);
         if (idx !== -1) {
-          allBookings[idx] = { ...allBookings[idx], status: 'cancelled', cancelled_at: new Date().toISOString() };
+          allBookings[idx] = { 
+            ...allBookings[idx], 
+            status: 'cancelled', 
+            cancelled_at: new Date().toISOString(),
+            cancelled_by: cancelledBy
+          };
           renderBookings();
         } else {
           // Fallback: full reload if we can't find it locally

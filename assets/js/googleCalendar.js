@@ -13,7 +13,7 @@ window.GoogleCalendar = (function() {
    * @returns {Promise<{success: boolean, error?: string}>}
    */
   async function cancelEvent(googleEventId, bookingId) {
-    console.log('[GoogleCalendar] Cancelling event:', { googleEventId, bookingId });
+    console.log('[GoogleCalendar] Cancelling event:', googleEventId);
 
     if (!googleEventId) {
       console.warn('[GoogleCalendar] No Google event ID provided, skipping Google Calendar cancellation');
@@ -53,8 +53,7 @@ window.GoogleCalendar = (function() {
       // Success (200) or Not Found/Gone (404/410) => treat as success
       // 404/410 means event is already deleted, which is our goal
       if (response.ok || response.status === 404 || response.status === 410) {
-        const result = await response.json().catch(() => ({ ok: true }));
-        console.log('[GoogleCalendar] ✅ Event cancelled successfully:', result);
+        console.log('[GoogleCalendar] ✅ Google Calendar event cancelled');
         return { success: true };
       }
 
@@ -79,7 +78,7 @@ window.GoogleCalendar = (function() {
    * @returns {Promise<{success: boolean, error?: string}>}
    */
   async function cancelBooking(bookingId, googleEventId, cancelledBy = null) {
-    console.log('[GoogleCalendar] Starting booking cancellation:', { bookingId, googleEventId, cancelledBy });
+    console.log('[GoogleCalendar] Starting cancellation for booking:', bookingId);
 
     try {
       // Step 1: Cancel in Google Calendar first (if event ID exists)
@@ -87,15 +86,12 @@ window.GoogleCalendar = (function() {
         const googleResult = await cancelEvent(googleEventId, bookingId);
         if (!googleResult.success) {
           // Google cancellation failed - ABORT the entire operation
-          console.error('[GoogleCalendar] ❌ Google Calendar cancellation failed, aborting database update');
+          console.error('[GoogleCalendar] ❌ Google Calendar cancellation failed, aborting');
           return { 
             success: false, 
             error: 'Failed to cancel in Google Calendar: ' + googleResult.error + '. Database not updated.'
           };
         }
-        console.log('[GoogleCalendar] ✅ Google Calendar event cancelled successfully');
-      } else {
-        console.warn('[GoogleCalendar] No Google event ID - will update database only');
       }
 
       // Step 2: Update booking status in our database (only if Google succeeded or no Google event)
@@ -122,7 +118,7 @@ window.GoogleCalendar = (function() {
         throw new Error('Database update failed: ' + dbError.message);
       }
 
-      console.log('[GoogleCalendar] ✅ Booking cancelled successfully in database');
+      console.log('[GoogleCalendar] ✅ Booking cancelled successfully');
       return { success: true };
 
     } catch (error) {
@@ -134,9 +130,141 @@ window.GoogleCalendar = (function() {
     }
   }
 
+  /**
+   * Unified cancellation handler with confirmation, loading state, and success message
+   * @param {Object} options - Configuration options
+   * @param {string} options.bookingId - The booking ID
+   * @param {string} options.googleEventId - The Google Calendar event ID (optional)
+   * @param {string} options.cancelledBy - Email of person who cancelled
+   * @param {string} options.confirmMessage - Custom confirmation message (optional)
+   * @param {Function} options.onSuccess - Callback after successful cancellation (optional)
+   * @param {Function} options.onError - Callback after error (optional)
+   * @param {Function} options.onCancel - Callback when user aborts cancellation (optional)
+   * @param {HTMLElement} options.triggerElement - The element that triggered cancellation (for loading state)
+   * @param {boolean} options.showSuccessMessage - Whether to show success modal (default: true)
+   * @returns {Promise<void>}
+   */
+  async function cancelWithConfirmation(options) {
+    const {
+      bookingId,
+      googleEventId,
+      cancelledBy,
+      confirmMessage = 'Are you sure you want to cancel this booking? This action cannot be undone.',
+      onSuccess = null,
+      onError = null,
+      onCancel = null,
+      triggerElement = null,
+      showSuccessMessage = true
+    } = options;
+
+    // Show confirmation modal
+    const confirmed = await new Promise((resolve) => {
+      if (window.Modal && window.Modal.confirm) {
+        window.Modal.confirm(
+          confirmMessage,
+          () => resolve(true),
+          () => resolve(false),
+          'Cancel Booking'
+        );
+      } else {
+        resolve(confirm(confirmMessage));
+      }
+    });
+
+    if (!confirmed) {
+      console.log('[GoogleCalendar] Cancellation aborted by user');
+      if (onCancel) {
+        onCancel();
+      }
+      return;
+    }
+
+    // Show loading indicator
+    let loadingModal = null;
+    if (window.Modal && window.Modal.loading) {
+      loadingModal = window.Modal.loading('Cancelling booking...', 'Please wait');
+    }
+
+    // Disable trigger element if provided
+    let originalText = '';
+    let originalDisabled = false;
+    if (triggerElement) {
+      originalDisabled = triggerElement.disabled;
+      triggerElement.disabled = true;
+      
+      if (triggerElement.tagName === 'BUTTON') {
+        originalText = triggerElement.textContent;
+        triggerElement.textContent = 'Cancelling...';
+      } else if (triggerElement.tagName === 'SELECT') {
+        triggerElement.style.backgroundColor = '#fef3c7'; // yellow-100
+      }
+    }
+
+    try {
+      // Perform the cancellation
+      const result = await cancelBooking(bookingId, googleEventId, cancelledBy);
+
+      // Hide loading indicator
+      if (loadingModal && loadingModal.close) {
+        loadingModal.close();
+      }
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to cancel booking');
+      }
+
+      // Call success callback BEFORE showing success message
+      if (onSuccess) {
+        await onSuccess();
+      }
+
+      // Show success message (if enabled)
+      if (showSuccessMessage) {
+        if (window.Modal && window.Modal.success) {
+          window.Modal.success('The booking has been cancelled successfully.', 'Booking Cancelled');
+        } else {
+          alert('The booking has been cancelled successfully.');
+        }
+      }
+
+    } catch (error) {
+      console.error('[GoogleCalendar] Cancellation failed:', error);
+
+      // Hide loading indicator
+      if (loadingModal && loadingModal.close) {
+        loadingModal.close();
+      }
+
+      // Show error message
+      if (window.Modal && window.Modal.error) {
+        window.Modal.error('Failed to cancel booking: ' + error.message, 'Cancellation Failed');
+      } else {
+        alert('Failed to cancel booking: ' + error.message);
+      }
+
+      // Call error callback
+      if (onError) {
+        onError(error);
+      }
+
+    } finally {
+      // Restore trigger element
+      if (triggerElement) {
+        triggerElement.disabled = originalDisabled;
+        
+        if (triggerElement.tagName === 'BUTTON' && originalText) {
+          triggerElement.textContent = originalText;
+        } else if (triggerElement.tagName === 'SELECT') {
+          triggerElement.style.backgroundColor = '';
+        }
+      }
+    }
+  }
+
   // Public API
   return {
     cancelEvent,
-    cancelBooking
+    cancelBooking,
+    cancelWithConfirmation
   };
 })();

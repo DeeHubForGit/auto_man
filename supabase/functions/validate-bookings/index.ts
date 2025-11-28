@@ -18,8 +18,8 @@ const corsHeaders = {
 };
 
 // Australian mobile number validation
-function validateMobile(mobile: string | null): boolean | null {
-  if (!mobile) return null;
+function validateMobile(mobile: string | null): boolean {
+  if (!mobile || mobile.trim() === '') return false; // Required field
   
   const cleaned = mobile.replace(/\s+/g, ''); // Remove spaces
   const australianMobileRegex = /^(\+61|0)[4-5]\d{8}$/;
@@ -28,8 +28,8 @@ function validateMobile(mobile: string | null): boolean | null {
 }
 
 // Basic pickup location validation
-function validatePickupLocation(location: string | null): boolean | null {
-  if (!location) return null;
+function validatePickupLocation(location: string | null): boolean {
+  if (!location || location.trim() === '') return false; // Required field
   
   const trimmed = location.trim();
   
@@ -37,10 +37,9 @@ function validatePickupLocation(location: string | null): boolean | null {
   if (trimmed.length < 5) return false;
   if (!/[a-zA-Z]{2,}/.test(trimmed)) return false; // At least 2 letters
   
-  // Check for obvious test data
-  const testPatterns = ['test', 'asdf', 'qwerty', '123', 'xxx', 'n/a', 'tbd', 'none'];
-  const lowerLocation = trimmed.toLowerCase();
-  if (testPatterns.some(pattern => lowerLocation === pattern || lowerLocation.includes(pattern + ' '))) {
+  // Check for obvious test data (exact matches only)
+  const testPatterns = [/^test$/i, /^asdf/i, /^qwerty/i, /^xxx/i, /^temp$/i, /^sample$/i, /^n\/?a$/i, /^tbd$/i, /^none$/i];
+  if (testPatterns.some(pattern => pattern.test(trimmed))) {
     return false;
   }
   
@@ -147,8 +146,8 @@ serve(async (req) => {
 
       console.log(
         `[validate-bookings] ${booking.id}: ` +
-        `Mobile ${isMobileValid === null ? 'NULL' : isMobileValid ? 'VALID' : 'INVALID'}, ` +
-        `Location ${isLocationValid === null ? 'NULL' : isLocationValid ? 'VALID' : 'INVALID'}`
+        `Mobile ${isMobileValid ? 'VALID' : 'INVALID'}, ` +
+        `Location ${isLocationValid ? 'VALID' : 'INVALID'}`
       );
     }
 

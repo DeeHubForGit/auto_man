@@ -1,9 +1,10 @@
+// @ts-nocheck
 /**
  * Supabase Edge Function: validate-bookings
- * 
+ *
  * Validates mobile numbers and pickup locations for bookings.
  * Can be triggered manually, via cron, or by webhook.
- * 
+ *
  * Usage:
  *   POST /validate-bookings
  *   Body (optional): { "all": true } or { "since": "2024-01-01" }
@@ -17,15 +18,29 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+type PickupValidationResult = {
+  isValid: boolean;
+  issue: string;       // short code, e.g. 'empty', 'street_mismatch'
+  suggestion?: string; // formatted address from Google, if helpful
+};
+
+// ---------------------------------------------------------------------
+// Mobile validation
+// ---------------------------------------------------------------------
+
 // Australian mobile number validation
 function validateMobile(mobile: string | null): boolean {
   if (!mobile || mobile.trim() === '') return false; // Required field
-  
+
   const cleaned = mobile.replace(/\s+/g, ''); // Remove spaces
   const australianMobileRegex = /^(\+61|0)[4-5]\d{8}$/;
-  
+
   return australianMobileRegex.test(cleaned);
 }
+
+// ---------------------------------------------------------------------
+// Helpers for address parsing
+// ---------------------------------------------------------------------
 
 // Extract the leading street number from the input, e.g. "23 West Street" -> "23"
 function getStreetNumberFromInput(address: string): string | null {
@@ -41,14 +56,17 @@ function getSuburbFromInput(address: string): string | null {
   return suburb || null;
 }
 
+// ---------------------------------------------------------------------
 // Google Maps Address Validation
-async function validateAddressWithGoogle(address: string): Promise<boolean> {
-  // Use backend-only key from Supabase secrets
+// ---------------------------------------------------------------------
+
+async function validateAddressWithGoogle(address: string): Promise<PickupValidationResult> {
   const apiKey = Deno.env.get('GOOGLE_MAPS_API_KEY');
 
   if (!apiKey) {
     console.warn('[validate-bookings] No Google Maps API key found. Skipping Google validation.');
-    return true; // Fallback to true if no key (do not block users)
+    // Fail open, no hint
+    return { isValid: true, issue: 'no_api_key' };
   }
 
   const url =
@@ -63,34 +81,39 @@ async function validateAddressWithGoogle(address: string): Promise<boolean> {
 
     if (data.status !== 'OK' || !data.results || data.results.length === 0) {
       if (data.status === 'ZERO_RESULTS') {
-        return false; // Definitely not found
+        return { isValid: false, issue: 'google_no_result' };
       }
       console.warn('[validate-bookings] Google API Error:', data.status, data.error_message);
-      return true; // Fail open on weird API errors
+      return { isValid: true, issue: 'google_error' };
     }
 
     const result: any = data.results[0];
+    const formattedAddress: string | undefined = result.formatted_address;
 
-    // 1) If Google only has a partial match, treat as invalid
+    // 1) Partial match → invalid, but show suggestion
     if (result.partial_match) {
       console.warn(
         '[validate-bookings] Partial match from Google for address:',
         address,
         '→',
-        result.formatted_address,
+        formattedAddress,
       );
-      return false;
+      return {
+        isValid: false,
+        issue: 'partial_match',
+        suggestion: formattedAddress,
+      };
     }
 
     const components: any[] = Array.isArray(result.address_components)
       ? result.address_components
       : [];
 
-    // 2) Compare street numbers. If Google "fixes" the house number, treat as invalid.
+    // 2) Compare street numbers
     const inputStreetNumber = getStreetNumberFromInput(address);
     if (inputStreetNumber && components.length > 0) {
       const streetNumberComponent = components.find(
-        (c) => Array.isArray(c.types) && c.types.includes('street_number'),
+        (c: any) => Array.isArray(c.types) && c.types.includes('street_number'),
       );
       const googleStreetNumber = streetNumberComponent?.long_name as string | undefined;
 
@@ -102,17 +125,21 @@ async function validateAddressWithGoogle(address: string): Promise<boolean> {
           'google =',
           googleStreetNumber,
           'formatted =',
-          result.formatted_address,
+          formattedAddress,
         );
-        return false;
+        return {
+          isValid: false,
+          issue: 'street_number_mismatch',
+          suggestion: formattedAddress,
+        };
       }
     }
 
-    // 3) Compare suburb/locality. If Google moves it to another suburb, treat as invalid.
+    // 3) Compare suburb/locality
     const inputSuburb = getSuburbFromInput(address);
     if (inputSuburb && components.length > 0) {
       const localityComponent = components.find(
-        (c) =>
+        (c: any) =>
           Array.isArray(c.types) &&
           (c.types.includes('locality') ||
             c.types.includes('sublocality') ||
@@ -132,20 +159,24 @@ async function validateAddressWithGoogle(address: string): Promise<boolean> {
             'google =',
             googleSuburb,
             'formatted =',
-            result.formatted_address,
+            formattedAddress,
           );
-          return false;
+          return {
+            isValid: false,
+            issue: 'suburb_mismatch',
+            suggestion: formattedAddress,
+          };
         }
       }
     }
 
-    // 4) Compare street name (route). If Google gives a different street, treat as invalid.
+    // 4) Compare street name (route)
     const inputStreetLine = address.split(',')[0].trim(); // "23 West Street"
     const inputStreetName = inputStreetLine.replace(/^\d+\s+/, '').toLowerCase(); // "west street"
 
     if (inputStreetName) {
       const routeComponent = components.find(
-        (c) => Array.isArray(c.types) && c.types.includes('route'),
+        (c: any) => Array.isArray(c.types) && c.types.includes('route'),
       );
       const googleRoute = routeComponent?.long_name?.toLowerCase();
 
@@ -159,40 +190,68 @@ async function validateAddressWithGoogle(address: string): Promise<boolean> {
             'google =',
             googleRoute,
             'formatted =',
-            result.formatted_address,
+            formattedAddress,
           );
-          return false;
+          return {
+            isValid: false,
+            issue: 'street_mismatch',
+            suggestion: formattedAddress,
+          };
         }
       }
     }
 
     // Passed all checks → treat as valid
-    return true;
+    return { isValid: true, issue: 'none', suggestion: formattedAddress };
   } catch (err) {
     console.error('[validate-bookings] Network error calling Google Maps:', err);
-    return true; // Fail open on network issues
+    return { isValid: true, issue: 'network_error' }; // fail open on network issues
   }
 }
 
+// ---------------------------------------------------------------------
 // Basic pickup location validation + Google Check
-async function validatePickupLocation(location: string | null): Promise<boolean> {
-  if (!location || location.trim() === '') return false; // Required field
-  
-  const trimmed = location.trim();
-  
-  // Basic checks first (save API calls)
-  if (trimmed.length < 5) return false;
-  if (!/[a-zA-Z]{2,}/.test(trimmed)) return false; // At least 2 letters
-  
-  // Check for obvious test data (exact matches only)
-  const testPatterns = [/^test$/i, /^asdf/i, /^qwerty/i, /^xxx/i, /^temp$/i, /^sample$/i, /^n\/?a$/i, /^tbd$/i, /^none$/i];
-  if (testPatterns.some(pattern => pattern.test(trimmed))) {
-    return false;
+// ---------------------------------------------------------------------
+
+async function validatePickupLocation(location: string | null): Promise<PickupValidationResult> {
+  if (!location || location.trim() === '') {
+    return { isValid: false, issue: 'empty' };
   }
-  
+
+  const trimmed = location.trim();
+
+  // Basic checks first (save API calls)
+  if (trimmed.length < 5) {
+    return { isValid: false, issue: 'too_short' };
+  }
+
+  if (!/[a-zA-Z]{2,}/.test(trimmed)) {
+    return { isValid: false, issue: 'not_enough_letters' };
+  }
+
+  // Check for obvious test data (exact matches only)
+  const testPatterns = [
+    /^test$/i,
+    /^asdf/i,
+    /^qwerty/i,
+    /^xxx/i,
+    /^temp$/i,
+    /^sample$/i,
+    /^n\/?a$/i,
+    /^tbd$/i,
+    /^none$/i,
+  ];
+  if (testPatterns.some((pattern) => pattern.test(trimmed))) {
+    return { isValid: false, issue: 'test_data' };
+  }
+
   // Perform deep validation with Google Maps
   return await validateAddressWithGoogle(trimmed);
 }
+
+// ---------------------------------------------------------------------
+// Main handler
+// ---------------------------------------------------------------------
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -209,10 +268,10 @@ serve(async (req) => {
     // Parse request body for options
     let validateAll = false;
     let sinceDate: string | null = null;
-    
+
     if (req.method === 'POST') {
       try {
-        const body = await req.json();
+        const body = await req.json() as any;
         validateAll = body.all === true;
         sinceDate = body.since || null;
       } catch {
@@ -220,13 +279,17 @@ serve(async (req) => {
       }
     }
 
-    console.log(`[validate-bookings] Starting validation. All: ${validateAll}, Since: ${sinceDate || 'today'}`);
+    console.log(
+      `[validate-bookings] Starting validation. All: ${validateAll}, Since: ${
+        sinceDate || 'today'
+      }`,
+    );
 
     // Build query - only validate bookings that haven't been checked yet
     let query = supabase
       .from('booking')
       .select('id, mobile, pickup_location, start_time')
-      .eq('is_booking', true) // Only actual bookings
+      .eq('is_booking', true)           // Only actual bookings
       .is('validation_checked_at', null); // Only unchecked bookings
 
     if (!validateAll) {
@@ -242,15 +305,15 @@ serve(async (req) => {
 
     if (!bookings || bookings.length === 0) {
       return new Response(
-        JSON.stringify({ 
-          success: true, 
+        JSON.stringify({
+          success: true,
           message: 'No bookings found to validate',
-          validated: 0 
+          validated: 0,
         }),
-        { 
+        {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
-        }
+          status: 200,
+        },
       );
     }
 
@@ -261,18 +324,22 @@ serve(async (req) => {
     const invalidMobiles: string[] = [];
     const invalidLocations: string[] = [];
 
-    for (const booking of bookings) {
+    for (const booking of bookings as any[]) {
       const isMobileValid = validateMobile(booking.mobile);
-      // Await the async location validation
-      const isLocationValid = await validatePickupLocation(booking.pickup_location);
+      const pickupResult = await validatePickupLocation(booking.pickup_location);
+      const isLocationValid = pickupResult.isValid;
 
-      // Update booking with validation results
+      // Update booking with validation results + hints
       const { error: updateError } = await supabase
         .from('booking')
         .update({
           is_mobile_valid: isMobileValid,
           is_pickup_location_valid: isLocationValid,
+          pickup_location_issue: isLocationValid ? null : pickupResult.issue,
+          pickup_location_suggestion: pickupResult.suggestion ?? null,
           validation_checked_at: new Date().toISOString(),
+          // Any automatic validation means admin has not checked yet
+          is_admin_checked: false,
         })
         .eq('id', booking.id);
 
@@ -295,46 +362,46 @@ serve(async (req) => {
 
       console.log(
         `[validate-bookings] ${booking.id}: ` +
-        `Mobile ${isMobileValid ? 'VALID' : 'INVALID'}, ` +
-        `Location ${isLocationValid ? 'VALID' : 'INVALID'}`
+          `Mobile ${isMobileValid ? 'VALID' : 'INVALID'}, ` +
+          `Location ${isLocationValid ? 'VALID' : 'INVALID'} (issue=${pickupResult.issue})`,
       );
     }
 
     // Prepare response
-    const response = {
+    const responseBody = {
       success: true,
       validated: validatedCount,
       total_bookings: bookings.length,
       mobile_invalid_count: mobileInvalidCount,
       location_invalid_count: locationInvalidCount,
-      invalid_mobiles: invalidMobiles.slice(0, 10), // Limit to first 10
-      invalid_locations: invalidLocations.slice(0, 10), // Limit to first 10
+      invalid_mobiles: invalidMobiles.slice(0, 10),
+      invalid_locations: invalidLocations.slice(0, 10),
       timestamp: new Date().toISOString(),
     };
 
-    console.log(`[validate-bookings] Complete. Validated ${validatedCount}/${bookings.length} bookings`);
-    console.log(`[validate-bookings] Invalid mobiles: ${mobileInvalidCount}, Invalid locations: ${locationInvalidCount}`);
-
-    return new Response(
-      JSON.stringify(response),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200 
-      }
+    console.log(
+      `[validate-bookings] Complete. Validated ${validatedCount}/${bookings.length} bookings`,
+    );
+    console.log(
+      `[validate-bookings] Invalid mobiles: ${mobileInvalidCount}, Invalid locations: ${locationInvalidCount}`,
     );
 
+    return new Response(JSON.stringify(responseBody), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    });
   } catch (error) {
     console.error('[validate-bookings] Error:', error);
-    
+
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: (error as Error).message || 'Unknown error occurred' 
+      JSON.stringify({
+        success: false,
+        error: (error as Error).message || 'Unknown error occurred',
       }),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500 
-      }
+        status: 500,
+      },
     );
   }
 });

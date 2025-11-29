@@ -555,7 +555,7 @@
         
         const { data, error } = await window.supabaseClient
           .from('booking')
-          .select('*, is_mobile_valid, is_pickup_location_valid, validation_checked_at')
+          .select('*, is_mobile_valid, is_pickup_location_valid, validation_checked_at, pickup_location_issue, pickup_location_suggestion')
           .eq('client_id', window.clientData.id)
           .order('start_time', { ascending: true });
 
@@ -692,6 +692,14 @@
       } else {
         const cardsHtml = bookings.map(booking => renderBookingCard(booking, isUpcoming)).join('');
         container.innerHTML = cardsHtml;
+        
+        // Initialize validation UI for each card
+        bookings.forEach(booking => {
+          const cardEl = document.getElementById(`booking-card-${booking.id}`);
+          if (cardEl) {
+            initPickupValidationUI(cardEl, booking);
+          }
+        });
       }
       
       // Set aria-busy to false after rendering
@@ -726,6 +734,128 @@
       return '';
     }
 
+    // Maps backend issue codes to human-friendly messages for the client portal
+    const PICKUP_LOCATION_ISSUE_MESSAGES = {
+      partial_match:
+        'We found a similar address but it is not an exact match. Please check the street number and suburb.',
+      street_mismatch:
+        'We could not match this street. Please check the spelling of the street name.',
+      suburb_mismatch:
+        'We matched the street, but the suburb looks different. Please check the suburb.',
+      not_found:
+        'We could not find this address in Google Maps. Please check the number, street and suburb.',
+      test_data:
+        'This looks like a test address. Please enter your real pickup address.',
+      unknown:
+        'Please provide a valid address so we can find you for your lesson.',
+    };
+
+    function getPickupIssueMessage(issueCode) {
+      if (!issueCode) return null;
+      return PICKUP_LOCATION_ISSUE_MESSAGES[issueCode] || PICKUP_LOCATION_ISSUE_MESSAGES.unknown;
+    }
+
+    function applyPickupSuggestion(bookingId, suggestion) {
+        // Deprecated - handled by initPickupValidationUI
+    }
+    // window.applyPickupSuggestion = applyPickupSuggestion;
+
+    function initPickupValidationUI(cardEl, booking) {
+      const pickupInput = cardEl.querySelector('.pickup-address-input');
+      const issueEl = cardEl.querySelector('.pickup-issue-message');
+      const suggestionPanel = cardEl.querySelector('.pickup-suggestion-panel');
+      const suggestionTextEl = cardEl.querySelector('.pickup-suggestion-text');
+
+      if (!pickupInput || !issueEl || !suggestionPanel || !suggestionTextEl) return;
+
+      // ----- issue message -----
+      const issueMessage = getPickupIssueMessage(booking.pickup_location_issue);
+      if (booking.is_pickup_location_valid === false && issueMessage) {
+        issueEl.textContent = issueMessage;
+      } else {
+        issueEl.textContent = '';
+      }
+
+      // ----- suggestion panel (show only when needed) -----
+      const suggestion = booking.pickup_location_suggestion;
+      const shouldShowSuggestion =
+        booking.is_pickup_location_valid === false &&
+        suggestion &&
+        suggestion !== booking.pickup_location;
+
+      if (shouldShowSuggestion) {
+        suggestionTextEl.textContent = suggestion;
+        suggestionPanel.classList.remove('hidden');
+      } else {
+        suggestionPanel.classList.add('hidden');
+      }
+
+      // Click = apply suggestion, hide panel, trigger re-validation
+      suggestionPanel.onclick = async () => {
+        if (!suggestion) return;
+
+        // Update input immediately
+        pickupInput.value = suggestion;
+
+        // Save to Supabase and clear validation so it will be re-checked
+        const { error } = await window.supabaseClient
+          .from('booking')
+          .update({
+            pickup_location: suggestion,
+            is_pickup_location_valid: null,
+            pickup_location_issue: null,
+            pickup_location_suggestion: null,
+            validation_checked_at: null,
+          })
+          .eq('id', booking.id);
+
+        if (!error) {
+          // Hide panel straight away
+          suggestionPanel.classList.add('hidden');
+          issueEl.textContent = '';
+
+          // Fire edge function to re-run Google validation
+          try {
+            await window.supabaseClient.functions.invoke('validate-bookings', {
+              body: { id: booking.id }
+            });
+            // Reload bookings to show updated state
+            loadBookings(); 
+          } catch (e) { console.warn('Validation trigger failed', e); }
+        }
+      };
+
+      // When user edits the address manually, also clear validation & re-run
+      pickupInput.addEventListener('change', async () => {
+        const newValue = pickupInput.value.trim();
+        // Basic local check
+        if (!newValue) return; // Let general validation handle empty
+
+        const { error } = await window.supabaseClient
+          .from('booking')
+          .update({
+            pickup_location: newValue,
+            is_pickup_location_valid: null,
+            pickup_location_issue: null,
+            pickup_location_suggestion: null,
+            validation_checked_at: null,
+          })
+          .eq('id', booking.id);
+
+        if (!error) {
+          suggestionPanel.classList.add('hidden');
+          issueEl.textContent = '';
+
+          try {
+            await window.supabaseClient.functions.invoke('validate-bookings', {
+              body: { id: booking.id }
+            });
+            loadBookings();
+          } catch (e) { console.warn('Validation trigger failed', e); }
+        }
+      });
+    }
+
     function renderBookingCard(booking, isUpcoming) {
       // Safety check: ensure booking exists and has required fields
       if (!booking || !booking.id || !booking.start_time || !booking.end_time) {
@@ -758,6 +888,17 @@
       let statusBadge = renderStatusChip(booking.status);
       let cancelButton = '';
       
+      // Determine pickup error message
+      const issueMessage = getPickupIssueMessage(booking.pickup_location_issue);
+      let pickupHelpText = '';
+      if (booking.is_pickup_location_valid === false) {
+          if (!booking.pickup_location || booking.pickup_location.trim() === '') {
+            pickupHelpText = 'Pickup address is required';
+          } else {
+            pickupHelpText = issueMessage || 'Please provide a valid pickup address so Darren knows where to collect you.';
+          }
+      }
+
       // Refund badge (only show if actually refunded)
       let refundBadge = '';
       if (booking.refunded && booking.refunded_at) {
@@ -798,7 +939,7 @@
       const serviceName = getServiceName(booking.service_code);
 
       return `
-        <div class="booking-card bg-gray-100 border border-gray-300 rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow">
+        <div id="booking-card-${booking.id}" class="booking-card bg-gray-100 border border-gray-300 rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow">
           <!-- Header with title, status, and cancel -->
           <div class="flex items-start justify-between gap-2 mb-2">
             <div class="flex items-center gap-2 flex-1 min-w-0">
@@ -872,29 +1013,36 @@
                   </svg>
                   <div class="flex-1 min-w-0">
                     ${isUpcoming && booking.status?.toLowerCase() === 'confirmed' ? `
-                      <div class="flex items-center gap-2">
-                        <input 
-                          type="text" 
-                          value="${booking.pickup_location || ''}"
-                          data-booking-id="${booking.id}"
-                          data-field="pickup_location"
-                          data-original="${booking.pickup_location || ''}"
-                          data-is-invalid="${booking.is_pickup_location_valid === false}"
-                          oninput="validateBookingAddress(this)"
-                          onblur="saveBookingField(this)"
-                          onkeydown="if(event.key==='Enter') this.blur(); if(event.key==='Escape') { this.value=this.dataset.original; this.blur(); document.getElementById('pickup-error-${booking.id}').classList.add('hidden'); }"
-                          class="px-2 py-1 text-sm ${booking.is_pickup_location_valid === false || !booking.pickup_location || booking.pickup_location.trim() === '' ? 'text-red-600 border-red-400' : 'text-gray-900 border-gray-300'} border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          style="width: 320px;"
-                          placeholder="Enter full address"
-                          id="pickup-input-${booking.id}"
-                        />
-                        ${booking.is_pickup_location_valid === false || !booking.pickup_location || booking.pickup_location.trim() === '' ? `
-                          <svg class="w-5 h-5 flex-shrink-0" fill="#dc2626" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-                          </svg>
-                        ` : ''}
+                      <!-- Input wrapper constrained to 320px -->
+                      <div style="width: 320px; max-width: 100%;">
+                        <div class="flex items-center gap-2">
+                          <input 
+                            type="text" 
+                            value="${booking.pickup_location || ''}"
+                            class="pickup-address-input w-full px-2 py-1 text-sm ${booking.is_pickup_location_valid === false || !booking.pickup_location || booking.pickup_location.trim() === '' ? 'text-red-600 border-red-400' : 'text-gray-900 border-gray-300'} border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Enter full address"
+                          />
+                          ${booking.is_pickup_location_valid === false || !booking.pickup_location || booking.pickup_location.trim() === '' ? `
+                            <svg class="w-5 h-5 flex-shrink-0" fill="#dc2626" viewBox="0 0 20 20">
+                              <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                            </svg>
+                          ` : ''}
+                        </div>
+                        
+                        <!-- Validation message under the pickup address input -->
+                        <p class="pickup-issue-message text-xs text-red-600 mt-1"></p>
+
+                        <!-- Suggested address panel (hidden by default, shown via JS) -->
+                        <button
+                          type="button"
+                          class="pickup-suggestion-panel hidden mt-2 w-full rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-left text-sm text-blue-900 hover:bg-blue-100 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        >
+                          <div class="font-semibold mb-0.5 text-xs text-blue-800">
+                            Suggested address (tap to use)
+                          </div>
+                          <div class="pickup-suggestion-text truncate text-blue-700"></div>
+                        </button>
                       </div>
-                      <div id="pickup-error-${booking.id}" class="text-xs text-red-600 mt-1 ${booking.is_pickup_location_valid === false || !booking.pickup_location || booking.pickup_location.trim() === '' ? '' : 'hidden'}">${!booking.pickup_location || booking.pickup_location.trim() === '' ? 'Pickup address is required' : 'Please provide a valid address'}</div>
                     ` : `
                       <span class="${booking.is_pickup_location_valid === false ? 'text-red-600 font-medium' : 'text-gray-900'} break-words">${booking.pickup_location || 'No pickup address'}</span>
                       ${booking.is_pickup_location_valid === false ? `
@@ -1219,10 +1367,13 @@
             updateData.is_pickup_location_valid = false;
             updateData.validation_checked_at = new Date().toISOString();
           } else if (isValid) {
-            updateData.is_pickup_location_valid = true;
+            // Reset validation flags so server re-checks (Google API)
+            updateData.is_pickup_location_valid = null;
+            updateData.pickup_location_issue = null;
+            updateData.pickup_location_suggestion = null;
             updateData.validation_checked_at = null;
           } else {
-            // User entered something but it's invalid format
+            // User entered something but it's invalid format (locally)
             updateData.is_pickup_location_valid = false;
             updateData.validation_checked_at = new Date().toISOString();
           }
@@ -1235,6 +1386,18 @@
           .select();
 
         if (error) throw error;
+
+        // Trigger server-side validation immediately if we just reset the flags
+        if (fieldName === 'pickup_location' && isValid && newValue) {
+          try {
+            console.log('Triggering server-side validation...');
+            await window.supabaseClient.functions.invoke('validate-bookings', {
+              body: { id: bookingId }
+            });
+          } catch (valErr) {
+            console.warn('Validation trigger failed (will be picked up by background job):', valErr);
+          }
+        }
 
         // Reload this booking from database to get the actual saved values
         const { data: updatedBooking, error: fetchError } = await window.supabaseClient

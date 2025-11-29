@@ -268,12 +268,14 @@ serve(async (req) => {
     // Parse request body for options
     let validateAll = false;
     let sinceDate: string | null = null;
+    let bookingId: string | null = null; // NEW: optional single booking id
 
     if (req.method === 'POST') {
       try {
         const body = await req.json() as any;
         validateAll = body.all === true;
         sinceDate = body.since || null;
+        bookingId = body.id || null;     // NEW: read id from body
       } catch {
         // No body or invalid JSON, use defaults
       }
@@ -282,19 +284,27 @@ serve(async (req) => {
     console.log(
       `[validate-bookings] Starting validation. All: ${validateAll}, Since: ${
         sinceDate || 'today'
-      }`,
+      }, Id: ${bookingId || 'none'}`,
     );
 
-    // Build query - only validate bookings that haven't been checked yet
+    // Build query
     let query = supabase
       .from('booking')
-      .select('id, mobile, pickup_location, start_time')
-      .eq('is_booking', true)           // Only actual bookings
-      .is('validation_checked_at', null); // Only unchecked bookings
+      .select('id, mobile, pickup_location, start_time');
 
-    if (!validateAll) {
-      const cutoffDate = sinceDate || new Date().toISOString().split('T')[0];
-      query = query.gte('start_time', cutoffDate);
+    if (bookingId) {
+      // Validate a single booking regardless of previous validation state or date
+      query = query.eq('id', bookingId);
+    } else {
+      // Only validate bookings that haven't been checked yet
+      query = query
+        .eq('is_booking', true) // Only actual bookings
+        .is('validation_checked_at', null); // Only unchecked bookings
+
+      if (!validateAll) {
+        const cutoffDate = sinceDate || new Date().toISOString().split('T')[0];
+        query = query.gte('start_time', cutoffDate);
+      }
     }
 
     const { data: bookings, error: fetchError } = await query;

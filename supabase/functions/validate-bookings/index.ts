@@ -27,13 +27,160 @@ function validateMobile(mobile: string | null): boolean {
   return australianMobileRegex.test(cleaned);
 }
 
-// Basic pickup location validation
-function validatePickupLocation(location: string | null): boolean {
+// Extract the leading street number from the input, e.g. "23 West Street" -> "23"
+function getStreetNumberFromInput(address: string): string | null {
+  const match = address.trim().match(/^(\d+)\s+/);
+  return match ? match[1] : null;
+}
+
+// Extract the suburb (part after the last comma), e.g. "23 West Street, Grovedale" -> "Grovedale"
+function getSuburbFromInput(address: string): string | null {
+  const parts = address.split(',');
+  if (parts.length < 2) return null;
+  const suburb = parts[parts.length - 1].trim();
+  return suburb || null;
+}
+
+// Google Maps Address Validation
+async function validateAddressWithGoogle(address: string): Promise<boolean> {
+  // Use backend-only key from Supabase secrets
+  const apiKey = Deno.env.get('GOOGLE_MAPS_API_KEY');
+
+  if (!apiKey) {
+    console.warn('[validate-bookings] No Google Maps API key found. Skipping Google validation.');
+    return true; // Fallback to true if no key (do not block users)
+  }
+
+  const url =
+    'https://maps.googleapis.com/maps/api/geocode/json' +
+    `?address=${encodeURIComponent(address)}` +
+    `&key=${apiKey}` +
+    '&components=country:AU';
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.status !== 'OK' || !data.results || data.results.length === 0) {
+      if (data.status === 'ZERO_RESULTS') {
+        return false; // Definitely not found
+      }
+      console.warn('[validate-bookings] Google API Error:', data.status, data.error_message);
+      return true; // Fail open on weird API errors
+    }
+
+    const result: any = data.results[0];
+
+    // 1) If Google only has a partial match, treat as invalid
+    if (result.partial_match) {
+      console.warn(
+        '[validate-bookings] Partial match from Google for address:',
+        address,
+        '→',
+        result.formatted_address,
+      );
+      return false;
+    }
+
+    const components: any[] = Array.isArray(result.address_components)
+      ? result.address_components
+      : [];
+
+    // 2) Compare street numbers. If Google "fixes" the house number, treat as invalid.
+    const inputStreetNumber = getStreetNumberFromInput(address);
+    if (inputStreetNumber && components.length > 0) {
+      const streetNumberComponent = components.find(
+        (c) => Array.isArray(c.types) && c.types.includes('street_number'),
+      );
+      const googleStreetNumber = streetNumberComponent?.long_name as string | undefined;
+
+      if (googleStreetNumber && googleStreetNumber !== inputStreetNumber) {
+        console.warn(
+          '[validate-bookings] Street number mismatch:',
+          'input =',
+          inputStreetNumber,
+          'google =',
+          googleStreetNumber,
+          'formatted =',
+          result.formatted_address,
+        );
+        return false;
+      }
+    }
+
+    // 3) Compare suburb/locality. If Google moves it to another suburb, treat as invalid.
+    const inputSuburb = getSuburbFromInput(address);
+    if (inputSuburb && components.length > 0) {
+      const localityComponent = components.find(
+        (c) =>
+          Array.isArray(c.types) &&
+          (c.types.includes('locality') ||
+            c.types.includes('sublocality') ||
+            c.types.includes('postal_town')),
+      );
+      const googleSuburb = localityComponent?.long_name as string | undefined;
+
+      if (googleSuburb) {
+        const inputLower = inputSuburb.toLowerCase();
+        const googleLower = googleSuburb.toLowerCase();
+
+        if (!googleLower.includes(inputLower) && !inputLower.includes(googleLower)) {
+          console.warn(
+            '[validate-bookings] Suburb mismatch:',
+            'input =',
+            inputSuburb,
+            'google =',
+            googleSuburb,
+            'formatted =',
+            result.formatted_address,
+          );
+          return false;
+        }
+      }
+    }
+
+    // 4) Compare street name (route). If Google gives a different street, treat as invalid.
+    const inputStreetLine = address.split(',')[0].trim(); // "23 West Street"
+    const inputStreetName = inputStreetLine.replace(/^\d+\s+/, '').toLowerCase(); // "west street"
+
+    if (inputStreetName) {
+      const routeComponent = components.find(
+        (c) => Array.isArray(c.types) && c.types.includes('route'),
+      );
+      const googleRoute = routeComponent?.long_name?.toLowerCase();
+
+      if (googleRoute) {
+        const inputFirstWord = inputStreetName.split(/\s+/)[0]; // "west"
+        if (inputFirstWord && !googleRoute.includes(inputFirstWord)) {
+          console.warn(
+            '[validate-bookings] Street name mismatch:',
+            'input =',
+            inputStreetName,
+            'google =',
+            googleRoute,
+            'formatted =',
+            result.formatted_address,
+          );
+          return false;
+        }
+      }
+    }
+
+    // Passed all checks → treat as valid
+    return true;
+  } catch (err) {
+    console.error('[validate-bookings] Network error calling Google Maps:', err);
+    return true; // Fail open on network issues
+  }
+}
+
+// Basic pickup location validation + Google Check
+async function validatePickupLocation(location: string | null): Promise<boolean> {
   if (!location || location.trim() === '') return false; // Required field
   
   const trimmed = location.trim();
   
-  // Basic checks
+  // Basic checks first (save API calls)
   if (trimmed.length < 5) return false;
   if (!/[a-zA-Z]{2,}/.test(trimmed)) return false; // At least 2 letters
   
@@ -43,7 +190,8 @@ function validatePickupLocation(location: string | null): boolean {
     return false;
   }
   
-  return true;
+  // Perform deep validation with Google Maps
+  return await validateAddressWithGoogle(trimmed);
 }
 
 serve(async (req) => {
@@ -115,7 +263,8 @@ serve(async (req) => {
 
     for (const booking of bookings) {
       const isMobileValid = validateMobile(booking.mobile);
-      const isLocationValid = validatePickupLocation(booking.pickup_location);
+      // Await the async location validation
+      const isLocationValid = await validatePickupLocation(booking.pickup_location);
 
       // Update booking with validation results
       const { error: updateError } = await supabase

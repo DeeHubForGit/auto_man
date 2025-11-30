@@ -56,6 +56,12 @@ function getSuburbFromInput(address: string): string | null {
   return suburb || null;
 }
 
+// Remove trailing ", Australia" for cleaner suggestion display
+function stripTrailingCountry(address?: string | null): string | null {
+  if (!address) return null;
+  return address.replace(/,?\s*Australia$/i, '');
+}
+
 // ---------------------------------------------------------------------
 // Google Maps Address Validation
 // ---------------------------------------------------------------------
@@ -346,7 +352,7 @@ serve(async (req) => {
           is_mobile_valid: isMobileValid,
           is_pickup_location_valid: isLocationValid,
           pickup_location_issue: isLocationValid ? null : pickupResult.issue,
-          pickup_location_suggestion: pickupResult.suggestion ?? null,
+          pickup_location_suggestion: stripTrailingCountry(pickupResult.suggestion),
           validation_checked_at: new Date().toISOString(),
           // Any automatic validation means admin has not checked yet
           is_admin_checked: false,

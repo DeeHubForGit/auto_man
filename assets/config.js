@@ -445,7 +445,7 @@ window.SITE_CONFIG.loadFromAPI = async function(apiUrl) {
   // Ensure favicon and title branding across all pages
   function ensureBrandingHead(){
     try {
-      const href = 'images/auto-man-small-logo120x120.png';
+      const href = 'images/auto-man-small-logo120x120-red.png';
       let link = document.querySelector('link[rel="icon"]');
       if (!link) {
         link = document.createElement('link');

@@ -520,5 +520,30 @@ Deno.serve(async () => {
     }),
   });
 
+  // Trigger validation for any new/unchecked bookings (once per sync)
+  try {
+    const validateRes = await fetch(`${supa}/functions/v1/validate-bookings`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        apikey: key,
+        authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({}),
+    });
+
+    if (!validateRes.ok) {
+      console.warn(
+        `[gcal-sync] validate-bookings failed after sync:`,
+        validateRes.status,
+        await validateRes.text().catch(() => "<no body>"),
+      );
+    } else {
+      console.log("[gcal-sync] validate-bookings triggered successfully after sync");
+    }
+  } catch (err) {
+    console.error("[gcal-sync] Error calling validate-bookings after sync:", err);
+  }
+
   return new Response(JSON.stringify({ ok: true, results }), { headers: { "Content-Type": "application/json" } });
 });

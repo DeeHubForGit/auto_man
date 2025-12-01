@@ -1,3 +1,4 @@
+// @ts-nocheck
 // supabase/functions/gcal-sync/index.ts
 // Google Calendar → Supabase Booking Sync (v5.0 - SMS with Email fallback)
 // =================================================================
@@ -194,16 +195,41 @@ function extractFieldsFromEvent(e: any) {
   return { first_name, last_name, email, mobile, pickup_location: pickup };
 }
 
+function isNonEmpty(value: any): boolean {
+  return typeof value === "string" ? value.trim() !== "" : Boolean(value);
+}
+
 // ---------- BOOKING DETECTION ----------
+// The Google Appointment Schedule booking form is configurable.
+// Only First name, Last name and Email address are guaranteed mandatory fields.
+// Mobile and Pickup Address are currently required in our configuration,
+// but they can be removed at any time, so booking detection cannot rely on them.
 function isBookingEvent(e: any, fields: any): boolean {
-  const title = e.summary || "";
-  const pickup = fields.pickup_location;
-  
-  // Booking detection: title contains "Driving Lesson" OR pickup exists
-  const titleLooksLikeLesson = /driving lesson/i.test(title);
-  const hasPickup = Boolean(pickup && String(pickup).trim() !== "");
-  
-  return titleLooksLikeLesson || hasPickup;
+  const hasFirstName = isNonEmpty(fields.first_name);
+  const hasLastName  = isNonEmpty(fields.last_name);
+  const hasEmail     = isNonEmpty(fields.email);
+
+  // Core rule: only treat as a booking if it looks like a booking form submission.
+  const looksLikeBookingForm = hasFirstName && hasLastName && hasEmail;
+
+  if (!looksLikeBookingForm) {
+    return false;
+  }
+
+  // Optional: soft warnings if mobile / pickup are missing, but do NOT block booking
+  const hasMobile = isNonEmpty(fields.mobile);
+  const hasPickup = isNonEmpty(fields.pickup_location);
+
+  if (!hasMobile || !hasPickup) {
+    console.log('[gcal-sync][WARN] Booking detected but missing mobile or pickup', {
+      eventId: e.id,
+      summary: e.summary,
+      hasMobile,
+      hasPickup,
+    });
+  }
+
+  return true;
 }
 
 // ---------- SERVICE CODE ----------
@@ -318,7 +344,7 @@ Deno.serve(async () => {
       // We need PostgreSQL to store: "2025-11-23T04:00:00Z" (4 AM UTC)
       const startUTC = new Date(start).toISOString();
       const endUTC = new Date(end).toISOString();
-      
+
       const payload = {
         p_google_event_id: e.id,
         p_calendar_id: calendar_id,

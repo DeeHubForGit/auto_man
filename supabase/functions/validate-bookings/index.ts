@@ -12,6 +12,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
+import { parseAuMobile } from "../_shared/mobile.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,20 +24,6 @@ type PickupValidationResult = {
   issue: string;       // short code, e.g. 'empty', 'street_mismatch'
   suggestion?: string; // formatted address from Google, if helpful
 };
-
-// ---------------------------------------------------------------------
-// Mobile validation
-// ---------------------------------------------------------------------
-
-// Australian mobile number validation
-function validateMobile(mobile: string | null): boolean {
-  if (!mobile || mobile.trim() === '') return false; // Required field
-
-  const cleaned = mobile.replace(/\s+/g, ''); // Remove spaces
-  const australianMobileRegex = /^(\+61|0)[4-5]\d{8}$/;
-
-  return australianMobileRegex.test(cleaned);
-}
 
 // ---------------------------------------------------------------------
 // Helpers for address parsing
@@ -473,7 +460,7 @@ serve(async (req) => {
     const invalidLocations: string[] = [];
 
     for (const booking of bookings as any[]) {
-      const isMobileValid = validateMobile(booking.mobile);
+      const { isValid: isMobileValid } = parseAuMobile(booking.mobile);
       const pickupResult = await validatePickupLocation(booking.pickup_location);
       const isLocationValid = pickupResult.isValid;
 

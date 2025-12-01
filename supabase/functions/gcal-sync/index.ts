@@ -127,8 +127,9 @@ function parseDescriptionFields(descHtml: string | null | undefined) {
     }
   }
 
-  // 3. Normalise mobile (digits only, keep +)
-  if (mobile) mobile = mobile.replace(/[^\d+]/g, "");
+  // 3. Keep raw mobile as entered; validation / SMS will normalise later.
+  // (Do not strip characters here so we can see what the customer typed.)
+  //if (mobile) mobile = mobile.replace(/[^\d+]/g, "");
   
   // 4. Split name into first/last
   const parts = name ? name.trim().split(/\s+/, 2) : [];
@@ -166,7 +167,7 @@ function extractFieldsFromEvent(e: any) {
     if (key.includes("first")) first_name = val;
     else if (key.includes("last")) last_name = val;
     else if (key.includes("email")) email = val;
-    else if (key.includes("mobile") || key.includes("phone")) mobile = val.replace(/[^\d+]/g, "");
+    else if (key.includes("mobile") || key.includes("phone")) mobile = val;
     else if (key.includes("pickup")) pickup = val;
   }
 
@@ -190,8 +191,11 @@ function extractFieldsFromEvent(e: any) {
 
   // 6. Final cleanup
   if (email && !email.includes("@")) email = null;
-  if (mobile && mobile.length < 6) mobile = null;
 
+  // Keep whatever mobile was entered so we can see what the customer typed.
+  // Only treat it as null if it is completely blank/whitespace.
+  if (mobile && mobile.trim().length === 0) mobile = null;
+  
   return { first_name, last_name, email, mobile, pickup_location: pickup };
 }
 

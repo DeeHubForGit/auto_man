@@ -369,6 +369,7 @@
 
     // ===== BOOKINGS MANAGEMENT =====
     let allBookings = [];
+    const pickupDebounceTimers = {};
     let bookingsInit = false;
 
     // Wait for element to exist in DOM
@@ -760,6 +761,31 @@
     }
     // window.applyPickupSuggestion = applyPickupSuggestion;
 
+    async function savePickupLocationAndRevalidate(bookingId, newValue, suggestionPanel, issueEl) {
+      const { error } = await window.supabaseClient
+        .from('booking')
+        .update({
+          pickup_location: newValue,
+          is_pickup_location_valid: null,
+          pickup_location_issue: null,
+          pickup_location_suggestion: null,
+          validation_checked_at: null,
+        })
+        .eq('id', bookingId);
+
+      if (!error) {
+        if (suggestionPanel) suggestionPanel.classList.add('hidden');
+        if (issueEl) issueEl.textContent = '';
+
+        try {
+          await window.supabaseClient.functions.invoke('validate-bookings', {
+            body: { id: bookingId }
+          });
+          loadBookings();
+        } catch (e) { console.warn('Validation trigger failed', e); }
+      }
+    }
+
     function initPickupValidationUI(cardEl, booking) {
       const pickupInput = cardEl.querySelector('.pickup-address-input');
       const issueEl = cardEl.querySelector('.pickup-issue-message');
@@ -796,63 +822,43 @@
 
         // Update input immediately
         pickupInput.value = suggestion;
-
-        // Save to Supabase and clear validation so it will be re-checked
-        const { error } = await window.supabaseClient
-          .from('booking')
-          .update({
-            pickup_location: suggestion,
-            is_pickup_location_valid: null,
-            pickup_location_issue: null,
-            pickup_location_suggestion: null,
-            validation_checked_at: null,
-          })
-          .eq('id', booking.id);
-
-        if (!error) {
-          // Hide panel straight away
-          suggestionPanel.classList.add('hidden');
-          issueEl.textContent = '';
-
-          // Fire edge function to re-run Google validation
-          try {
-            await window.supabaseClient.functions.invoke('validate-bookings', {
-              body: { id: booking.id }
-            });
-            // Reload bookings to show updated state
-            loadBookings(); 
-          } catch (e) { console.warn('Validation trigger failed', e); }
-        }
+        savePickupLocationAndRevalidate(booking.id, suggestion, suggestionPanel, issueEl);
       };
 
       // When user edits the address manually, also clear validation & re-run
-      pickupInput.addEventListener('change', async () => {
+      pickupInput.addEventListener('input', () => {
         const newValue = pickupInput.value.trim();
-        // Basic local check
-        if (!newValue) return; // Let general validation handle empty
-
-        const { error } = await window.supabaseClient
-          .from('booking')
-          .update({
-            pickup_location: newValue,
-            is_pickup_location_valid: null,
-            pickup_location_issue: null,
-            pickup_location_suggestion: null,
-            validation_checked_at: null,
-          })
-          .eq('id', booking.id);
-
-        if (!error) {
-          suggestionPanel.classList.add('hidden');
-          issueEl.textContent = '';
-
-          try {
-            await window.supabaseClient.functions.invoke('validate-bookings', {
-              body: { id: booking.id }
-            });
-            loadBookings();
-          } catch (e) { console.warn('Validation trigger failed', e); }
+        
+        // Basic local validation while typing (optional but nice)
+        if (!newValue) {
+          // Empty – show "required" styling but DO NOT call backend.
+          pickupInput.classList.add('border-red-400', 'text-red-600');
+          pickupInput.classList.remove('border-gray-300', 'text-gray-900');
+        } else if (!isValidAddress(newValue)) {
+          // Looks dodgy – keep red border, still no backend call yet.
+          pickupInput.classList.add('border-red-400', 'text-red-600');
+          pickupInput.classList.remove('border-gray-300', 'text-gray-900');
+        } else {
+          // Looks OK locally – remove red border.
+          pickupInput.classList.remove('border-red-400', 'text-red-600');
+          pickupInput.classList.add('border-gray-300', 'text-gray-900');
         }
+        
+        // Clear any existing timer for this booking
+        clearTimeout(pickupDebounceTimers[booking.id]);
+        
+        // If the field is empty, don't schedule a backend save at all
+        if (!newValue) {
+          return;
+        }
+        
+        // Debounce backend update + Google validation
+        pickupDebounceTimers[booking.id] = setTimeout(() => {
+          // Only call backend if the value actually changed from what we originally had
+          if (newValue !== (booking.pickup_location || '').trim()) {
+            savePickupLocationAndRevalidate(booking.id, newValue, suggestionPanel, issueEl);
+          }
+        }, 600); // 600ms of no typing
       });
     }
 

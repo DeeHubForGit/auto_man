@@ -66,14 +66,61 @@ function stripTrailingCountry(address?: string | null): string | null {
 function normaliseStreetType(value: string | null): string | null {
   if (!value) return null;
   const v = value.toLowerCase();
+
+  // Road
   if (v === 'rd' || v === 'road') return 'road';
+
+  // Street
   if (v === 'st' || v === 'street') return 'street';
+
+  // Avenue
   if (v === 'ave' || v === 'av' || v === 'avenue') return 'avenue';
+
+  // Drive
   if (v === 'dr' || v === 'drive') return 'drive';
+
+  // Court
   if (v === 'ct' || v === 'court') return 'court';
-  return null;  // <- only known types get compared
+
+  // Crescent
+  if (v === 'crescent' || v === 'cres' || v === 'crs') return 'crescent';
+
+  // Boulevard
+  if (v === 'boulevard' || v === 'blvd') return 'boulevard';
+
+  // Place
+  if (v === 'place' || v === 'pl') return 'place';
+
+  // Lane
+  if (v === 'lane' || v === 'ln') return 'lane';
+
+  // Way
+  if (v === 'way') return 'way';
+
+  // Grove
+  if (v === 'grove' || v === 'gr') return 'grove';
+
+  // Terrace
+  if (v === 'terrace' || v === 'tce') return 'terrace';
+
+  // Close
+  if (v === 'close' || v === 'cl') return 'close';
+
+  return null; // Everything else considered "unknown"
 }
 
+// Normalise directional prefixes so "South" and "S" are treated the same
+function normaliseDirectionalPrefix(word: string | null): string | null {
+  if (!word) return null;
+  const w = word.toLowerCase();
+
+  if (w === 'north' || w === 'n') return 'n';
+  if (w === 'south' || w === 's') return 's';
+  if (w === 'east' || w === 'e') return 'e';
+  if (w === 'west' || w === 'w') return 'w';
+
+  return w;
+}
 
 // ---------------------------------------------------------------------
 // Google Maps Address Validation
@@ -155,7 +202,8 @@ async function validateAddressWithGoogle(address: string): Promise<PickupValidat
 
     // 3) Compare suburb/locality
     const inputSuburb = getSuburbFromInput(address);
-    if (inputSuburb && components.length > 0) {
+
+    if (components.length > 0) {
       const localityComponent = components.find(
         (c: any) =>
           Array.isArray(c.types) &&
@@ -163,18 +211,31 @@ async function validateAddressWithGoogle(address: string): Promise<PickupValidat
             c.types.includes('sublocality') ||
             c.types.includes('postal_town')),
       );
+
       const googleSuburb = localityComponent?.long_name as string | undefined;
 
       if (googleSuburb) {
-        const inputLower = inputSuburb.toLowerCase();
         const googleLower = googleSuburb.toLowerCase();
+        const addressLower = address.toLowerCase();
 
-        if (!googleLower.includes(inputLower) && !inputLower.includes(googleLower)) {
+        // Treat as a match if the full suburb appears anywhere
+        // in the address string (handles with or without comma).
+        let suburbLooksOk = addressLower.includes(googleLower);
+
+        // If we have a parsed suburb (from a comma), keep the old
+        // lenient comparison as a backup.
+        if (!suburbLooksOk && inputSuburb) {
+          const inputLower = inputSuburb.toLowerCase();
+          suburbLooksOk =
+            googleLower.includes(inputLower) || inputLower.includes(googleLower);
+        }
+
+        if (!suburbLooksOk) {
           console.warn(
             '[validate-bookings] Suburb mismatch:',
-            'input =',
-            inputSuburb,
-            'google =',
+            'input address =',
+            address,
+            'google suburb =',
             googleSuburb,
             'formatted =',
             formattedAddress,
@@ -189,8 +250,9 @@ async function validateAddressWithGoogle(address: string): Promise<PickupValidat
     }
 
     // 4) Compare street name (route)
-    const inputStreetLine = address.split(',')[0].trim(); // "23 West Street"
-    const inputStreetName = inputStreetLine.replace(/^\d+\s+/, '').toLowerCase(); // "west street"
+    // Start with everything before the first comma as the street line
+    let inputStreetLine = address.split(',')[0].trim(); // e.g. "12 Pioneer Road Grovedale"
+    let inputStreetName = inputStreetLine.replace(/^\d+\s+/, '').toLowerCase(); // remove number
 
     if (inputStreetName) {
       const routeComponent = components.find(
@@ -199,6 +261,36 @@ async function validateAddressWithGoogle(address: string): Promise<PickupValidat
       const googleRoute = routeComponent?.long_name?.toLowerCase();
 
       if (googleRoute) {
+        // Try to get a cleaner street name by stripping the suburb
+        // using Google's suburb from the geocode result.
+        let hasReliableStreetSplit = false;
+
+        const suburbComponent = components.find(
+          (c: any) =>
+            Array.isArray(c.types) &&
+            (c.types.includes('locality') ||
+              c.types.includes('sublocality') ||
+              c.types.includes('postal_town')),
+        );
+        const googleSuburb = suburbComponent?.long_name as string | undefined;
+
+        if (googleSuburb) {
+          const addrLower = address.toLowerCase();
+          const suburbLower = googleSuburb.toLowerCase();
+          const idx = addrLower.lastIndexOf(suburbLower);
+
+          if (idx > -1) {
+            // Everything before the suburb is the street portion
+            const beforeSuburb = address.slice(0, idx).replace(/[,]\s*$/, '').trim();
+            const beforeNoNumber = beforeSuburb.replace(/^\d+\s+/, '').trim().toLowerCase();
+
+            if (beforeNoNumber) {
+              inputStreetName = beforeNoNumber;
+              hasReliableStreetSplit = true;
+            }
+          }
+        }
+
         const inputParts = inputStreetName.split(/\s+/);
         const googleParts = googleRoute.split(/\s+/);
 
@@ -206,7 +298,7 @@ async function validateAddressWithGoogle(address: string): Promise<PickupValidat
         const inputSuffix = normaliseStreetType(inputParts[inputParts.length - 1] || null);
         const googleSuffix = normaliseStreetType(googleParts[googleParts.length - 1] || null);
 
-        // Raw suffixes, used for catching obvious typos like "raod" vs "road"
+        // Raw suffixes, for catching obvious typos like "raod" vs "road"
         const inputRawSuffix = (inputParts[inputParts.length - 1] || '').toLowerCase();
         const googleRawSuffix = (googleParts[googleParts.length - 1] || '').toLowerCase();
 
@@ -218,9 +310,11 @@ async function validateAddressWithGoogle(address: string): Promise<PickupValidat
           !!googleSuffix &&
           inputSuffix !== googleSuffix;
 
-        // If Google has a known suffix, and our normalised suffix is unknown,
-        // but the raw words differ, treat as a suffix typo (e.g. "raod" vs "road").
+        // Only treat this as a suffix typo when we are confident that
+        // we have separated street and suburb (so we know the last word
+        // really is the street suffix, not the suburb).
         const suffixTypoMismatch =
+          hasReliableStreetSplit &&
           !!googleSuffix &&
           !inputSuffix &&
           !!inputRawSuffix &&
@@ -244,7 +338,7 @@ async function validateAddressWithGoogle(address: string): Promise<PickupValidat
         }
       }
     }
-
+    
     // Passed all checks → treat as valid
     return { isValid: true, issue: 'none', suggestion: formattedAddress };
   } catch (err) {

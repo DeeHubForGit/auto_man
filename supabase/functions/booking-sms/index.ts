@@ -1,9 +1,11 @@
+// @ts-nocheck
 // Send one-time booking confirmation SMS with full audit logging
 // Usage (server-to-server or admin): POST /functions/v1/booking-sms
 // Body: { booking_id?: string, google_event_id?: string }
 // Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SMS_SENDER (optional)
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { parseAuMobile } from "../_shared/mobile.ts";
 
 type Json = Record<string, unknown>;
 
@@ -20,19 +22,6 @@ function json(body: Json, init: number | ResponseInit = 200) {
       ...(initObj as ResponseInit).headers || {},
     },
   });
-}
-
-function digits(v: string | null | undefined) {
-  return (v || "").replace(/\D+/g, "");
-}
-
-// AU only. Adjust if you later want international.
-function toE164Au(mobile: string | null | undefined): string | null {
-  const d = digits(mobile || "");
-  if (/^04\d{8}$/.test(d)) return `+61${d.slice(1)}`;
-  if (/^614\d{8}$/.test(d)) return `+${d}`;
-  if (/^\+614\d{8}$/.test(mobile || "")) return mobile!;
-  return null;
 }
 
 async function fetchJson(url: string, init: RequestInit) {
@@ -172,8 +161,8 @@ serve(async (req) => {
       return json({ ok: true, skipped: "not_initial_create", booking_id: b.id });
     }
 
-    const e164 = toE164Au(b.mobile);
-    if (!e164) {
+    const { e164, isValid } = parseAuMobile(b.mobile);
+    if (!isValid || !e164) {
       console.error(`[booking-sms] Invalid mobile: ${b.mobile}`);
       return json({ error: "Invalid or missing AU mobile on booking" }, 400);
     }

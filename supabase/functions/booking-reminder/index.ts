@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Google Calendar → Booking reminder SMS sender
 // -----------------------------------------------------------
 // Finds bookings starting ~X hours from now and sends a short reminder.
@@ -10,6 +11,7 @@
 //   { booking_id?: string, hours?: number, window_minutes?: number, dry_run?: boolean, limit?: number }
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { parseAuMobile } from "../_shared/mobile.ts";
 
 type Json = Record<string, unknown>;
 
@@ -37,16 +39,6 @@ async function fetchJson(url: string, init: RequestInit) {
   }
 }
 
-function digits(v: string | null | undefined) {
-  return (v || "").replace(/\D+/g, "");
-}
-function toE164Au(mobile: string | null | undefined): string | null {
-  const d = digits(mobile);
-  if (/^04\d{8}$/.test(d)) return `+61${d.slice(1)}`;
-  if (/^614\d{8}$/.test(d)) return `+${d}`;
-  if (/^\+614\d{8}$/.test(mobile || "")) return mobile!;
-  return null;
-}
 function getOrdinalSuffix(day: number): string {
   if (day > 3 && day < 21) return "th";
   switch (day % 10) {
@@ -199,8 +191,8 @@ serve(async (req) => {
           continue;
         }
 
-        const e164 = toE164Au(b.mobile);
-        if (!e164) {
+        const { e164, isValid } = parseAuMobile(b.mobile);
+        if (!isValid || !e164) {
           results.push({ id: b.id, skipped: "invalid_mobile" });
           continue;
         }

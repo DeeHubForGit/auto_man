@@ -62,10 +62,22 @@ function stripTrailingCountry(address?: string | null): string | null {
   return address.replace(/,?\s*Australia$/i, '');
 }
 
+// Normalise common street suffixes so we can compare Street vs Road etc.
+function normaliseStreetType(value: string | null): string | null {
+  if (!value) return null;
+  const v = value.toLowerCase();
+  if (v === 'rd' || v === 'road') return 'road';
+  if (v === 'st' || v === 'street') return 'street';
+  if (v === 'ave' || v === 'av' || v === 'avenue') return 'avenue';
+  if (v === 'dr' || v === 'drive') return 'drive';
+  if (v === 'ct' || v === 'court') return 'court';
+  return null;  // <- only known types get compared
+}
+
+
 // ---------------------------------------------------------------------
 // Google Maps Address Validation
 // ---------------------------------------------------------------------
-
 async function validateAddressWithGoogle(address: string): Promise<PickupValidationResult> {
   const apiKey = Deno.env.get('GOOGLE_MAPS_API_KEY');
 
@@ -187,8 +199,34 @@ async function validateAddressWithGoogle(address: string): Promise<PickupValidat
       const googleRoute = routeComponent?.long_name?.toLowerCase();
 
       if (googleRoute) {
-        const inputFirstWord = inputStreetName.split(/\s+/)[0]; // "west"
-        if (inputFirstWord && !googleRoute.includes(inputFirstWord)) {
+        const inputParts = inputStreetName.split(/\s+/);
+        const googleParts = googleRoute.split(/\s+/);
+
+        const inputFirstWord = inputParts[0]; // "pioneer"
+        const inputSuffix = normaliseStreetType(inputParts[inputParts.length - 1] || null);
+        const googleSuffix = normaliseStreetType(googleParts[googleParts.length - 1] || null);
+
+        // Raw suffixes, used for catching obvious typos like "raod" vs "road"
+        const inputRawSuffix = (inputParts[inputParts.length - 1] || '').toLowerCase();
+        const googleRawSuffix = (googleParts[googleParts.length - 1] || '').toLowerCase();
+
+        const firstWordMismatch =
+          !!inputFirstWord && !googleRoute.includes(inputFirstWord);
+
+        const suffixMismatch =
+          !!inputSuffix &&
+          !!googleSuffix &&
+          inputSuffix !== googleSuffix;
+
+        // If Google has a known suffix, and our normalised suffix is unknown,
+        // but the raw words differ, treat as a suffix typo (e.g. "raod" vs "road").
+        const suffixTypoMismatch =
+          !!googleSuffix &&
+          !inputSuffix &&
+          !!inputRawSuffix &&
+          inputRawSuffix !== googleRawSuffix;
+
+        if (firstWordMismatch || suffixMismatch || suffixTypoMismatch) {
           console.warn(
             '[validate-bookings] Street name mismatch:',
             'input =',

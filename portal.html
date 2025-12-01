@@ -739,7 +739,7 @@
       partial_match:
         'We found a similar address but it is not an exact match. Please check the street number and suburb.',
       street_mismatch:
-        'We could not match this street. Please check the spelling of the street name.',
+        'We could not match this street or suffix (road, drive, etc). Please check the spelling of the street name or suffix.',
       suburb_mismatch:
         'We matched the street, but the suburb looks different. Please check the suburb.',
       not_found:
@@ -990,11 +990,9 @@
                             placeholder="+61 or 04XX XXX XXX"
                             id="mobile-input-${booking.id}"
                         />
-                        ${booking.is_mobile_valid === false || !booking.mobile || booking.mobile.trim() === '' ? `
-                          <svg class="w-5 h-5 flex-shrink-0" fill="#dc2626" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-                          </svg>
-                        ` : ''}
+                        <svg class="w-5 h-5 flex-shrink-0 ${booking.is_mobile_valid === false || !booking.mobile || booking.mobile.trim() === '' ? '' : 'hidden'}" fill="#dc2626" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
                       </div>
                       <div id="mobile-error-${booking.id}" class="text-xs text-red-600 mt-1 ${booking.is_mobile_valid === false || !booking.mobile || booking.mobile.trim() === '' ? '' : 'hidden'}">${!booking.mobile || booking.mobile.trim() === '' ? 'Mobile number is required' : 'Invalid mobile format - please update'}</div>
                     ` : `
@@ -1022,11 +1020,9 @@
                             class="pickup-address-input w-full px-2 py-1 text-sm ${booking.is_pickup_location_valid === false || !booking.pickup_location || booking.pickup_location.trim() === '' ? 'text-red-600 border-red-400' : 'text-gray-900 border-gray-300'} border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="Enter full address"
                           />
-                          ${booking.is_pickup_location_valid === false || !booking.pickup_location || booking.pickup_location.trim() === '' ? `
-                            <svg class="w-5 h-5 flex-shrink-0" fill="#dc2626" viewBox="0 0 20 20">
-                              <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-                            </svg>
-                          ` : ''}
+                          <svg class="w-5 h-5 flex-shrink-0 ${booking.is_pickup_location_valid === false || !booking.pickup_location || booking.pickup_location.trim() === '' ? '' : 'hidden'}" fill="#dc2626" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                          </svg>
                         </div>
                         
                         <!-- Validation message under the pickup address input -->

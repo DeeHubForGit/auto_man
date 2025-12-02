@@ -92,27 +92,20 @@
 
   // Validate mobile with debounce (pause typing detection)
   function validateAdminMobile(inputElement, bookingId) {
-    // Clear existing timer
-    if (mobileDebounceTimers[bookingId]) {
-      clearTimeout(mobileDebounceTimers[bookingId]);
-    }
+    
+    const value = inputElement.value.trim();
+    const row = document.getElementById(`mobile-row-${bookingId}`);
+    const icon = document.getElementById(`mobile-error-icon-${bookingId}`);
+    const checkbox = row?.querySelector('input[type="checkbox"]');
 
-    // Set new timer - validate after 500ms pause
-    mobileDebounceTimers[bookingId] = setTimeout(() => {
-      const value = inputElement.value.trim();
-      const row = document.getElementById(`mobile-row-${bookingId}`);
-      const icon = document.getElementById(`mobile-error-icon-${bookingId}`);
-      const checkbox = row?.querySelector('input[type="checkbox"]');
-
-      if (!value) {
-        // Empty - mark invalid
-        inputElement.classList.add('border-red-400', 'text-red-600');
-        inputElement.classList.remove('border-gray-300', 'text-gray-900');
-        if (icon) icon.classList.remove('hidden');
-        if (checkbox) checkbox.checked = false;
-        return;
-      }
-
+    // ----- local styling (immediate feedback) -----
+    if (!value) {
+      // Empty - mark invalid
+      inputElement.classList.add('border-red-400', 'text-red-600');
+      inputElement.classList.remove('border-gray-300', 'text-gray-900');
+      if (icon) icon.classList.remove('hidden');
+      if (checkbox) checkbox.checked = false;
+    } else {
       // Check format
       const isValid = isValidAuMobile(value);
       if (isValid) {
@@ -126,12 +119,40 @@
         if (icon) icon.classList.remove('hidden');
         if (checkbox) checkbox.checked = false;
       }
+    }
+
+    // ----- debounce backend save -----
+    
+    // Clear existing timer
+    if (mobileDebounceTimers[bookingId]) {
+      clearTimeout(mobileDebounceTimers[bookingId]);
+    }
+
+    // If empty, don't schedule backend save
+    if (!value) return;
+
+    // Capture the value at the time we start the timer
+    const scheduledValue = value;
+
+    // Set new timer - save after 500ms pause
+    mobileDebounceTimers[bookingId] = setTimeout(async () => {
+      // If the user kept typing, let the newer timer handle it
+      const rowInput = document.querySelector(`#mobile-row-${bookingId} input[type="text"]`);
+      const latest = rowInput ? rowInput.value.trim() : scheduledValue;
+      if (latest !== scheduledValue) return;
+
+      // Skip if unchanged from original DB value
+      const booking = adminBookings.find(b => String(b.id) === String(bookingId));
+      const original = (booking?.mobile || '').trim();
+      if (latest === original) return;
+
+      // Save to database and update badges
+      await window.updateAdminBookingField(bookingId, 'mobile', latest);
     }, 500);
   }
 
   // Validate pickup with debounce (pause typing detection)
   function validateAdminPickup(inputElement, bookingId) {
-    console.log('[admin-bookings] validateAdminPickup called for booking', bookingId, 'value:', inputElement.value);
     
     const value = inputElement.value.trim();
     const row = document.getElementById(`pickup-row-${bookingId}`);
@@ -170,45 +191,30 @@
     }
 
     // ----- debounce backend save + validation -----
-
+    
     // Clear any existing debounce timer
     if (pickupDebounceTimers[bookingId]) {
       clearTimeout(pickupDebounceTimers[bookingId]);
     }
 
     // If empty, do not hit the backend
-    if (!value) {
-      console.log('[admin-bookings] Pickup empty, skipping debounce');
-      return;
-    }
+    if (!value) return;
 
     // Capture the value at the time we start the timer
     const scheduledValue = value;
 
-    console.log('[admin-bookings] Starting debounce timer (600ms)');
     pickupDebounceTimers[bookingId] = setTimeout(async () => {
-      console.log('[admin-bookings] Debounce fired for booking', bookingId);
-
       // If the user kept typing, let the newer timer handle it
       const rowInput = document.querySelector(`#pickup-row-${bookingId} input[type="text"]`);
       const latest = rowInput ? rowInput.value.trim() : scheduledValue;
-      if (latest !== scheduledValue) {
-        console.log('[admin-bookings] Value changed again, skipping this run');
-        return;
-      }
+      if (latest !== scheduledValue) return;
 
-      // Optionally skip if unchanged from original DB value
+      // Skip if unchanged from original DB value
       const booking = adminBookings.find(b => String(b.id) === String(bookingId));
       const original = (booking?.pickup_location || '').trim();
-      if (latest === original) {
-        console.log('[admin-bookings] Pickup unchanged from original, skipping backend call');
-        return;
-      }
+      if (latest === original) return;
 
-      // Use the existing helper – this will:
-      // 1) Update pickup_location and reset validity fields
-      // 2) Call validate-bookings edge function
-      // 3) Reload admin bookings
+      // Update pickup_location, trigger validation, reload bookings, and update badges
       await window.updateAdminBookingField(bookingId, 'pickup_location', latest);
     }, 600);
   }
@@ -364,7 +370,6 @@
                     value="${booking.mobile || ''}" 
                     class="max-w-[280px] px-2 py-1 text-sm ${isMobileInvalid ? 'border-red-400 text-red-600' : 'border-gray-300 text-gray-900'} border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     oninput="validateAdminMobile(this, '${booking.id}')"
-                    onchange="updateAdminBookingField('${booking.id}', 'mobile', this.value)"
                     placeholder="Mobile"
                   >
                   <svg class="w-5 h-5 flex-shrink-0 ${isMobileInvalid ? '' : 'hidden'}" id="mobile-error-icon-${booking.id}" fill="#dc2626" viewBox="0 0 20 20">
@@ -499,23 +504,40 @@
           body: { id: id }
         });
         // Reload to show result (valid or suggestions)
-        loadAdminBookings();
+        await loadAdminBookings();
+        // Update notification badges
+        if (window.updateNotificationBadges) {
+          await window.updateNotificationBadges();
+        }
       } catch (e) {
         console.warn('Validation trigger failed', e);
+      }
+    }
+    
+    // For mobile, update badges immediately
+    if (field === 'mobile') {
+      if (window.updateNotificationBadges) {
+        await window.updateNotificationBadges();
       }
     }
   };
 
   window.toggleAdminValidation = async function(id, field, isChecked) {
+    console.log('[admin-bookings] Validation toggled:', { field, isChecked });
+    
     // Admin manual override of validation
     const { error } = await window.supabaseClient
       .from('booking')
       .update({ [field]: isChecked })
       .eq('id', id);
       
-    if (error) console.error('Validation override failed:', error);
-    else {
-        loadAdminBookings();
+    if (error) {
+      console.error('[admin-bookings] Validation toggle failed:', error);
+    } else {
+      await loadAdminBookings();
+      if (window.updateNotificationBadges) {
+        await window.updateNotificationBadges();
+      }
     }
   };
   
@@ -524,17 +546,28 @@
           .from('booking')
           .update({ pickup_location: suggestion, is_pickup_location_valid: true }) // Assume valid if suggestion taken
           .eq('id', id);
-      loadAdminBookings();
+      await loadAdminBookings();
+      // Update notification badges
+      if (window.updateNotificationBadges) {
+        await window.updateNotificationBadges();
+      }
   };
 
   window.toggleAdminChecked = async function(id, isChecked) {
+    console.log('[admin-bookings] Admin checked toggled:', { isChecked });
+    
     const { error } = await window.supabaseClient
       .from('booking')
       .update({ is_admin_checked: isChecked })
       .eq('id', id);
       
-    if (!error) {
-      loadAdminBookings();
+    if (error) {
+      console.error('[admin-bookings] Admin checked toggle failed:', error);
+    } else {
+      await loadAdminBookings();
+      if (window.updateNotificationBadges) {
+        await window.updateNotificationBadges();
+      }
     }
   };
 

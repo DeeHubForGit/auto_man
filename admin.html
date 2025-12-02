@@ -308,17 +308,26 @@
           
         const uncheckedCount = uncheckedBookings?.length || 0;
 
-        // Count bookings with invalid fields (Top Alert Badge)
-        // Only count invalid bookings that haven't been admin checked
-        const { data: invalidBookings } = await window.supabaseClient
+        // Count invalid FIELDS (not bookings) - Top Alert Badge
+        // Count each invalid field separately: mobile + pickup can = 2 invalid fields per booking
+        // Only count invalid fields for bookings that haven't been admin checked
+        
+        const { data: invalidBookings, error: invalidError } = await window.supabaseClient
           .from('booking')
-          .select('id')
+          .select('id, mobile, pickup_location, is_mobile_valid, is_pickup_location_valid, is_admin_checked, start_time')
           .eq('is_booking', true)
           .eq('is_admin_checked', false)
           .gte('start_time', today)
           .or('is_mobile_valid.eq.false,is_pickup_location_valid.eq.false');
-          
-        const invalidCount = invalidBookings?.length || 0;
+        
+        // Count individual invalid fields
+        let invalidCount = 0;
+        if (invalidBookings && invalidBookings.length > 0) {
+          invalidBookings.forEach(b => {
+            if (b.is_mobile_valid === false) invalidCount++;
+            if (b.is_pickup_location_valid === false) invalidCount++;
+          });
+        }
         
         // Update refund alert
         const refundIcon = document.getElementById('refundAlertIcon');

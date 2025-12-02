@@ -21,6 +21,71 @@
     #messageAlertIcon:active {
       background-color: #f3f4f6 !important;
     }
+    #section-bookings .booking-card {
+      background-color: #dbeafe;      /* same as contact-card unread */
+      border: 1px solid #3b82f6;
+      border-radius: 0.75rem;         /* rounded-xl */
+      box-shadow: none;
+    }
+    #section-bookings .booking-label {
+      font-size: 0.875rem;       /* text-sm */
+      color: #374151;            /* text-gray-700 */
+      font-weight: 500;          /* medium, softer than semibold */
+    }
+    #section-bookings .booking-value {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #111827;            /* text-gray-900 but not heavy */
+    }
+
+    /* =============================================== */
+    /* FIX: Prevent global dark theme from overriding  */
+    /* Booking Validation colours & fonts              */
+    /* =============================================== */
+
+    /* Force booking card text back to dark grey/black */
+    #section-bookings .booking-card,
+    #section-bookings .booking-card * {
+      color: #111827 !important;            /* dark text */
+    }
+
+    /* Override global text-gray utilities ONLY inside bookings */
+    #section-bookings .text-gray-700,
+    #section-bookings .text-gray-900,
+    #section-bookings label {
+      color: #111827 !important;
+    }
+
+    /* Inputs inside booking cards: light-mode styling */
+    #section-bookings input[type="text"],
+    #section-bookings input[type="email"],
+    #section-bookings input[type="tel"],
+    #section-bookings input[type="search"],
+    #section-bookings input[type="url"],
+    #section-bookings input[type="number"],
+    #section-bookings textarea,
+    #section-bookings select {
+      background-color: white !important;
+      color: #111827 !important;          /* proper dark text */
+      border-color: #3b82f6 !important;   /* blue border */
+    }
+
+    /* Checkbox fix – match card colour instead of global white */
+    #section-bookings input[type="checkbox"] {
+      background-color: #dbeafe !important;   /* same as card */
+      border-color: #3b82f6 !important;
+    }
+
+    #section-bookings input[type="checkbox"]:checked {
+      background-color: #3b82f6 !important;
+      border-color: #3b82f6 !important;
+    }
+
+    /* Suggestion box background fix */
+    #section-bookings .suggestion-box {
+      background-color: #c7ddfd !important;   /* slightly darker blue */
+      color: #111827 !important;
+    }
   </style>
   <!-- Auth scripts -->
   <div data-include="partials/auth-scripts.html"></div>
@@ -35,6 +100,14 @@
       
       <!-- Notification Icons -->
       <div id="adminNotifications" class="flex items-center gap-3 flex-shrink-0">
+        <!-- Invalid Fields Alert -->
+        <button id="invalidAlertIcon" style="background-color: transparent !important;" class="hidden relative p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-all" onclick="showInvalidBookings()" title="Invalid bookings" type="button">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-gray-900 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <span id="invalidAlertBadge" class="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-red-600 rounded-full min-w-[20px] pointer-events-none"></span>
+        </button>
+
         <!-- Refund Alerts -->
         <button id="refundAlertIcon" style="background-color: transparent !important;" class="hidden relative p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-all" onclick="showRefundAlerts()" title="Refund alerts" type="button">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-gray-900 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -66,6 +139,11 @@
                class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors border-l-4 border-transparent">
               <span class="font-medium">Calendar</span>
             </a>
+            <a href="#bookings" onclick="showSection('bookings')" id="nav-bookings"
+               class="nav-item flex items-center justify-between px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors border-l-4 border-transparent">
+              <span class="font-medium">Bookings</span>
+              <span id="bookingsBadge" class="hidden bg-red-600 text-white py-0.5 px-2 rounded-full text-xs font-bold shadow-sm">0</span>
+            </a>
             <a href="#cancellations" onclick="showSection('cancellations')" id="nav-cancellations"
                class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors border-l-4 border-transparent">
               <span class="font-medium">Cancellations</span>
@@ -90,6 +168,7 @@
       <div class="flex-1 min-w-0">
         <!-- Include all admin sections as partials -->
         <div data-include="partials/admin-calendar.html"></div>
+        <div data-include="partials/admin-bookings.html"></div>
         <div data-include="partials/admin-cancellations.html"></div>
         <div data-include="partials/admin-progress.html"></div>
         <div data-include="partials/admin-messaging.html"></div>
@@ -204,6 +283,13 @@
           }
         }, 50);
       }
+      
+      // Load bookings if navigating to bookings section
+      if (section === 'bookings') {
+        setTimeout(() => {
+          if (window.loadAdminBookings) window.loadAdminBookings();
+        }, 50);
+      }
     }
     
     // Notification icon handlers
@@ -233,6 +319,25 @@
         window.adminContactsLoadAndFilter('unread');
       }
     };
+
+    window.showInvalidBookings = function() {
+      showSection('bookings', 'alert');
+      // Wait for section to load then set filters
+      setTimeout(() => {
+        const filterChecked = document.getElementById('bookingFilterChecked');
+        const filterValid = document.getElementById('bookingFilterValid');
+        
+        if (filterChecked) {
+          filterChecked.value = 'unchecked';
+          filterChecked.dispatchEvent(new Event('change'));
+        }
+        if (filterValid) {
+          filterValid.value = 'invalid';
+          // Dispatch change only on the last one to trigger load
+          filterValid.dispatchEvent(new Event('change'));
+        }
+      }, 100);
+    };
     
     // Update notification badges
     window.updateNotificationBadges = async function() {
@@ -257,6 +362,27 @@
         
         const messageCount = messageData?.length || 0;
         
+        // Count bookings that need admin check (Side Menu Badge)
+        const today = new Date().toISOString().split('T')[0];
+        const { data: uncheckedBookings } = await window.supabaseClient
+          .from('booking')
+          .select('id')
+          .eq('is_booking', true)
+          .eq('is_admin_checked', false)
+          .gte('start_time', today);
+          
+        const uncheckedCount = uncheckedBookings?.length || 0;
+
+        // Count bookings with invalid fields (Top Alert Badge)
+        const { data: invalidBookings } = await window.supabaseClient
+          .from('booking')
+          .select('id')
+          .eq('is_booking', true)
+          .gte('start_time', today)
+          .or('is_mobile_valid.eq.false,is_pickup_location_valid.eq.false');
+          
+        const invalidCount = invalidBookings?.length || 0;
+        
         // Update refund alert
         const refundIcon = document.getElementById('refundAlertIcon');
         const refundBadge = document.getElementById('refundAlertBadge');
@@ -265,6 +391,16 @@
           if (refundBadge) refundBadge.textContent = refundCount;
         } else {
           if (refundIcon) refundIcon.classList.add('hidden');
+        }
+
+        // Update invalid alert
+        const invalidIcon = document.getElementById('invalidAlertIcon');
+        const invalidBadge = document.getElementById('invalidAlertBadge');
+        if (invalidCount > 0) {
+          if (invalidIcon) invalidIcon.classList.remove('hidden');
+          if (invalidBadge) invalidBadge.textContent = invalidCount;
+        } else {
+          if (invalidIcon) invalidIcon.classList.add('hidden');
         }
         
         // Update message alert
@@ -277,7 +413,18 @@
           if (messageIcon) messageIcon.classList.add('hidden');
         }
         
-        console.log('[admin] Notification badges updated:', { refundCount, messageCount });
+        // Update Bookings sidebar badge (Unchecked count)
+        const bookingsBadge = document.getElementById('bookingsBadge');
+        if (bookingsBadge) {
+          if (uncheckedCount > 0) {
+            bookingsBadge.textContent = uncheckedCount;
+            bookingsBadge.classList.remove('hidden');
+          } else {
+            bookingsBadge.classList.add('hidden');
+          }
+        }
+        
+        console.log('[admin] Notification badges updated:', { refundCount, messageCount, uncheckedCount, invalidCount });
       } catch (error) {
         console.error('[admin] Error updating notification badges:', error);
       }

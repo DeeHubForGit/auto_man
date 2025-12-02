@@ -21,71 +21,6 @@
     #messageAlertIcon:active {
       background-color: #f3f4f6 !important;
     }
-    #section-bookings .booking-card {
-      background-color: #dbeafe;      /* same as contact-card unread */
-      border: 1px solid #3b82f6;
-      border-radius: 0.75rem;         /* rounded-xl */
-      box-shadow: none;
-    }
-    #section-bookings .booking-label {
-      font-size: 0.875rem;       /* text-sm */
-      color: #374151;            /* text-gray-700 */
-      font-weight: 500;          /* medium, softer than semibold */
-    }
-    #section-bookings .booking-value {
-      font-size: 0.875rem;
-      font-weight: 500;
-      color: #111827;            /* text-gray-900 but not heavy */
-    }
-
-    /* =============================================== */
-    /* FIX: Prevent global dark theme from overriding  */
-    /* Booking Validation colours & fonts              */
-    /* =============================================== */
-
-    /* Force booking card text back to dark grey/black */
-    #section-bookings .booking-card,
-    #section-bookings .booking-card * {
-      color: #111827 !important;            /* dark text */
-    }
-
-    /* Override global text-gray utilities ONLY inside bookings */
-    #section-bookings .text-gray-700,
-    #section-bookings .text-gray-900,
-    #section-bookings label {
-      color: #111827 !important;
-    }
-
-    /* Inputs inside booking cards: light-mode styling */
-    #section-bookings input[type="text"],
-    #section-bookings input[type="email"],
-    #section-bookings input[type="tel"],
-    #section-bookings input[type="search"],
-    #section-bookings input[type="url"],
-    #section-bookings input[type="number"],
-    #section-bookings textarea,
-    #section-bookings select {
-      background-color: white !important;
-      color: #111827 !important;          /* proper dark text */
-      border-color: #3b82f6 !important;   /* blue border */
-    }
-
-    /* Checkbox fix – match card colour instead of global white */
-    #section-bookings input[type="checkbox"] {
-      background-color: #dbeafe !important;   /* same as card */
-      border-color: #3b82f6 !important;
-    }
-
-    #section-bookings input[type="checkbox"]:checked {
-      background-color: #3b82f6 !important;
-      border-color: #3b82f6 !important;
-    }
-
-    /* Suggestion box background fix */
-    #section-bookings .suggestion-box {
-      background-color: #c7ddfd !important;   /* slightly darker blue */
-      color: #111827 !important;
-    }
   </style>
   <!-- Auth scripts -->
   <div data-include="partials/auth-scripts.html"></div>
@@ -374,10 +309,12 @@
         const uncheckedCount = uncheckedBookings?.length || 0;
 
         // Count bookings with invalid fields (Top Alert Badge)
+        // Only count invalid bookings that haven't been admin checked
         const { data: invalidBookings } = await window.supabaseClient
           .from('booking')
           .select('id')
           .eq('is_booking', true)
+          .eq('is_admin_checked', false)
           .gte('start_time', today)
           .or('is_mobile_valid.eq.false,is_pickup_location_valid.eq.false');
           

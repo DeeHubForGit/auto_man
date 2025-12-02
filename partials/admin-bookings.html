@@ -56,6 +56,8 @@
 <script>
 (function() {
   let adminBookings = [];
+  let mobileDebounceTimers = {};
+  let pickupDebounceTimers = {};
 
   // Helper for mobile validation (AU regex)
   function isValidAuMobile(mobile) {
@@ -63,6 +65,157 @@
     const cleaned = mobile.replace(/\s+/g, '');
     return /^(\+61|0)[4-5]\d{8}$/.test(cleaned);
   }
+
+  // Helper for address validation (from portal)
+  function isValidAddress(address) {
+    if (!address) return false;
+    const trimmed = address.trim();
+    return trimmed.length >= 5;
+  }
+
+  // Pickup location issue messages (from portal)
+  const PICKUP_LOCATION_ISSUE_MESSAGES = {
+    partial_match: 'We found a similar address but it is not an exact match. Please check the street number and suburb.',
+    street_mismatch: 'We could not match this street or suffix (road, drive, etc). Please check the spelling of the street name or suffix.',
+    suburb_mismatch: 'We matched the street, but the suburb looks different. Please check the suburb.',
+    not_found: 'We could not find this address in Google Maps. Please check the number, street and suburb.',
+    google_no_result: 'Address not found on Google Maps. Please check the address.',
+    empty: 'Address is required.',
+    test_data: 'This looks like a test address. Please enter a real pickup address.',
+    unknown: 'Please provide a valid address so we can find you for your lesson.'
+  };
+
+  function getPickupIssueMessage(issueCode) {
+    if (!issueCode) return null;
+    return PICKUP_LOCATION_ISSUE_MESSAGES[issueCode] || PICKUP_LOCATION_ISSUE_MESSAGES.unknown;
+  }
+
+  // Validate mobile with debounce (pause typing detection)
+  function validateAdminMobile(inputElement, bookingId) {
+    // Clear existing timer
+    if (mobileDebounceTimers[bookingId]) {
+      clearTimeout(mobileDebounceTimers[bookingId]);
+    }
+
+    // Set new timer - validate after 500ms pause
+    mobileDebounceTimers[bookingId] = setTimeout(() => {
+      const value = inputElement.value.trim();
+      const row = document.getElementById(`mobile-row-${bookingId}`);
+      const icon = document.getElementById(`mobile-error-icon-${bookingId}`);
+      const checkbox = row?.querySelector('input[type="checkbox"]');
+
+      if (!value) {
+        // Empty - mark invalid
+        inputElement.classList.add('border-red-400', 'text-red-600');
+        inputElement.classList.remove('border-gray-300', 'text-gray-900');
+        if (icon) icon.classList.remove('hidden');
+        if (checkbox) checkbox.checked = false;
+        return;
+      }
+
+      // Check format
+      const isValid = isValidAuMobile(value);
+      if (isValid) {
+        inputElement.classList.remove('border-red-400', 'text-red-600');
+        inputElement.classList.add('border-gray-300', 'text-gray-900');
+        if (icon) icon.classList.add('hidden');
+        if (checkbox) checkbox.checked = true;
+      } else {
+        inputElement.classList.add('border-red-400', 'text-red-600');
+        inputElement.classList.remove('border-gray-300', 'text-gray-900');
+        if (icon) icon.classList.remove('hidden');
+        if (checkbox) checkbox.checked = false;
+      }
+    }, 500);
+  }
+
+  // Validate pickup with debounce (pause typing detection)
+  function validateAdminPickup(inputElement, bookingId) {
+    console.log('[admin-bookings] validateAdminPickup called for booking', bookingId, 'value:', inputElement.value);
+    
+    const value = inputElement.value.trim();
+    const row = document.getElementById(`pickup-row-${bookingId}`);
+    const icon = document.getElementById(`pickup-error-icon-${bookingId}`);
+    const errorText = document.getElementById(`pickup-error-text-${bookingId}`);
+    const checkbox = row?.querySelector('input[type="checkbox"]');
+
+    // ----- local styling (same as before) -----
+    if (!value) {
+      // Empty – show "required" styling
+      inputElement.classList.add('border-red-400', 'text-red-600');
+      inputElement.classList.remove('border-gray-300', 'text-gray-900');
+      if (icon) icon.classList.remove('hidden');
+      if (errorText) {
+        errorText.textContent = 'Address is required.';
+        errorText.classList.remove('hidden');
+      }
+      if (checkbox) checkbox.checked = false;
+    } else if (!isValidAddress(value)) {
+      // Too short / looks dodgy
+      inputElement.classList.add('border-red-400', 'text-red-600');
+      inputElement.classList.remove('border-gray-300', 'text-gray-900');
+      if (icon) icon.classList.remove('hidden');
+      if (errorText) {
+        errorText.textContent = 'Please provide a valid address (minimum 5 characters)';
+        errorText.classList.remove('hidden');
+      }
+      if (checkbox) checkbox.checked = false;
+    } else {
+      // Looks OK locally
+      inputElement.classList.remove('border-red-400', 'text-red-600');
+      inputElement.classList.add('border-gray-300', 'text-gray-900');
+      if (icon) icon.classList.add('hidden');
+      if (errorText) errorText.classList.add('hidden');
+      // Do not auto-tick checkbox – we wait for server validation
+    }
+
+    // ----- debounce backend save + validation -----
+
+    // Clear any existing debounce timer
+    if (pickupDebounceTimers[bookingId]) {
+      clearTimeout(pickupDebounceTimers[bookingId]);
+    }
+
+    // If empty, do not hit the backend
+    if (!value) {
+      console.log('[admin-bookings] Pickup empty, skipping debounce');
+      return;
+    }
+
+    // Capture the value at the time we start the timer
+    const scheduledValue = value;
+
+    console.log('[admin-bookings] Starting debounce timer (600ms)');
+    pickupDebounceTimers[bookingId] = setTimeout(async () => {
+      console.log('[admin-bookings] Debounce fired for booking', bookingId);
+
+      // If the user kept typing, let the newer timer handle it
+      const rowInput = document.querySelector(`#pickup-row-${bookingId} input[type="text"]`);
+      const latest = rowInput ? rowInput.value.trim() : scheduledValue;
+      if (latest !== scheduledValue) {
+        console.log('[admin-bookings] Value changed again, skipping this run');
+        return;
+      }
+
+      // Optionally skip if unchanged from original DB value
+      const booking = adminBookings.find(b => String(b.id) === String(bookingId));
+      const original = (booking?.pickup_location || '').trim();
+      if (latest === original) {
+        console.log('[admin-bookings] Pickup unchanged from original, skipping backend call');
+        return;
+      }
+
+      // Use the existing helper – this will:
+      // 1) Update pickup_location and reset validity fields
+      // 2) Call validate-bookings edge function
+      // 3) Reload admin bookings
+      await window.updateAdminBookingField(bookingId, 'pickup_location', latest);
+    }, 600);
+  }
+
+  // Expose validation functions globally
+  window.validateAdminMobile = validateAdminMobile;
+  window.validateAdminPickup = validateAdminPickup;
 
   // Load bookings function
   window.loadAdminBookings = async function() {
@@ -130,8 +283,14 @@
 
     if (adminBookings.length === 0) {
       container.innerHTML = `
-        <div class="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-          <p class="text-gray-500 font-medium">No bookings found matching these filters.</p>
+        <div class="text-center py-12">
+          <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <p class="mt-4 text-base font-medium text-white">
+            No bookings found matching these filters.
+          </p>
         </div>`;
       return;
     }
@@ -172,11 +331,8 @@
     const isMobileInvalid = booking.is_mobile_valid === false;
     const isPickupInvalid = booking.is_pickup_location_valid === false;
     
-    // Pickup Error Text
-    let pickupErrorText = "Address invalid";
-    if (booking.pickup_location_issue === 'google_no_result') pickupErrorText = "Address not found on Google Maps";
-    else if (booking.pickup_location_issue === 'empty') pickupErrorText = "Address required";
-    else if (booking.pickup_location_issue === 'test_data') pickupErrorText = "Invalid test data";
+    // Pickup Error Text - use issue message mapping
+    const pickupErrorText = getPickupIssueMessage(booking.pickup_location_issue) || 'Address invalid';
 
     return `
       <div class="booking-card p-3 sm:p-4 mb-4 transition-all duration-200 group" id="booking-card-${booking.id}">
@@ -207,6 +363,7 @@
                   <input type="text" 
                     value="${booking.mobile || ''}" 
                     class="max-w-[280px] px-2 py-1 text-sm ${isMobileInvalid ? 'border-red-400 text-red-600' : 'border-gray-300 text-gray-900'} border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    oninput="validateAdminMobile(this, '${booking.id}')"
                     onchange="updateAdminBookingField('${booking.id}', 'mobile', this.value)"
                     placeholder="Mobile"
                   >
@@ -237,7 +394,7 @@
                     <input type="text" 
                       value="${booking.pickup_location || ''}" 
                       class="w-full px-2 py-1 text-sm ${isPickupInvalid ? 'border-red-400 text-red-600' : 'border-gray-300 text-gray-900'} border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      onchange="updateAdminBookingField('${booking.id}', 'pickup_location', this.value)"
+                      oninput="validateAdminPickup(this, '${booking.id}')"
                       placeholder="Pickup address"
                     >
                     <svg class="w-5 h-5 flex-shrink-0 ${isPickupInvalid ? '' : 'hidden'}" id="pickup-error-icon-${booking.id}" fill="#dc2626" viewBox="0 0 20 20">
@@ -253,7 +410,7 @@
                     </label>
                   </div>
                   
-                  ${isPickupInvalid ? `<p class="text-xs text-red-600 mt-1">${pickupErrorText}</p>` : ''}
+                  ${isPickupInvalid ? `<p id="pickup-error-text-${booking.id}" class="text-xs text-red-600 mt-1">${pickupErrorText}</p>` : `<p id="pickup-error-text-${booking.id}" class="text-xs text-red-600 mt-1 hidden"></p>`}
                   
                   ${booking.pickup_location_suggestion ? `
                     <button type="button"

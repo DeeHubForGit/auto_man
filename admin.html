@@ -219,12 +219,25 @@
         }, 50);
       }
       
-      // Load bookings if navigating to bookings section
-      if (section === 'bookings') {
+      // Bookings – sidebar vs other sources
+      if (section === 'bookings' && source === 'sidebar') {
+        // Sidebar: force defaults → Not Checked + Valid and Invalid
+        setTimeout(() => {
+          const filterChecked = document.getElementById('bookingFilterChecked');
+          const filterValid = document.getElementById('bookingFilterValid');
+          
+          if (filterChecked) filterChecked.value = 'unchecked';
+          if (filterValid) filterValid.value = 'all';
+          
+          if (window.loadAdminBookings) window.loadAdminBookings();
+        }, 50);
+      } else if (section === 'bookings' && source !== 'alert') {
+        // Other callers (NOT the alert): just load with whatever filters are set
         setTimeout(() => {
           if (window.loadAdminBookings) window.loadAdminBookings();
         }, 50);
       }
+      // Note: When source === 'alert', alert handler takes full control to avoid race
     }
     
     // Notification icon handlers
@@ -255,23 +268,33 @@
       }
     };
 
-    window.showInvalidBookings = function() {
+    window.showInvalidBookings = async function() {
+      console.log('[admin] showInvalidBookings called');
       showSection('bookings', 'alert');
-      // Wait for section to load then set filters
-      setTimeout(() => {
+
+      // Wait until the filter dropdowns exist (max ~1 second)
+      let attempts = 0;
+      while (attempts < 20) {
         const filterChecked = document.getElementById('bookingFilterChecked');
         const filterValid = document.getElementById('bookingFilterValid');
         
-        if (filterChecked) {
-          filterChecked.value = 'unchecked';
-          filterChecked.dispatchEvent(new Event('change'));
-        }
-        if (filterValid) {
+        if (filterChecked && filterValid) {
+          // Set filters: All bookings, Invalid fields only
+          filterChecked.value = 'all';
           filterValid.value = 'invalid';
-          // Dispatch change only on the last one to trigger load
-          filterValid.dispatchEvent(new Event('change'));
+
+          // Single, explicit load with these filters
+          if (window.loadAdminBookings) {
+            await window.loadAdminBookings();
+          }
+          return;
         }
-      }, 100);
+
+        attempts++;
+        await new Promise(r => setTimeout(r, 50));
+      }
+
+      console.warn('[admin] showInvalidBookings: booking filters not found after waiting');
     };
     
     // Update notification badges
@@ -310,13 +333,12 @@
 
         // Count invalid FIELDS (not bookings) - Top Alert Badge
         // Count each invalid field separately: mobile + pickup can = 2 invalid fields per booking
-        // Only count invalid fields for bookings that haven't been admin checked
+        // Count ALL invalid fields regardless of admin checked status (users can invalidate after checking)
         
         const { data: invalidBookings, error: invalidError } = await window.supabaseClient
           .from('booking')
           .select('id, mobile, pickup_location, is_mobile_valid, is_pickup_location_valid, is_admin_checked, start_time')
           .eq('is_booking', true)
-          .eq('is_admin_checked', false)
           .gte('start_time', today)
           .or('is_mobile_valid.eq.false,is_pickup_location_valid.eq.false');
         

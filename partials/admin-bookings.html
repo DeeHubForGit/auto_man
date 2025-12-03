@@ -260,10 +260,12 @@
       query = query.eq('is_admin_checked', true);
     }
 
-    // Apply Valid Filter
+    // Apply Valid Filter  
     if (filterValid === 'invalid') {
+      // Show bookings where mobile is explicitly false OR pickup is explicitly false
       query = query.or('is_mobile_valid.eq.false,is_pickup_location_valid.eq.false');
     } else if (filterValid === 'valid') {
+      // Show bookings where both mobile AND pickup are explicitly true
       query = query.eq('is_mobile_valid', true).eq('is_pickup_location_valid', true);
     }
 

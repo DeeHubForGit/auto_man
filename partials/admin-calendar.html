@@ -188,6 +188,94 @@
     min-width: auto; /* Allow mobile to shrink */
   }
   
+  /* Personal appointment modal */
+  .admin-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(15, 23, 42, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+  }
+
+  .admin-modal-backdrop.hidden {
+    display: none;
+  }
+
+  .admin-modal {
+    background-color: #0b1727; /* same dark panel as admin */
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    max-width: 480px;
+    width: 100%;
+    box-shadow: 0 20px 25px rgba(15, 23, 42, 0.5);
+  }
+
+  .admin-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+
+  .admin-modal-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #e5e7eb;
+  }
+
+  .admin-modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #9ca3af;
+    cursor: pointer;
+  }
+
+  .admin-modal-close:hover {
+    color: #ffffff;
+  }
+
+  .admin-modal-body .form-group {
+    margin-bottom: 0.75rem;
+  }
+
+  .admin-modal-body label {
+    display: block;
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+    color: #e5e7eb;
+  }
+
+  .admin-modal-body .form-input {
+    width: 100%;
+    padding: 0.45rem 0.6rem;
+    border-radius: 0.375rem;
+    border: 1px solid #1f2937;
+    background-color: #020617;
+    color: #e5e7eb;
+    font-size: 0.9rem;
+  }
+
+  .admin-modal-body .form-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 1px #3b82f6;
+  }
+
+  .admin-modal-body .form-row {
+    display: flex;
+    gap: 0.75rem;
+  }
+
+  .admin-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+  
   /* Visible scrollbar for mobile */
   #section-calendar #calendar::-webkit-scrollbar {
     height: 8px;
@@ -398,6 +486,17 @@
             <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
           </svg>
         </button>
+        <button id="btn-new-appointment" class="btn btn-primary btn-sm ml-2" title="New appointment">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+            <line x1="12" y1="14" x2="12" y2="18"></line>
+            <line x1="10" y1="16" x2="14" y2="16"></line>
+          </svg>
+          <span class="hidden sm:inline ml-1">New appointment</span>
+        </button>
       </div>
     </div>
   </div>
@@ -410,6 +509,61 @@
   <div id="calendar" class="overflow-auto max-h-[600px] relative">
     <div id="weekGrid" class="grid grid-cols-8 text-sm" style="grid-template-columns: 80px repeat(7, minmax(120px, 1fr));"></div>
   </div>
+
+  <!-- Add Appointment Modal -->
+  <div id="appointment-modal-backdrop" class="admin-modal-backdrop hidden">
+    <div class="admin-modal">
+      <div class="admin-modal-header">
+        <h2 class="admin-modal-title">New appointment</h2>
+        <button type="button" id="appointment-modal-close" class="admin-modal-close">&times;</button>
+      </div>
+
+      <form id="appointment-form" class="admin-modal-body">
+        <!-- Title -->
+        <div class="form-group">
+          <label for="appt-title">Title<span class="text-red-500">*</span></label>
+          <input id="appt-title" name="title" type="text" class="form-input" />
+          <p id="appt-title-error" class="text-xs text-red-500 mt-1 hidden"></p>
+        </div>
+
+        <!-- Date -->
+        <div class="form-group">
+          <label for="appt-date">Date<span class="text-red-500">*</span></label>
+          <input id="appt-date" name="date" type="date" class="form-input" style="max-width: 200px;" />
+          <p id="appt-date-error" class="text-xs text-red-500 mt-1 hidden"></p>
+        </div>
+
+        <!-- Time range -->
+        <div class="form-row">
+          <div class="form-group">
+            <label for="appt-start">Start time<span class="text-red-500">*</span></label>
+            <input id="appt-start" name="startTime" type="time" class="form-input" />
+            <p id="appt-start-error" class="text-xs text-red-500 mt-1 hidden"></p>
+          </div>
+          <div class="form-group">
+            <label for="appt-end">End time<span class="text-gray-400"> (optional)</span></label>
+            <input id="appt-end" name="endTime" type="time" class="form-input" />
+          </div>
+        </div>
+
+        <!-- Location -->
+        <div class="form-group">
+          <label for="appt-location">Location<span class="text-red-500">*</span></label>
+          <input id="appt-location" name="location" type="text" class="form-input" />
+          <p id="appt-location-error" class="text-xs text-red-500 mt-1 hidden"></p>
+        </div>
+
+        <div class="admin-modal-footer">
+          <button type="button" id="appointment-cancel" class="btn btn-secondary btn-sm">
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-primary btn-sm">
+            Save
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 </section>
 
 <script>
@@ -417,6 +571,208 @@
   // Calendar logic
   function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
   let weekStart = new Date();
+
+  // Modal handling for personal appointments
+  const btnNewAppointment = document.getElementById("btn-new-appointment");
+  const apptBackdrop = document.getElementById("appointment-modal-backdrop");
+  const apptForm = document.getElementById("appointment-form");
+  const apptCloseBtn = document.getElementById("appointment-modal-close");
+  const apptCancelBtn = document.getElementById("appointment-cancel");
+  let formHasChanges = false;
+
+  function openAppointmentModal(defaults = {}) {
+    // Populate defaults (title/date/time pre-fill if we later click on a slot)
+    document.getElementById("appt-title").value = defaults.title || "";
+    document.getElementById("appt-date").value = defaults.date || "";
+    document.getElementById("appt-start").value = defaults.startTime || "";
+    document.getElementById("appt-end").value = defaults.endTime || "";
+    document.getElementById("appt-location").value = defaults.location || "";
+
+    // Clear all validation errors
+    clearApptError("appt-title");
+    clearApptError("appt-date");
+    clearApptError("appt-start");
+    clearApptError("appt-location");
+
+    formHasChanges = false; // Reset change tracking
+    apptBackdrop.classList.remove("hidden");
+  }
+
+  function closeAppointmentModal(force = false) {
+    // Check if there are unsaved changes
+    if (!force && formHasChanges) {
+      if (window.Modal && window.Modal.confirm) {
+        window.Modal.confirm(
+          "Do you want to save your changes?",
+          () => {
+            // User clicked Yes - trigger form submission
+            apptForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+          },
+          () => {
+            // User clicked No - close without saving
+            apptBackdrop.classList.add("hidden");
+            apptForm.reset();
+            formHasChanges = false;
+          },
+          "Unsaved Changes",
+          { confirmText: 'Yes', cancelText: 'No' }
+        );
+      } else {
+        // Fallback to native confirm if Modal.js not available
+        const confirmClose = confirm("You have unsaved changes. Are you sure you want to close?");
+        if (!confirmClose) {
+          return;
+        }
+        apptBackdrop.classList.add("hidden");
+        apptForm.reset();
+        formHasChanges = false;
+      }
+      return;
+    }
+    
+    apptBackdrop.classList.add("hidden");
+    apptForm.reset();
+    formHasChanges = false;
+  }
+
+  // Validation helper functions
+  function showApptError(fieldId, message) {
+    const field = document.getElementById(fieldId);
+    const error = document.getElementById(fieldId + "-error");
+    
+    if (!field || !error) return;
+    
+    field.classList.add('border-red-400');
+    error.textContent = message;
+    error.classList.remove('hidden');
+  }
+
+  function clearApptError(fieldId) {
+    const field = document.getElementById(fieldId);
+    const error = document.getElementById(fieldId + "-error");
+    
+    if (!field || !error) return;
+    
+    field.classList.remove('border-red-400');
+    error.classList.add('hidden');
+  }
+
+  // Track changes to form inputs and clear errors on input
+  apptForm.addEventListener("input", (e) => {
+    formHasChanges = true;
+    // Clear error for the field being edited
+    if (e.target.id) {
+      clearApptError(e.target.id);
+    }
+  });
+
+  btnNewAppointment.addEventListener("click", () => {
+    openAppointmentModal();
+  });
+
+  apptCloseBtn.addEventListener("click", () => closeAppointmentModal());
+  apptCancelBtn.addEventListener("click", () => closeAppointmentModal());
+
+  // Close when clicking outside the modal
+  apptBackdrop.addEventListener("click", (e) => {
+    if (e.target === apptBackdrop) {
+      closeAppointmentModal();
+    }
+  });
+
+  // Helper function to validate address format
+  function isValidAddress(addr) {
+    if (!addr || addr.trim().length < 5) return false;
+    // Basic check: should have at least some text
+    return true;
+  }
+
+  // Handle form submission
+  apptForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const title = document.getElementById("appt-title").value.trim();
+    const date = document.getElementById("appt-date").value;
+    const startTime = document.getElementById("appt-start").value;
+    const endTime = document.getElementById("appt-end").value;
+    const location = document.getElementById("appt-location").value.trim();
+
+    // Clear all errors first
+    clearApptError("appt-title");
+    clearApptError("appt-date");
+    clearApptError("appt-start");
+    clearApptError("appt-location");
+
+    // Validate required fields
+    let hasError = false;
+    if (!title) {
+      showApptError("appt-title", "Title is required");
+      hasError = true;
+    }
+    if (!date) {
+      showApptError("appt-date", "Date is required");
+      hasError = true;
+    }
+    if (!startTime) {
+      showApptError("appt-start", "Start time is required");
+      hasError = true;
+    }
+    if (!location) {
+      showApptError("appt-location", "Location is required");
+      hasError = true;
+    } else if (!isValidAddress(location)) {
+      showApptError("appt-location", "Please provide a valid address (minimum 5 characters)");
+      hasError = true;
+    }
+
+    if (hasError) {
+      return;
+    }
+
+    try {
+      console.log("[appointment] Creating personal appointment via edge function");
+
+      // Call edge function to create Google Calendar event and insert into DB
+      const { data, error } = await window.supabaseClient.functions.invoke('create-admin-appointment', {
+        body: { 
+          title,
+          date,
+          startTime,
+          endTime: endTime || null,
+          location
+        }
+      });
+
+      if (error) {
+        console.error("[appointment] Edge function error:", error);
+        throw new Error(error.message || "Failed to create appointment");
+      }
+
+      if (!data || !data.ok) {
+        console.error("[appointment] Edge function returned error:", data);
+        throw new Error(data?.error || "Failed to create appointment");
+      }
+
+      console.log("[appointment] ✅ Appointment created successfully:", data);
+
+      closeAppointmentModal(true); // Force close without confirmation since we just saved
+
+      // Reload events so the new appointment appears in the calendar
+      renderWeek(weekStart);
+    } catch (err) {
+      console.error("[appointment] Failed to create appointment", err);
+      
+      // Show user-friendly error message
+      if (window.Modal && window.Modal.error) {
+        window.Modal.error(
+          err.message || "Could not save appointment. Please try again.",
+          "Error"
+        );
+      } else {
+        alert("Could not save appointment. Please try again. Error: " + (err.message || err));
+      }
+    }
+  });
 
   function renderWeek(startDate) {
     weekStart = new Date(startDate);

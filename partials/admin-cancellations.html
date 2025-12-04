@@ -156,7 +156,7 @@
     >
       <option value="all">All cancellations</option>
       <option value="eligible">Refund eligible</option>
-      <option value="not-eligible">No refund (<24h)</option>
+      <option value="not-eligible">Refund not eligible</option>
     </select>
     <select 
       id="refundStatusFilter" 
@@ -328,9 +328,14 @@
       }
     });
     
-    // Update total count
+    // Update total count and refunds required (count from ALL cancellations, not just filtered)
     if (cancellationsCount) {
-      cancellationsCount.textContent = `(${filtered.length} total)`;
+      const refundsRequired = allCancellations.filter(c => c.refund_eligible === true && !c.refunded).length;
+      if (refundsRequired > 0) {
+        cancellationsCount.textContent = `(${filtered.length} total, ${refundsRequired} refund${refundsRequired === 1 ? '' : 's'} required)`;
+      } else {
+        cancellationsCount.textContent = `(${filtered.length} total)`;
+      }
     }
     
     // Calculate pagination
@@ -519,7 +524,7 @@
                 alert('Failed to update refund status: ' + error.message);
               } else {
                 console.log('[cancellations] ✅ Refund status updated successfully');
-                // Reload data and refresh the display to show the updated date
+                // Reload data and refresh the display to show the updated date and updated count
                 await loadCancellations();
               }
             } catch (err) {

@@ -548,7 +548,7 @@
 
         <!-- Location -->
         <div class="form-group">
-          <label for="appt-location">Location<span class="text-red-500">*</span></label>
+          <label for="appt-location">Location<span class="text-gray-400"> (optional)</span></label>
           <input id="appt-location" name="location" type="text" class="form-input" />
           <p id="appt-location-error" class="text-xs text-red-500 mt-1 hidden"></p>
         </div>
@@ -717,10 +717,8 @@
       showApptError("appt-start", "Start time is required");
       hasError = true;
     }
-    if (!location) {
-      showApptError("appt-location", "Location is required");
-      hasError = true;
-    } else if (!isValidAddress(location)) {
+    // Location is optional, but if provided, must be valid
+    if (location && !isValidAddress(location)) {
       showApptError("appt-location", "Please provide a valid address (minimum 5 characters)");
       hasError = true;
     }
@@ -754,11 +752,60 @@
       }
 
       console.log("[appointment] ✅ Appointment created successfully:", data);
+      const googleEventId = data?.googleEvent?.id;
 
       closeAppointmentModal(true); // Force close without confirmation since we just saved
 
-      // Reload events so the new appointment appears in the calendar
-      renderWeek(weekStart);
+      // Poll database directly for the new event by Google event ID
+      // This is more efficient than refreshing the UI multiple times
+      console.log("[appointment] Waiting for gcal-sync to process the new event...", googleEventId);
+      
+      let pollAttempts = 0;
+      const maxPolls = 10; // Try for up to 30 seconds (10 attempts x 3 seconds)
+      
+      const pollForEvent = async () => {
+        pollAttempts++;
+        console.log(`[appointment] Checking database for new event (attempt ${pollAttempts}/${maxPolls})...`);
+        
+        try {
+          // Query database directly for the Google event ID
+          const { data: booking, error } = await window.supabaseClient
+            .from('booking')
+            .select('id, google_event_id')
+            .eq('google_event_id', googleEventId)
+            .maybeSingle();
+          
+          if (booking) {
+            // Event found in database!
+            console.log(`[appointment] ✅ Event found in database! Refreshing calendar once.`, booking);
+            renderWeek(weekStart);
+            return; // Stop polling
+          }
+          
+          if (error && error.code !== 'PGRST116') {
+            // PGRST116 is "no rows returned" which is expected, other errors are real issues
+            console.error('[appointment] Database query error:', error);
+          }
+          
+          // Not found yet, continue polling if we haven't hit max attempts
+          if (pollAttempts < maxPolls) {
+            console.log(`[appointment] Event not yet in database, retrying in 3 seconds...`);
+            setTimeout(pollForEvent, 3000);
+          } else {
+            console.warn(`[appointment] ⚠️ Event not found after ${maxPolls} attempts. Webhook may be delayed.`);
+            // Do one final refresh anyway
+            renderWeek(weekStart);
+          }
+        } catch (err) {
+          console.error('[appointment] Error polling for event:', err);
+          if (pollAttempts < maxPolls) {
+            setTimeout(pollForEvent, 3000);
+          }
+        }
+      };
+      
+      // Start polling after 2 seconds (give webhook a head start)
+      setTimeout(pollForEvent, 2000);
     } catch (err) {
       console.error("[appointment] Failed to create appointment", err);
       

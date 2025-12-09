@@ -877,7 +877,7 @@
       selectEl.innerHTML = '<option value="">Select a client...</option>' +
         clients.map(c => {
           const fullName = [c.first_name, c.last_name].filter(Boolean).join(' ');
-          return `<option value="${c.id}" data-email="${c.email || ''}" data-mobile="${c.mobile || ''}">${fullName} (${c.email || 'no email'})</option>`;
+          return `<option value="${c.id}" data-first-name="${c.first_name || ''}" data-last-name="${c.last_name || ''}" data-email="${c.email || ''}" data-mobile="${c.mobile || ''}">${fullName} (${c.email || 'no email'})</option>`;
         }).join('');
 
       console.log(`[admin-calendar] Loaded ${clients.length} clients`);
@@ -1095,10 +1095,10 @@
     
     const firstName = clientMode === "new" 
       ? document.getElementById("newClientFirstName").value.trim()
-      : "";
+      : existingClientSelect.selectedOptions[0]?.dataset.firstName || "";
     const lastName = clientMode === "new"
       ? document.getElementById("newClientLastName").value.trim()
-      : "";
+      : existingClientSelect.selectedOptions[0]?.dataset.lastName || "";
     const email = clientMode === "existing"
       ? existingClientSelect.selectedOptions[0]?.dataset.email || ""
       : document.getElementById("newClientEmail").value.trim();

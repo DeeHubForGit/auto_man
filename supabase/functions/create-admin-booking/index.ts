@@ -79,9 +79,9 @@ const corsHeaders = {
 
 // ---------- CANCELLATION POLICY TEXT ----------
 const CANCELLATION_POLICY_HTML = `<br><b>Cancellation policy</b>
-Cancellations made <strong>24 hours or more</strong> before the lesson will receive a full refund.
-Cancellations made with <strong>less than 24 hours' notice</strong> are <strong>non-refundable</strong>.
-To cancel or reschedule, please contact us as soon as possible.`;
+<p>Cancellations made <b>24 hours or more</b> before the lesson will receive a full refund.<br>Cancellations made with <b>less than 24 hours' notice</b> are <b>non-refundable</b>, as the lesson time cannot be rebooked at short notice.<br>If you need to reschedule, please contact us as early as possible to avoid losing your payment.</p>`;
+
+const SERVICE_DESCRIPTION = `<br>Patient, friendly driving lessons in Geelong. Learn at your own pace with qualified instructors and dual-control vehicles. Pickup available from your preferred address within our Geelong service area.`;
 
 // ---------- MAIN FUNCTION ----------
 Deno.serve(async (req) => {
@@ -157,20 +157,34 @@ Deno.serve(async (req) => {
 
     console.log("[create-admin-booking] Time conversion:", { startTime, start24, startISO, endTime, end24, endISO });
 
-    // Build event summary + description to match gcal-sync expectations
-    const fullName = lastName ? `${firstName} ${lastName}` : firstName;
-    const summary = `${serviceLabel} (${fullName})`;
+    // Build client name with trim to handle whitespace
+    const clientFirstName = firstName?.trim() || "";
+    const clientLastName = lastName?.trim() || "";
+    
+    const clientName = [clientFirstName, clientLastName]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
 
-    const description = [
-      "<b>Booked by</b>",
-      fullName,
-      email,
-      "<br><b>Mobile</b>",
-      mobile,
-      "<br><b>Pickup Address</b>",
-      pickupLocation,
-      CANCELLATION_POLICY_HTML,
-    ].join("\n");
+    // Build event summary to match Google Scheduling format: "Service (Client Name)"
+    const summary = clientName ? `${serviceLabel} (${clientName})` : serviceLabel;
+
+    // Build description with safe fallbacks
+    const bookedByLabel = clientName || 'Admin booking';
+    const safeEmail = email || 'No email provided';
+    const safeMobile = mobile || 'None';
+    const safePickup = pickupLocation || 'Pickup location';
+
+    const description =
+      `<b>Booked by</b>\n` +
+      `${bookedByLabel}\n` +
+      `${safeEmail}\n` +
+      `<br><b>Mobile</b>\n` +
+      `${safeMobile}\n` +
+      `<br><b>Pickup Address</b>\n` +
+      `${safePickup}\n` +
+      CANCELLATION_POLICY_HTML + `\n` +
+      SERVICE_DESCRIPTION;
 
     // Get Google Calendar access token
     const token = await getAccessToken();
@@ -186,7 +200,7 @@ Deno.serve(async (req) => {
     const eventBody = {
       summary,
       description,
-      location: pickupLocation,
+      location: pickupLocation || '', // Empty if not provided to avoid misleading map info
       start: {
         dateTime: startISO,
         timeZone: "Australia/Melbourne",

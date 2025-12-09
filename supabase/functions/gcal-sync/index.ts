@@ -359,7 +359,8 @@ Deno.serve(async () => {
       const startUTC = new Date(start).toISOString();
       const endUTC = new Date(end).toISOString();
 
-      // Extract is_payment_required from extended properties (defaults to true)
+      // Extract is_payment_required from extended properties (defaults to false)
+      // Admin bookings without this flag should be treated as payment not required
       const isPaymentRequiredRaw =
         e.extendedProperties?.shared?.is_payment_required ?? "false";
       

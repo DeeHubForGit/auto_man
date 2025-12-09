@@ -209,6 +209,16 @@ function isNonEmpty(value: any): boolean {
 // Mobile and Pickup Address are currently required in our configuration,
 // but they can be removed at any time, so booking detection cannot rely on them.
 function isBookingEvent(e: any, fields: any): boolean {
+  // Check for explicit is_booking flag from admin-created bookings
+  const isBookingFlag = e.extendedProperties?.shared?.is_booking;
+  if (isBookingFlag === "true") {
+    return true;
+  }
+  if (isBookingFlag === "false") {
+    return false;
+  }
+
+  // Fall back to heuristic detection for Google-created bookings
   const hasFirstName = isNonEmpty(fields.first_name);
   const hasLastName  = isNonEmpty(fields.last_name);
   const hasEmail     = isNonEmpty(fields.email);
@@ -349,6 +359,12 @@ Deno.serve(async () => {
       const startUTC = new Date(start).toISOString();
       const endUTC = new Date(end).toISOString();
 
+      // Extract is_payment_required from extended properties (defaults to true)
+      const isPaymentRequiredRaw =
+        e.extendedProperties?.shared?.is_payment_required ?? "false";
+      
+      const isPaymentRequired = isPaymentRequiredRaw === "true";
+      
       const payload = {
         p_google_event_id: e.id,
         p_calendar_id: calendar_id,
@@ -364,6 +380,7 @@ Deno.serve(async () => {
         p_extended: e,  // Store full event object for debugging/audit
         p_is_booking: isBooking,  // Simple booking detection
         p_title: e.summary ?? null,
+        p_is_payment_required: isPaymentRequired,  // Payment flag for admin bookings
       };
 
       const up = await fetch(`${supa}/rest/v1/rpc/upsert_booking_from_google`, {

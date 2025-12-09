@@ -248,6 +248,34 @@
     color: #e5e7eb;
   }
 
+  /* Override section-calendar inline color for all modal labels */
+  #section-calendar .admin-modal-body label {
+    color: #e5e7eb !important;
+  }
+
+  /* Ensure radio button and checkbox labels are visible - override section-calendar inline style */
+  #section-calendar .admin-modal-body label span {
+    color: #e5e7eb !important;
+  }
+
+  #section-calendar .admin-modal-body .inline-options label {
+    display: flex !important;
+    color: #e5e7eb !important;
+  }
+
+  #section-calendar .admin-modal-body .inline-options label span {
+    color: #e5e7eb !important;
+  }
+
+  /* Ensure help text is visible */
+  #section-calendar .admin-modal-body p {
+    color: #9ca3af !important;
+  }
+
+  #section-calendar .admin-modal-body .text-gray-400 {
+    color: #9ca3af !important;
+  }
+
   .admin-modal-body .form-input {
     width: 100%;
     padding: 0.45rem 0.6rem;
@@ -455,6 +483,11 @@
     #section-calendar .booking-backdrop.active {
       display: block;
     }
+
+    /* Ensure appointment type labels are visible in dark modal */
+    .appointment-type-options span {
+      color: #ffffff !important;
+    }
   }
   
 </style>
@@ -519,8 +552,23 @@
       </div>
 
       <form id="appointment-form" class="admin-modal-body">
-        <!-- Title -->
+        <!-- Appointment Type -->
         <div class="form-group">
+          <label>Type<span class="text-red-500">*</span></label>
+          <div class="inline-options flex gap-4 appointment-type-options">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="appointmentType" value="booking" checked class="cursor-pointer">
+              <span class="text-sm text-white">Lesson booking</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="appointmentType" value="personal" class="cursor-pointer">
+              <span class="text-sm text-white">Personal appointment</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Title (Personal appointments only) -->
+        <div id="personal-title-field" class="form-group" style="display:none;">
           <label for="appt-title">Title<span class="text-red-500">*</span></label>
           <input id="appt-title" name="title" type="text" class="form-input" />
           <p id="appt-title-error" class="text-xs text-red-500 mt-1 hidden"></p>
@@ -546,11 +594,91 @@
           </div>
         </div>
 
-        <!-- Location -->
-        <div class="form-group">
+        <!-- Location (Personal appointments only) -->
+        <div id="personal-location-field" class="form-group" style="display:none;">
           <label for="appt-location">Location<span class="text-gray-400"> (optional)</span></label>
           <input id="appt-location" name="location" type="text" class="form-input" />
           <p id="appt-location-error" class="text-xs text-red-500 mt-1 hidden"></p>
+        </div>
+
+        <!-- Booking-specific fields -->
+        <div id="bookingFields" class="mt-3" style="display:block;">
+          <!-- Service -->
+          <div class="form-group">
+            <label for="bookingService">Service<span class="text-red-500">*</span></label>
+            <select id="bookingService" class="form-input">
+              <option value="">Select a service...</option>
+              <option value="auto_60">Automatic Driving Lesson 1 hr</option>
+              <option value="auto_90">Automatic Driving Lesson 1.5 hr</option>
+              <option value="auto_120">Automatic Driving Lesson 2 hr</option>
+            </select>
+            <p id="bookingService-error" class="text-xs text-red-500 mt-1 hidden"></p>
+          </div>
+
+          <!-- Client mode -->
+          <div class="form-group">
+            <label>Client<span class="text-red-500">*</span></label>
+            <div class="inline-options flex gap-4">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="clientMode" value="existing" checked class="cursor-pointer">
+                <span class="text-sm text-gray-200">Existing</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="clientMode" value="new" class="cursor-pointer">
+                <span class="text-sm text-gray-200">New</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Existing client -->
+          <div id="existingClientFields">
+            <div class="form-group">
+              <label for="existingClientSelect">Select client<span class="text-red-500">*</span></label>
+              <select id="existingClientSelect" class="form-input">
+                <option value="">Loading clients...</option>
+              </select>
+              <p id="existingClientSelect-error" class="text-xs text-red-500 mt-1 hidden"></p>
+            </div>
+          </div>
+
+          <!-- New client -->
+          <div id="newClientFields" style="display:none;">
+            <div class="form-group">
+              <label for="newClientFirstName">First name<span class="text-red-500">*</span></label>
+              <input id="newClientFirstName" type="text" class="form-input">
+              <p id="newClientFirstName-error" class="text-xs text-red-500 mt-1 hidden"></p>
+            </div>
+            <div class="form-group">
+              <label for="newClientLastName">Last name<span class="text-gray-400"> (optional)</span></label>
+              <input id="newClientLastName" type="text" class="form-input">
+            </div>
+            <div class="form-group">
+              <label for="newClientEmail">Email address<span class="text-red-500">*</span></label>
+              <input id="newClientEmail" type="email" class="form-input">
+              <p id="newClientEmail-error" class="text-xs text-red-500 mt-1 hidden"></p>
+            </div>
+            <div class="form-group">
+              <label for="newClientMobile">Mobile<span class="text-red-500">*</span></label>
+              <input id="newClientMobile" type="text" class="form-input" placeholder="e.g. 0412 345 678">
+              <p id="newClientMobile-error" class="text-xs text-red-500 mt-1 hidden"></p>
+            </div>
+          </div>
+
+          <!-- Pickup -->
+          <div class="form-group">
+            <label for="bookingPickupLocation">Pickup address<span class="text-red-500">*</span></label>
+            <input id="bookingPickupLocation" type="text" class="form-input" placeholder="e.g. 123 Main St, Melbourne VIC 3000">
+            <p id="bookingPickupLocation-error" class="text-xs text-red-500 mt-1 hidden"></p>
+          </div>
+
+          <!-- Payment required -->
+          <div class="form-group">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="bookingPaymentRequired" checked class="cursor-pointer">
+              <span class="text-sm">Payment required?</span>
+            </label>
+            <p class="text-xs text-gray-400 mt-1">Uncheck when payment made by cash, direct transfer, etc</p>
+          </div>
         </div>
 
         <div class="admin-modal-footer">
@@ -581,6 +709,24 @@
   let formHasChanges = false;
 
   function openAppointmentModal(defaults = {}) {
+    // Reset form to defaults
+    apptForm.reset();
+    
+    // Reset appointment type to "booking" (default)
+    const bookingRadio = document.querySelector('input[name="appointmentType"][value="booking"]');
+    if (bookingRadio) bookingRadio.checked = true;
+    
+    // Reset client mode to "existing" (default)
+    const existingClientRadio = document.querySelector('input[name="clientMode"][value="existing"]');
+    if (existingClientRadio) existingClientRadio.checked = true;
+    
+    // Show/hide fields based on default type (booking)
+    document.getElementById('personal-title-field').style.display = 'none';
+    document.getElementById('personal-location-field').style.display = 'none';
+    document.getElementById('bookingFields').style.display = 'block';
+    document.getElementById('existingClientFields').style.display = 'block';
+    document.getElementById('newClientFields').style.display = 'none';
+    
     // Populate defaults (title/date/time pre-fill if we later click on a slot)
     document.getElementById("appt-title").value = defaults.title || "";
     document.getElementById("appt-date").value = defaults.date || "";
@@ -666,6 +812,88 @@
     }
   });
 
+  // Toggle between personal appointment and booking
+  const appointmentTypeRadios = document.querySelectorAll('input[name="appointmentType"]');
+  appointmentTypeRadios.forEach(radio => {
+    radio.addEventListener('change', () => {
+      const isBooking = radio.value === 'booking';
+      const personalFields = document.getElementById('personal-title-field');
+      const personalLocation = document.getElementById('personal-location-field');
+      const bookingFields = document.getElementById('bookingFields');
+      
+      if (isBooking) {
+        personalFields.style.display = 'none';
+        personalLocation.style.display = 'none';
+        bookingFields.style.display = 'block';
+      } else {
+        personalFields.style.display = 'block';
+        personalLocation.style.display = 'block';
+        bookingFields.style.display = 'none';
+      }
+    });
+  });
+
+  // Toggle between existing client and new client
+  const clientModeRadios = document.querySelectorAll('input[name="clientMode"]');
+  clientModeRadios.forEach(radio => {
+    radio.addEventListener('change', () => {
+      const isNew = radio.value === 'new';
+      const existingFields = document.getElementById('existingClientFields');
+      const newFields = document.getElementById('newClientFields');
+      
+      if (isNew) {
+        existingFields.style.display = 'none';
+        newFields.style.display = 'block';
+      } else {
+        existingFields.style.display = 'block';
+        newFields.style.display = 'none';
+      }
+    });
+  });
+
+  // Load clients from database
+  async function loadClients() {
+    const selectEl = document.getElementById('existingClientSelect');
+    if (!selectEl) return;
+
+    try {
+      const { data: clients, error } = await window.supabaseClient
+        .from('client')
+        .select('id, first_name, last_name, email, mobile')
+        .order('first_name');
+
+      if (error) {
+        console.error('[admin-calendar] Error loading clients:', error);
+        selectEl.innerHTML = '<option value="">Error loading clients</option>';
+        return;
+      }
+
+      if (!clients || clients.length === 0) {
+        selectEl.innerHTML = '<option value="">No clients found</option>';
+        return;
+      }
+
+      // Populate select with clients
+      selectEl.innerHTML = '<option value="">Select a client...</option>' +
+        clients.map(c => {
+          const fullName = [c.first_name, c.last_name].filter(Boolean).join(' ');
+          return `<option value="${c.id}" data-email="${c.email || ''}" data-mobile="${c.mobile || ''}">${fullName} (${c.email || 'no email'})</option>`;
+        }).join('');
+
+      console.log(`[admin-calendar] Loaded ${clients.length} clients`);
+    } catch (err) {
+      console.error('[admin-calendar] Exception loading clients:', err);
+      selectEl.innerHTML = '<option value="">Error loading clients</option>';
+    }
+  }
+
+  // Load clients when modal opens
+  const originalOpenModal = openAppointmentModal;
+  openAppointmentModal = function(defaults = {}) {
+    originalOpenModal(defaults);
+    loadClients();
+  };
+
   btnNewAppointment.addEventListener("click", () => {
     openAppointmentModal();
   });
@@ -687,10 +915,30 @@
     return true;
   }
 
+  // Helper function to convert 24-hour time to 12-hour format with AM/PM
+  function convert24To12Hour(time24) {
+    const [hours, minutes] = time24.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const hours12 = hours % 12 || 12;
+    return `${String(hours12).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${period}`;
+  }
+
   // Handle form submission
   apptForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
+    // Check appointment type
+    const appointmentType = document.querySelector('input[name="appointmentType"]:checked')?.value;
+
+    if (appointmentType === 'booking') {
+      await handleBookingSubmit();
+    } else {
+      await handlePersonalAppointmentSubmit();
+    }
+  });
+
+  // Handle personal appointment submission
+  async function handlePersonalAppointmentSubmit() {
     const title = document.getElementById("appt-title").value.trim();
     const date = document.getElementById("appt-date").value;
     const startTime = document.getElementById("appt-start").value;
@@ -730,13 +978,17 @@
     try {
       console.log("[appointment] Creating personal appointment via edge function");
 
+      // Convert 24-hour time to 12-hour format for the edge function
+      const startTime12 = convert24To12Hour(startTime);
+      const endTime12 = endTime ? convert24To12Hour(endTime) : null;
+
       // Call edge function to create Google Calendar event and insert into DB
       const { data, error } = await window.supabaseClient.functions.invoke('create-admin-appointment', {
         body: { 
           title,
           date,
-          startTime,
-          endTime: endTime || null,
+          startTime: startTime12,
+          endTime: endTime12,
           location
         }
       });
@@ -755,6 +1007,11 @@
       const googleEventId = data?.googleEvent?.id;
 
       closeAppointmentModal(true); // Force close without confirmation since we just saved
+
+      // Show success message
+      if (window.Modal && window.Modal.success) {
+        window.Modal.success("Appointment created successfully!", "Success");
+      }
 
       // Poll database directly for the new event by Google event ID
       // This is more efficient than refreshing the UI multiple times
@@ -819,7 +1076,205 @@
         alert("Could not save appointment. Please try again. Error: " + (err.message || err));
       }
     }
-  });
+  }
+
+  // Handle booking submission
+  async function handleBookingSubmit() {
+    const date = document.getElementById("appt-date").value;
+    const startTime = document.getElementById("appt-start").value;
+    const endTime = document.getElementById("appt-end").value;
+    
+    const serviceSelect = document.getElementById("bookingService");
+    const serviceCode = serviceSelect.value;
+    const serviceLabel = serviceSelect.options[serviceSelect.selectedIndex]?.text || "";
+
+    const clientMode = document.querySelector('input[name="clientMode"]:checked')?.value;
+    
+    const existingClientSelect = document.getElementById("existingClientSelect");
+    const clientId = clientMode === "existing" ? existingClientSelect.value : null;
+    
+    const firstName = clientMode === "new" 
+      ? document.getElementById("newClientFirstName").value.trim()
+      : "";
+    const lastName = clientMode === "new"
+      ? document.getElementById("newClientLastName").value.trim()
+      : "";
+    const email = clientMode === "existing"
+      ? existingClientSelect.selectedOptions[0]?.dataset.email || ""
+      : document.getElementById("newClientEmail").value.trim();
+    const mobile = clientMode === "existing"
+      ? existingClientSelect.selectedOptions[0]?.dataset.mobile || ""
+      : document.getElementById("newClientMobile").value.trim();
+    
+    const pickupLocation = document.getElementById("bookingPickupLocation").value.trim();
+    const isPaymentRequired = document.getElementById("bookingPaymentRequired").checked;
+
+    // Clear all errors first
+    clearApptError("appt-date");
+    clearApptError("appt-start");
+    clearApptError("bookingService");
+    clearApptError("existingClientSelect");
+    clearApptError("newClientFirstName");
+    clearApptError("newClientEmail");
+    clearApptError("newClientMobile");
+    clearApptError("bookingPickupLocation");
+
+    // Validate required fields
+    let hasError = false;
+    
+    if (!date) {
+      showApptError("appt-date", "Date is required");
+      hasError = true;
+    }
+    if (!startTime) {
+      showApptError("appt-start", "Start time is required");
+      hasError = true;
+    }
+    if (!serviceCode) {
+      showApptError("bookingService", "Please select a service");
+      hasError = true;
+    }
+    
+    if (clientMode === "existing") {
+      if (!clientId) {
+        showApptError("existingClientSelect", "Please select a client");
+        hasError = true;
+      }
+    } else {
+      if (!firstName) {
+        showApptError("newClientFirstName", "First name is required");
+        hasError = true;
+      }
+      if (!email || !email.includes('@')) {
+        showApptError("newClientEmail", "Valid email is required");
+        hasError = true;
+      }
+      if (!mobile) {
+        showApptError("newClientMobile", "Mobile is required");
+        hasError = true;
+      }
+    }
+    
+    if (!pickupLocation) {
+      showApptError("bookingPickupLocation", "Pickup address is required");
+      hasError = true;
+    } else if (!isValidAddress(pickupLocation)) {
+      showApptError("bookingPickupLocation", "Please provide a valid address (minimum 5 characters)");
+      hasError = true;
+    }
+
+    if (hasError) {
+      return;
+    }
+
+    try {
+      console.log("[booking] Creating admin booking via edge function");
+
+      // Convert 24-hour time to 12-hour format for the edge function
+      const startTime12 = convert24To12Hour(startTime);
+      const endTime12 = endTime ? convert24To12Hour(endTime) : null;
+
+      const payload = {
+        appointmentType: "booking",
+        serviceCode,
+        serviceLabel,
+        date,
+        startTime: startTime12,
+        endTime: endTime12,
+        clientId: clientId || null,
+        firstName,
+        lastName: lastName || null,
+        email,
+        mobile,
+        pickupLocation,
+        isPaymentRequired,
+      };
+
+      console.log("[booking] Payload:", payload);
+
+      // Call edge function to create Google Calendar event
+      const { data, error } = await window.supabaseClient.functions.invoke('create-admin-booking', {
+        body: payload
+      });
+
+      if (error) {
+        console.error("[booking] Edge function error:", error);
+        throw new Error(error.message || "Failed to create booking");
+      }
+
+      if (!data || !data.ok) {
+        console.error("[booking] Edge function returned error:", data);
+        throw new Error(data?.error || "Failed to create booking");
+      }
+
+      console.log("[booking] ✅ Booking created successfully:", data);
+      const googleEventId = data?.googleEvent?.id;
+
+      closeAppointmentModal(true); // Force close without confirmation since we just saved
+
+      // Show success message
+      if (window.Modal && window.Modal.success) {
+        window.Modal.success("Booking created successfully!", "Success");
+      }
+
+      // Poll database directly for the new event by Google event ID
+      console.log("[booking] Waiting for gcal-sync to process the new event...", googleEventId);
+      
+      let pollAttempts = 0;
+      const maxPolls = 10;
+      
+      const pollForEvent = async () => {
+        pollAttempts++;
+        console.log(`[booking] Checking database for new event (attempt ${pollAttempts}/${maxPolls})...`);
+        
+        try {
+          const { data: booking, error } = await window.supabaseClient
+            .from('booking')
+            .select('id, google_event_id')
+            .eq('google_event_id', googleEventId)
+            .maybeSingle();
+          
+          if (booking) {
+            console.log(`[booking] ✅ Event found in database! Refreshing calendar.`, booking);
+            renderWeek(weekStart);
+            return;
+          }
+          
+          if (error && error.code !== 'PGRST116') {
+            console.error('[booking] Database query error:', error);
+          }
+          
+          if (pollAttempts < maxPolls) {
+            console.log(`[booking] Event not yet in database, retrying in 3 seconds...`);
+            setTimeout(pollForEvent, 3000);
+          } else {
+            console.warn(`[booking] ⚠️ Event not found after ${maxPolls} attempts.`);
+            renderWeek(weekStart);
+          }
+        } catch (err) {
+          console.error('[booking] Error polling for event:', err);
+          if (pollAttempts < maxPolls) {
+            setTimeout(pollForEvent, 3000);
+          }
+        }
+      };
+      
+      // Start polling after 2 seconds
+      setTimeout(pollForEvent, 2000);
+    } catch (err) {
+      console.error("[booking] Failed to create booking", err);
+      
+      // Show user-friendly error message
+      if (window.Modal && window.Modal.error) {
+        window.Modal.error(
+          err.message || "Could not create booking. Please try again.",
+          "Error"
+        );
+      } else {
+        alert("Could not create booking. Please try again. Error: " + (err.message || err));
+      }
+    }
+  }
 
   function renderWeek(startDate) {
     weekStart = new Date(startDate);

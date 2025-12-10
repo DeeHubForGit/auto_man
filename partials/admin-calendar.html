@@ -205,6 +205,7 @@
 
   .admin-modal {
     background-color: #0b1727; /* same dark panel as admin */
+    border: 1px solid #1E40AF; /* subtle blue border */
     border-radius: 0.75rem;
     padding: 1.5rem;
     max-width: 480px;
@@ -567,6 +568,18 @@
           </div>
         </div>
 
+        <!-- Service (Lesson bookings only) -->
+        <div id="booking-service-field" class="form-group" style="display:block;">
+          <label for="bookingService">Service<span class="text-red-500">*</span></label>
+          <select id="bookingService" class="form-input">
+            <option value="">Select a service...</option>
+            <option value="auto_60">Automatic Driving Lesson 1 hr</option>
+            <option value="auto_90">Automatic Driving Lesson 1.5 hr</option>
+            <option value="auto_120">Automatic Driving Lesson 2 hr</option>
+          </select>
+          <p id="bookingService-error" class="text-xs text-red-500 mt-1 hidden"></p>
+        </div>
+
         <!-- Title (Personal appointments only) -->
         <div id="personal-title-field" class="form-group" style="display:none;">
           <label for="appt-title">Title<span class="text-red-500">*</span></label>
@@ -589,7 +602,7 @@
             <p id="appt-start-error" class="text-xs text-red-500 mt-1 hidden"></p>
           </div>
           <div class="form-group">
-            <label for="appt-end">End time<span class="text-gray-400"> (optional)</span></label>
+            <label for="appt-end" id="appt-end-label">End time</label>
             <input id="appt-end" name="endTime" type="time" class="form-input" />
           </div>
         </div>
@@ -603,18 +616,6 @@
 
         <!-- Booking-specific fields -->
         <div id="bookingFields" class="mt-3" style="display:block;">
-          <!-- Service -->
-          <div class="form-group">
-            <label for="bookingService">Service<span class="text-red-500">*</span></label>
-            <select id="bookingService" class="form-input">
-              <option value="">Select a service...</option>
-              <option value="auto_60">Automatic Driving Lesson 1 hr</option>
-              <option value="auto_90">Automatic Driving Lesson 1.5 hr</option>
-              <option value="auto_120">Automatic Driving Lesson 2 hr</option>
-            </select>
-            <p id="bookingService-error" class="text-xs text-red-500 mt-1 hidden"></p>
-          </div>
-
           <!-- Client mode -->
           <div class="form-group">
             <label>Client<span class="text-red-500">*</span></label>
@@ -700,6 +701,40 @@
   function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
   let weekStart = new Date();
 
+  // Service duration configuration (in minutes)
+  const SERVICE_DURATIONS = {
+    auto_60: 60,
+    auto_90: 90,
+    auto_120: 120
+  };
+
+  // Helper: Round time to next 15 minutes
+  function roundToNext15Minutes(date = new Date()) {
+    const d = new Date(date);
+    const minutes = d.getMinutes();
+    const remainder = minutes % 15;
+    const offset = remainder === 0 ? 0 : 15 - remainder;
+    d.setMinutes(minutes + offset, 0, 0);
+    return d;
+  }
+
+  // Helper: Format time as HH:MM for time input
+  function formatTimeForInput(date) {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  }
+
+  // Helper: Add minutes to a time string (HH:MM format)
+  function addMinutesToTime(timeString, date, minutesToAdd) {
+    if (!timeString || !date) return '';
+    const [hours, mins] = timeString.split(':').map(Number);
+    const d = new Date(date);
+    d.setHours(hours, mins, 0, 0);
+    d.setMinutes(d.getMinutes() + minutesToAdd);
+    return formatTimeForInput(d);
+  }
+
   // Modal handling for personal appointments
   const btnNewAppointment = document.getElementById("btn-new-appointment");
   const apptBackdrop = document.getElementById("appointment-modal-backdrop");
@@ -723,14 +758,31 @@
     // Show/hide fields based on default type (booking)
     document.getElementById('personal-title-field').style.display = 'none';
     document.getElementById('personal-location-field').style.display = 'none';
+    document.getElementById('booking-service-field').style.display = 'block';
     document.getElementById('bookingFields').style.display = 'block';
     document.getElementById('existingClientFields').style.display = 'block';
     document.getElementById('newClientFields').style.display = 'none';
     
-    // Populate defaults (title/date/time pre-fill if we later click on a slot)
+    // Set end time field to readonly for bookings
+    const endTimeInput = document.getElementById('appt-end');
+    endTimeInput.readOnly = true;
+    document.getElementById('appt-end-label').innerHTML = 'End time';
+    
+    // Default date to today if not provided
+    const today = new Date();
+    const dateStr = defaults.date || today.toISOString().split('T')[0];
+    
+    // Default start time to next 15 minutes if not provided and date is today
+    let startTime = defaults.startTime || '';
+    if (!startTime && dateStr === today.toISOString().split('T')[0]) {
+      const rounded = roundToNext15Minutes();
+      startTime = formatTimeForInput(rounded);
+    }
+    
+    // Populate defaults
     document.getElementById("appt-title").value = defaults.title || "";
-    document.getElementById("appt-date").value = defaults.date || "";
-    document.getElementById("appt-start").value = defaults.startTime || "";
+    document.getElementById("appt-date").value = dateStr;
+    document.getElementById("appt-start").value = startTime;
     document.getElementById("appt-end").value = defaults.endTime || "";
     document.getElementById("appt-location").value = defaults.location || "";
 
@@ -739,6 +791,9 @@
     clearApptError("appt-date");
     clearApptError("appt-start");
     clearApptError("appt-location");
+
+    // Calculate initial end time for booking if service is selected
+    updateBookingEndTime();
 
     formHasChanges = false; // Reset change tracking
     apptBackdrop.classList.remove("hidden");
@@ -812,6 +867,24 @@
     }
   });
 
+  // Update end time based on service selection and start time
+  function updateBookingEndTime() {
+    const appointmentType = document.querySelector('input[name="appointmentType"]:checked')?.value;
+    if (appointmentType !== 'booking') return;
+    
+    const serviceCode = document.getElementById('bookingService').value;
+    const startTime = document.getElementById('appt-start').value;
+    const date = document.getElementById('appt-date').value;
+    
+    if (!serviceCode || !startTime || !date) return;
+    
+    const duration = SERVICE_DURATIONS[serviceCode];
+    if (!duration) return;
+    
+    const endTime = addMinutesToTime(startTime, date, duration);
+    document.getElementById('appt-end').value = endTime;
+  }
+
   // Toggle between personal appointment and booking
   const appointmentTypeRadios = document.querySelectorAll('input[name="appointmentType"]');
   appointmentTypeRadios.forEach(radio => {
@@ -819,16 +892,26 @@
       const isBooking = radio.value === 'booking';
       const personalFields = document.getElementById('personal-title-field');
       const personalLocation = document.getElementById('personal-location-field');
+      const bookingServiceField = document.getElementById('booking-service-field');
       const bookingFields = document.getElementById('bookingFields');
+      const endTimeInput = document.getElementById('appt-end');
+      const endTimeLabel = document.getElementById('appt-end-label');
       
       if (isBooking) {
         personalFields.style.display = 'none';
         personalLocation.style.display = 'none';
+        bookingServiceField.style.display = 'block';
         bookingFields.style.display = 'block';
+        endTimeInput.readOnly = true;
+        endTimeLabel.innerHTML = 'End time';
+        updateBookingEndTime();
       } else {
         personalFields.style.display = 'block';
         personalLocation.style.display = 'block';
+        bookingServiceField.style.display = 'none';
         bookingFields.style.display = 'none';
+        endTimeInput.readOnly = false;
+        endTimeLabel.innerHTML = 'End time<span class="text-gray-400"> (optional)</span>';
       }
     });
   });
@@ -849,6 +932,21 @@
         newFields.style.display = 'none';
       }
     });
+  });
+
+  // Listen for service selection change to update end time
+  document.getElementById('bookingService')?.addEventListener('change', () => {
+    updateBookingEndTime();
+  });
+
+  // Listen for start time change to update end time
+  document.getElementById('appt-start')?.addEventListener('change', () => {
+    updateBookingEndTime();
+  });
+
+  // Listen for date change to update end time
+  document.getElementById('appt-date')?.addEventListener('change', () => {
+    updateBookingEndTime();
   });
 
   // Load clients from database

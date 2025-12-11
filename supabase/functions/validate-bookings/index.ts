@@ -394,6 +394,8 @@ serve(async (req) => {
     let validateAll = false;
     let sinceDate: string | null = null;
     let bookingId: string | null = null; // NEW: optional single booking id
+    let validateAddressOnly = false;
+    let addressToValidate: string | null = null;
 
     if (req.method === 'POST') {
       try {
@@ -401,9 +403,27 @@ serve(async (req) => {
         validateAll = body.all === true;
         sinceDate = body.since || null;
         bookingId = body.id || null;     // NEW: read id from body
+        validateAddressOnly = body.validate_address_only === true;
+        addressToValidate = body.address || null;
       } catch {
         // No body or invalid JSON, use defaults
       }
+    }
+
+    // Handle address-only validation mode (for appointment modal)
+    if (validateAddressOnly && addressToValidate) {
+      console.log('[validate-bookings] Address-only validation mode for:', addressToValidate);
+      const validationResult = await validatePickupLocation(addressToValidate);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          validation_result: validationResult
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
     }
 
     console.log(

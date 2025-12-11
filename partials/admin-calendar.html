@@ -277,6 +277,11 @@
     color: #9ca3af !important;
   }
 
+  /* Error messages must stay red */
+  #section-calendar .admin-modal-body p.text-red-500 {
+    color: #ef4444 !important;
+  }
+
   .admin-modal-body .form-input {
     width: 100%;
     padding: 0.45rem 0.6rem;
@@ -670,6 +675,12 @@
             <label for="bookingPickupLocation">Pickup address<span class="text-red-500">*</span></label>
             <input id="bookingPickupLocation" type="text" class="form-input" placeholder="e.g. 123 Main St, Melbourne VIC 3000">
             <p id="bookingPickupLocation-error" class="text-xs text-red-500 mt-1 hidden"></p>
+            
+            <!-- Suggestion button (hidden by default) -->
+            <button type="button" id="bookingPickupLocation-suggestion" class="hidden mt-2 w-full rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-left text-sm text-blue-900 hover:bg-blue-100 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400">
+              <div class="font-semibold mb-0.5 text-xs text-blue-800">Suggested address (tap to use)</div>
+              <div class="truncate text-blue-700" id="bookingPickupLocation-suggestion-text"></div>
+            </button>
           </div>
 
           <!-- Payment required -->
@@ -682,11 +693,16 @@
           </div>
         </div>
 
+        <!-- Info message at bottom -->
+        <p class="text-xs text-gray-400 mt-3 mb-2">
+          After an appointment is saved, it may take a few seconds to appear in your calendar.
+        </p>
+
         <div class="admin-modal-footer">
           <button type="button" id="appointment-cancel" class="btn btn-secondary btn-sm">
             Cancel
           </button>
-          <button type="submit" class="btn btn-primary btn-sm">
+          <button type="submit" class="btn btn-primary btn-sm" id="appointment-save">
             Save
           </button>
         </div>
@@ -791,6 +807,10 @@
     clearApptError("appt-date");
     clearApptError("appt-start");
     clearApptError("appt-location");
+    clearApptError("bookingPickupLocation");
+    
+    // Hide pickup suggestion on fresh modal open
+    hidePickupSuggestion();
 
     // Calculate initial end time for booking if service is selected
     updateBookingEndTime();
@@ -858,12 +878,57 @@
     error.classList.add('hidden');
   }
 
+  // Show pickup address suggestion
+  function showPickupSuggestion(suggestion) {
+    const suggestionBtn = document.getElementById('bookingPickupLocation-suggestion');
+    const suggestionText = document.getElementById('bookingPickupLocation-suggestion-text');
+    
+    if (!suggestionBtn || !suggestionText || !suggestion) return;
+    
+    suggestionText.textContent = suggestion;
+    suggestionBtn.classList.remove('hidden');
+  }
+
+  // Hide pickup address suggestion
+  function hidePickupSuggestion() {
+    const suggestionBtn = document.getElementById('bookingPickupLocation-suggestion');
+    if (suggestionBtn) {
+      suggestionBtn.classList.add('hidden');
+    }
+  }
+
+  // Apply pickup address suggestion
+  function applyPickupSuggestion() {
+    const suggestionText = document.getElementById('bookingPickupLocation-suggestion-text');
+    const pickupInput = document.getElementById('bookingPickupLocation');
+    
+    if (!suggestionText || !pickupInput) return;
+    
+    const suggestion = suggestionText.textContent;
+    if (suggestion) {
+      pickupInput.value = suggestion;
+      clearApptError('bookingPickupLocation');
+      hidePickupSuggestion();
+      formHasChanges = true;
+    }
+  }
+
+  // Set up suggestion button click handler
+  const suggestionBtn = document.getElementById('bookingPickupLocation-suggestion');
+  if (suggestionBtn) {
+    suggestionBtn.addEventListener('click', applyPickupSuggestion);
+  }
+
   // Track changes to form inputs and clear errors on input
   apptForm.addEventListener("input", (e) => {
     formHasChanges = true;
     // Clear error for the field being edited
     if (e.target.id) {
       clearApptError(e.target.id);
+      // Hide suggestion when user starts typing in pickup field
+      if (e.target.id === 'bookingPickupLocation') {
+        hidePickupSuggestion();
+      }
     }
   });
 
@@ -949,6 +1014,25 @@
     updateBookingEndTime();
   });
 
+  // Add real-time validation for pickup address
+  const pickupInput = document.getElementById('bookingPickupLocation');
+  if (pickupInput) {
+    pickupInput.addEventListener('blur', function() {
+      const appointmentType = document.querySelector('input[name="appointmentType"]:checked')?.value;
+      if (appointmentType !== 'booking') return; // Only validate for bookings
+      
+      const value = this.value.trim();
+      if (!value) return; // Don't show error on empty until submit
+      
+      const validation = validatePickupAddressForBooking(value);
+      if (!validation.valid) {
+        showApptError('bookingPickupLocation', validation.message);
+      } else {
+        clearApptError('bookingPickupLocation');
+      }
+    });
+  }
+
   // Load clients from database
   async function loadClients() {
     const selectEl = document.getElementById('existingClientSelect');
@@ -1006,11 +1090,146 @@
     }
   });
 
-  // Helper function to validate address format
+  // Helper function to validate address format (matches validate-bookings Edge Function)
   function isValidAddress(addr) {
     if (!addr || addr.trim().length < 5) return false;
-    // Basic check: should have at least some text
+    
+    const trimmed = addr.trim();
+    
+    // Must have at least 2 consecutive letters
+    if (!/[a-zA-Z]{2,}/.test(trimmed)) return false;
+    
+    // Check for obvious test data
+    const testPatterns = [
+      /^test$/i,
+      /^asdf/i,
+      /^qwerty/i,
+      /^xxx/i,
+      /^temp$/i,
+      /^sample$/i,
+      /^n\/?a$/i,
+      /^tbd$/i,
+      /^none$/i,
+      /^dsffdsa$/i  // Matches the user's screenshot
+    ];
+    
+    if (testPatterns.some(pattern => pattern.test(trimmed))) {
+      return false;
+    }
+    
     return true;
+  }
+
+  // Enhanced pickup validation with helpful error messages
+  function validatePickupAddressForBooking(addr) {
+    if (!addr || addr.trim() === '') {
+      return { valid: false, message: 'Pickup address is required' };
+    }
+    
+    const trimmed = addr.trim();
+    
+    if (trimmed.length < 5) {
+      return { valid: false, message: 'Address is too short (minimum 5 characters)' };
+    }
+    
+    if (!/[a-zA-Z]{2,}/.test(trimmed)) {
+      return { valid: false, message: 'Address must contain at least 2 consecutive letters' };
+    }
+    
+    // Check for test data
+    const testPatterns = [
+      { pattern: /^test$/i, name: 'test' },
+      { pattern: /^asdf/i, name: 'test keyboard input' },
+      { pattern: /^qwerty/i, name: 'test keyboard input' },
+      { pattern: /^xxx/i, name: 'placeholder' },
+      { pattern: /^temp$/i, name: 'temporary' },
+      { pattern: /^sample$/i, name: 'sample' },
+      { pattern: /^n\/?a$/i, name: 'N/A' },
+      { pattern: /^tbd$/i, name: 'TBD' },
+      { pattern: /^none$/i, name: 'none' },
+      { pattern: /^dsffdsa$/i, name: 'test' },
+      { pattern: /^pickup\s*(location|address)?$/i, name: 'placeholder' },
+      { pattern: /^address$/i, name: 'placeholder' },
+      { pattern: /^location$/i, name: 'placeholder' }
+    ];
+    
+    for (const { pattern, name } of testPatterns) {
+      if (pattern.test(trimmed)) {
+        return { valid: false, message: `This looks like ${name} data. Please enter a real pickup address.` };
+      }
+    }
+    
+    return { valid: true, message: null };
+  }
+
+  // Validate address with Google Maps via Edge Function (like Admin Bookings)
+  async function validateAddressWithBackend(address) {
+    try {
+      // Call the validate-bookings Edge Function with address-only mode
+      const { data, error } = await window.supabaseClient.functions.invoke('validate-bookings', {
+        body: { 
+          validate_address_only: true,
+          address: address 
+        }
+      });
+      
+      if (error) {
+        console.error('[admin-calendar] Address validation error:', error);
+        return { 
+          valid: false, 
+          message: 'Could not validate address. Please check your internet connection.',
+          issue: 'network_error'
+        };
+      }
+      
+      if (data && data.validation_result) {
+        const result = data.validation_result;
+        
+        if (result.isValid) {
+          return { valid: true, message: null };
+        } else {
+          // Map issue codes to user-friendly messages (matching Admin Bookings)
+          const issueMessages = {
+            'partial_match': 'We found a similar address but it is not an exact match. Please check the street number and suburb.',
+            'street_mismatch': 'We could not match this street or suffix (road, drive, etc). Please check the spelling.',
+            'suburb_mismatch': 'We matched the street, but the suburb looks different. Please check the suburb.',
+            'street_number_mismatch': 'The street number doesn\'t match. Please check the number.',
+            'not_found': 'We could not find this address in Google Maps. Please check the number, street and suburb.',
+            'google_no_result': 'Address not found on Google Maps. Please enter a valid address.',
+            'too_short': 'Address is too short. Please enter a complete address.',
+            'not_enough_letters': 'Address must contain more letters.',
+            'test_data': 'This looks like test data. Please enter a real address.',
+            'empty': 'Address is required.',
+            'unknown': 'Please provide a valid address.'
+          };
+          
+          const message = issueMessages[result.issue] || 'Please provide a valid address.';
+          
+          return {
+            valid: false,
+            message: message,
+            issue: result.issue,
+            suggestion: result.suggestion
+          };
+        }
+      }
+      
+      // If no result from backend, treat as validation failure (fail secure)
+      console.error('[admin-calendar] No validation_result in response, treating as invalid');
+      return { 
+        valid: false, 
+        message: 'Could not validate address with Google Maps. Please check the address and try again.',
+        issue: 'no_result'
+      };
+      
+    } catch (err) {
+      console.error('[admin-calendar] Address validation exception:', err);
+      return { 
+        valid: false, 
+        message: 'Could not validate address. Please try again.',
+        issue: 'exception'
+      };
+    }
   }
 
   // Helper function to convert 24-hour time to 12-hour format with AM/PM
@@ -1253,11 +1472,10 @@
       }
     }
     
-    if (!pickupLocation) {
-      showApptError("bookingPickupLocation", "Pickup address is required");
-      hasError = true;
-    } else if (!isValidAddress(pickupLocation)) {
-      showApptError("bookingPickupLocation", "Please provide a valid address (minimum 5 characters)");
+    // Enhanced pickup address validation
+    const pickupValidation = validatePickupAddressForBooking(pickupLocation);
+    if (!pickupValidation.valid) {
+      showApptError("bookingPickupLocation", pickupValidation.message);
       hasError = true;
     }
 
@@ -1265,7 +1483,41 @@
       return;
     }
 
+    // Show loading state on button only
+    const saveBtn = document.getElementById('appointment-save');
+    const originalBtnText = saveBtn ? saveBtn.textContent : '';
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+    }
+
     try {
+      // Validate address with Google Maps before saving
+      console.log("[booking] Validating pickup address with Google Maps...");
+      const backendValidation = await validateAddressWithBackend(pickupLocation);
+      
+      if (!backendValidation.valid) {
+        // Re-enable save button
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = originalBtnText;
+        }
+        
+        // Show validation error
+        showApptError("bookingPickupLocation", backendValidation.message);
+        
+        // Show suggestion button if available
+        if (backendValidation.suggestion) {
+          showPickupSuggestion(backendValidation.suggestion);
+        } else {
+          hidePickupSuggestion();
+        }
+        
+        console.log("[booking] Address validation failed:", backendValidation.issue);
+        return; // STOP HERE - do not save
+      }
+      
+      console.log("[booking] Address validated successfully");
       console.log("[booking] Creating admin booking via edge function");
 
       // Convert 24-hour time to 12-hour format for the edge function
@@ -1360,16 +1612,18 @@
       // Start polling after 2 seconds
       setTimeout(pollForEvent, 2000);
     } catch (err) {
-      console.error("[booking] Failed to create booking", err);
-      
-      // Show user-friendly error message
-      if (window.Modal && window.Modal.error) {
-        window.Modal.error(
-          err.message || "Could not create booking. Please try again.",
-          "Error"
-        );
+      console.error("[booking] Error creating booking:", err);
+      if (window.Modal && window.Modal.alert) {
+        window.Modal.alert("Failed to create booking. Please try again.");
       } else {
-        alert("Could not create booking. Please try again. Error: " + (err.message || err));
+        alert("Failed to create booking. Please try again.");
+      }
+    } finally {
+      // Re-enable save button
+      const saveBtn = document.getElementById('appointment-save');
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = originalBtnText || 'Save';
       }
     }
   }
@@ -1434,11 +1688,40 @@
       row.appendChild(timeCell);
       for (let d = 0; d < 7; d++) {
         const cell = document.createElement('div');
-        cell.className = 'p-2 border min-h-[80px] relative overflow-visible';
+        cell.className = 'p-2 border min-h-[80px] relative overflow-visible cursor-pointer hover:bg-blue-50 transition-colors';
         cell.dataset.day = d;
         cell.dataset.hour = h;
         const key = `${d}-${h}`;
         dayCells[key] = cell;
+        
+        // Add click handler to open appointment modal with pre-filled date/time
+        cell.addEventListener('click', (e) => {
+          // Don't trigger if clicking on a booking card
+          if (e.target.closest('.booking-card')) return;
+          
+          const dayIndex = parseInt(cell.dataset.day); // 0=Sunday, 1=Monday, ..., 6=Saturday
+          const hour = parseInt(cell.dataset.hour);
+          
+          // Calculate the actual date for this cell (no offset, dayIndex is already 0-based for Sunday)
+          const selectedDate = new Date(weekStart);
+          selectedDate.setDate(weekStart.getDate() + dayIndex);
+          
+          // Format date as YYYY-MM-DD for HTML date input
+          const yyyy = selectedDate.getFullYear();
+          const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
+          const dd = String(selectedDate.getDate()).padStart(2, '0');
+          const dateStr = `${yyyy}-${mm}-${dd}`;
+          
+          // Format time as HH:MM for time input
+          const timeStr = `${String(hour).padStart(2, '0')}:00`;
+          
+          // Open modal with pre-filled date and time
+          openAppointmentModal({
+            date: dateStr,
+            startTime: timeStr
+          });
+        });
+        
         row.appendChild(cell);
       }
       grid.appendChild(row);

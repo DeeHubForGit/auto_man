@@ -203,11 +203,12 @@
     display: none;
   }
 
+  /* Appointment modal layout */
   .admin-modal {
-    background-color: #0b1727; /* same dark panel as admin */
-    border: 1px solid #1E40AF; /* subtle blue border */
+    background-color: #0b1727;           /* same dark panel as admin */
+    border: 1px solid #1E40AF;          /* subtle blue border */
     border-radius: 0.75rem;
-    padding: 1.5rem;
+    padding: 0.75rem 1.5rem 1.5rem;     /* ↓ smaller top padding */
     max-width: 480px;
     width: 100%;
     box-shadow: 0 20px 25px rgba(15, 23, 42, 0.5);
@@ -217,13 +218,19 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;              /* ↓ less space below header */
   }
 
   .admin-modal-title {
     font-size: 1.125rem;
     font-weight: 600;
+    margin: 0;                          /* remove extra h2 margin */
     color: #e5e7eb;
+  }
+
+  /* Make sure calendar-wide h2 colour does not override the title */
+  #section-calendar .admin-modal-title {
+    color: #e5e7eb !important;
   }
 
   .admin-modal-close {
@@ -557,6 +564,10 @@
         <button type="button" id="appointment-modal-close" class="admin-modal-close">&times;</button>
       </div>
 
+      <p class="text-xs text-gray-400 mb-2">
+        After an appointment is saved, it may take a few seconds to appear in your calendar.
+      </p>
+
       <form id="appointment-form" class="admin-modal-body">
         <!-- Appointment Type -->
         <div class="form-group">
@@ -692,11 +703,6 @@
             <p class="text-xs text-gray-400 mt-1">Uncheck when payment made by cash, direct transfer, etc</p>
           </div>
         </div>
-
-        <!-- Info message at bottom -->
-        <p class="text-xs text-gray-400 mt-3 mb-2">
-          After an appointment is saved, it may take a few seconds to appear in your calendar.
-        </p>
 
         <div class="admin-modal-footer">
           <button type="button" id="appointment-cancel" class="btn btn-secondary btn-sm">

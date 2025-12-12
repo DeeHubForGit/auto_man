@@ -100,7 +100,7 @@ curl -X POST https://YOUR_PROJECT_REF.supabase.co/functions/v1/google-calendar-w
       ],
       "extendedProperties": {
         "shared": {
-          "serviceType": "auto-1hr",
+          "serviceType": "auto_60",
           "duration": "1 hour",
           "price": "85"
         }

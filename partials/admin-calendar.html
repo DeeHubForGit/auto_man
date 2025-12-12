@@ -589,9 +589,7 @@
           <label for="bookingService">Service<span class="text-red-500">*</span></label>
           <select id="bookingService" class="form-input">
             <option value="">Select a service...</option>
-            <option value="auto_60">Automatic Driving Lesson 1 hr</option>
-            <option value="auto_90">Automatic Driving Lesson 1.5 hr</option>
-            <option value="auto_120">Automatic Driving Lesson 2 hr</option>
+            <!-- Options populated dynamically from SITE_CONFIG.BOOKING_CATEGORIES -->
           </select>
           <p id="bookingService-error" class="text-xs text-red-500 mt-1 hidden"></p>
         </div>
@@ -666,8 +664,9 @@
               <p id="newClientFirstName-error" class="text-xs text-red-500 mt-1 hidden"></p>
             </div>
             <div class="form-group">
-              <label for="newClientLastName">Last name<span class="text-gray-400"> (optional)</span></label>
+              <label for="newClientLastName">Last name<span class="text-red-500">*</span></label>
               <input id="newClientLastName" type="text" class="form-input">
+              <p id="newClientLastName-error" class="text-xs text-red-500 mt-1 hidden"></p>
             </div>
             <div class="form-group">
               <label for="newClientEmail">Email address<span class="text-red-500">*</span></label>
@@ -723,12 +722,8 @@
   function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
   let weekStart = new Date();
 
-  // Service duration configuration (in minutes)
-  const SERVICE_DURATIONS = {
-    auto_60: 60,
-    auto_90: 90,
-    auto_120: 120
-  };
+  // Service duration configuration (in minutes) – populated from config
+  const SERVICE_DURATIONS = {};
 
   // Helper: Round time to next 15 minutes
   function roundToNext15Minutes(date = new Date()) {
@@ -950,7 +945,9 @@
     if (!serviceCode || !startTime || !date) return;
     
     const duration = SERVICE_DURATIONS[serviceCode];
-    if (!duration) return;
+    if (!duration) {
+      throw new Error(`No duration found for service: ${serviceCode}`);
+    }
     
     const endTime = addMinutesToTime(startTime, date, duration);
     document.getElementById('appt-end').value = endTime;
@@ -1075,11 +1072,69 @@
     }
   }
 
-  // Load clients when modal opens
+  // Helper function to get bookable services from config
+  function getBookingServicesFromConfig() {
+    if (!window.SITE_CONFIG || !Array.isArray(window.SITE_CONFIG.BOOKING_CATEGORIES)) {
+      console.warn('[admin-calendar] SITE_CONFIG.BOOKING_CATEGORIES not available');
+      return [];
+    }
+
+    return window.SITE_CONFIG.BOOKING_CATEGORIES
+      .filter(cat => !cat.comingSoon)          // skip manual "coming soon"
+      .flatMap(cat => (cat.services || []).map(svc => {
+        // Require durationMinutes as a number - no parsing, no fallbacks
+        if (typeof svc.durationMinutes !== 'number') {
+          throw new Error(`Missing durationMinutes for service: ${svc.id}`);
+        }
+
+        // Populate SERVICE_DURATIONS map with service id as key
+        SERVICE_DURATIONS[svc.id] = svc.durationMinutes;
+
+        return {
+          id: svc.id,              // used as <option> value
+          name: svc.name,
+          duration: svc.duration,  // e.g. "1 hour"
+          durationMinutes: svc.durationMinutes,
+          price: svc.price,
+          categoryId: cat.id,
+          categoryName: cat.name
+        };
+      }));
+  }
+
+  // Populate service dropdown from config
+  function loadServices() {
+    const serviceSelect = document.getElementById('bookingService');
+    if (!serviceSelect) return;
+
+    // Clear existing options except the first (placeholder)
+    serviceSelect.innerHTML = '<option value="">Select a service...</option>';
+
+    const services = getBookingServicesFromConfig();
+    
+    if (services.length === 0) {
+      console.warn('[admin-calendar] No services found in BOOKING_CATEGORIES');
+      return;
+    }
+
+    services.forEach(svc => {
+      const opt = document.createElement('option');
+      opt.value = svc.id;                       // must match SERVICE_DURATIONS key
+      // Label e.g. "Automatic Driving Lesson 1 hour" or "Senior Automatic Driving Lesson 1 hour"
+      opt.textContent = `${svc.name} ${svc.duration}`;
+      serviceSelect.appendChild(opt);
+    });
+
+    console.log(`[admin-calendar] Loaded ${services.length} services from config`);
+    console.log('[admin-calendar] Service durations:', SERVICE_DURATIONS);
+  }
+
+  // Load clients and services when modal opens
   const originalOpenModal = openAppointmentModal;
   openAppointmentModal = function(defaults = {}) {
     originalOpenModal(defaults);
     loadClients();
+    loadServices();
   };
 
   btnNewAppointment.addEventListener("click", () => {
@@ -1438,6 +1493,7 @@
     clearApptError("bookingService");
     clearApptError("existingClientSelect");
     clearApptError("newClientFirstName");
+    clearApptError("newClientLastName");
     clearApptError("newClientEmail");
     clearApptError("newClientMobile");
     clearApptError("bookingPickupLocation");
@@ -1466,6 +1522,10 @@
     } else {
       if (!firstName) {
         showApptError("newClientFirstName", "First name is required");
+        hasError = true;
+      }
+      if (!lastName) {
+        showApptError("newClientLastName", "Last name is required");
         hasError = true;
       }
       if (!email || !email.includes('@')) {

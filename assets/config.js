@@ -125,25 +125,28 @@ const SITE_CONFIG = {
       icon: 'images/auto-gearbox.png',
       services: [
         {
-          id: 'auto-1hr',
+          id: 'auto_60',
           name: 'Automatic Driving Lesson',
           duration: '1 hour',
+          durationMinutes: 60,
           price: 85,
           description: 'Perfect for beginners and skill improvement',
           bookingUrl: 'https://calendar.app.google/3ehp4B9MRcF83CEE9'
         },
         {
-          id: 'auto-1-5hr',
+          id: 'auto_90',
           name: 'Automatic Driving Lesson',
           duration: '1.5 hours',
+          durationMinutes: 90,
           price: 125,
           description: 'Extra time for complex skills',
           bookingUrl: 'https://calendar.app.google/tTykRfbx3w9izTY86'
         },
         {
-          id: 'auto-2hr',
+          id: 'auto_120',
           name: 'Automatic Driving Lesson',
           duration: '2 hours',
+          durationMinutes: 120,
           price: 165,
           description: 'Extended session for comprehensive practice',
           bookingUrl: 'https://calendar.app.google/QtGWGiyNpcqq9C1z8'
@@ -190,9 +193,10 @@ const SITE_CONFIG = {
       icon: 'images/elderly-couple.png',
       services: [
         {
-          id: 'senior-auto-1hr',
+          id: 'senior_auto_60',
           name: 'Senior Automatic Driving Lesson',
           duration: '1 hour',
+          durationMinutes: 60,
           price: 75,
           description: 'Includes pensioner discount',
           bookingUrl: 'https://calendar.app.google/vvE6utyXe4aa7BQb9'

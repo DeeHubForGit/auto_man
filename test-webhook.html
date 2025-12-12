@@ -50,10 +50,10 @@
         <div>
           <label class="block text-sm font-medium mb-2">Service Type</label>
           <select id="serviceType" class="w-full px-4 py-2 bg-slate-700 rounded border border-slate-600 focus:border-blue-500 focus:outline-none">
-            <option value="auto-1hr">Automatic - 1 hour ($85)</option>
-            <option value="auto-1-5hr">Automatic - 1.5 hours ($125)</option>
-            <option value="auto-2hr">Automatic - 2 hours ($165)</option>
-            <option value="senior-auto-1hr">Senior Automatic - 1 hour ($75)</option>
+            <option value="auto_60">Automatic - 1 hour ($85)</option>
+            <option value="auto_90">Automatic - 1.5 hours ($125)</option>
+            <option value="auto_120">Automatic - 2 hours ($165)</option>
+            <option value="senior_auto_60">Senior Automatic - 1 hour ($75)</option>
           </select>
         </div>
         
@@ -98,10 +98,10 @@
 
       // Parse service details
       const serviceMap = {
-        'auto-1hr': { duration: '1 hour', price: 85 },
-        'auto-1-5hr': { duration: '1.5 hours', price: 125 },
-        'auto-2hr': { duration: '2 hours', price: 165 },
-        'senior-auto-1hr': { duration: '1 hour', price: 75 }
+        'auto_60': { duration: '1 hour', price: 85 },
+        'auto_90': { duration: '1.5 hours', price: 125 },
+        'auto_120': { duration: '2 hours', price: 165 },
+        'senior_auto_60': { duration: '1 hour', price: 75 }
       };
 
       const service = serviceMap[serviceType];

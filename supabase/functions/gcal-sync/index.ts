@@ -366,6 +366,38 @@ Deno.serve(async () => {
       
       const isPaymentRequired = isPaymentRequiredRaw === "true";
       
+      // Determine service code
+      const serviceCode = parsed.service_code ?? inferServiceCode(e.summary, durationMinutes);
+      
+      // Fetch price_cents from service table based on serviceCode
+      let priceCents: number | null = parsed.price_cents ?? null;
+      
+      if (serviceCode) {
+        try {
+          const priceRes = await fetch(
+            `${supa}/rest/v1/service?code=eq.${serviceCode}&select=price_cents`,
+            {
+              headers: {
+                apikey: key,
+                Authorization: `Bearer ${key}`,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+          
+          if (priceRes.ok) {
+            const services = await priceRes.json();
+            if (services && services.length > 0 && typeof services[0].price_cents === 'number') {
+              priceCents = services[0].price_cents;
+            }
+          } else {
+            console.error(`[gcal-sync] Failed to load service price for ${serviceCode}: ${priceRes.status}`);
+          }
+        } catch (err) {
+          console.error(`[gcal-sync] Error fetching service price for ${serviceCode}:`, err);
+        }
+      }
+      
       const payload = {
         p_google_event_id: e.id,
         p_calendar_id: calendar_id,
@@ -373,8 +405,8 @@ Deno.serve(async () => {
         p_first_name: fields.first_name,
         p_last_name: fields.last_name,
         p_mobile: fields.mobile,
-        p_service_code: parsed.service_code ?? inferServiceCode(e.summary, durationMinutes),
-        p_price_cents: parsed.price_cents ?? null,
+        p_service_code: serviceCode,
+        p_price_cents: priceCents,
         p_start: startUTC,  // Send as proper UTC ISO string
         p_end: endUTC,      // Send as proper UTC ISO string
         p_pickup: fields.pickup_location ?? parsed.pickup_location ?? null,

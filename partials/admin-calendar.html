@@ -123,6 +123,28 @@
     font-size: 0.9em;
   }
   
+  /* Payment toggle checkbox and label */
+  #section-calendar .payment-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 0;
+  }
+  
+  #section-calendar .payment-toggle-checkbox {
+    transform: scale(1.0);
+    cursor: pointer;
+  }
+  
+  #section-calendar .payment-label {
+    font-weight: 600;
+  }
+  
+  /* Red warning when payment not yet received */
+  #section-calendar .payment-toggle.unpaid .payment-label {
+    color: #ff4d4d;
+  }
+  
   /* Ensure header row and time column are visible on dark background */
   #section-calendar .calendar-header {
     color: #111827 !important;
@@ -1846,6 +1868,21 @@
       });
     }
     
+    // Helper: Get short service label
+    const getServiceShortLabel = (serviceCode) => {
+      switch (serviceCode) {
+        case 'auto_60': return 'Auto - 1h';
+        case 'auto_90': return 'Auto - 1.5h';
+        case 'auto_120': return 'Auto - 2h';
+        case 'manual_60': return 'Manual - 1h';
+        case 'manual_90': return 'Manual - 1.5h';
+        case 'manual_120': return 'Manual - 2h';
+        case 'senior_auto_60': return 'Senior auto - 1h';
+        case 'senior_manual_60': return 'Senior manual - 1h';
+        default: return 'Lesson';
+      }
+    };
+    
     // Helper: Generate red $ marker if payment required
     const getPaymentMarker = (booking) => {
       return booking.is_payment_required ? '<span class="payment-marker">$</span>' : '';
@@ -1973,8 +2010,8 @@
           const serviceName = serviceMap[booking.service_code] || 'Driving Lesson';
           const clientName = [booking.first_name, booking.last_name].filter(Boolean).join(' ') || 'Unknown Client';
           
-          // Determine transmission type from service code
-          const transmissionType = booking.service_code?.includes('manual') ? 'Manual' : 'Automatic';
+          // Get short service label
+          const titleText = getServiceShortLabel(booking.service_code);
           
           // Build a compact location label for mobile
           let locationLabel = '';
@@ -1993,10 +2030,9 @@
           
           if (detailLevel === 1) {
             // Compact view: desktop shows richer info; mobile minimal (transmission + duration + address)
-            // Shorten 'Automatic' to 'Auto' for mobile summary
-            const shortTransmission = transmissionType === 'Automatic' ? 'Auto' : transmissionType;
             const paymentMarker = getPaymentMarker(booking);
-            const transmissionLine = `${transmissionType} - ${durationHours}h${paymentMarker}`;
+            const transmissionLine = `${titleText}${paymentMarker}`;
+            const shortTransmission = titleText.split(' - ')[0]; // Extract 'Auto' or 'Manual' for mobile
             // Duration implied by block height; omit address in desktop summary to reduce duplication.
             const desktopAddress = booking.pickup_location ? `📍 ${booking.pickup_location}` : '';
             summaryHTML = `
@@ -2014,6 +2050,12 @@
               <div class="text-sm font-semibold mb-1" style="color:#1e40af;">${clientName}</div>
               ${booking.mobile ? `<div class="text-xs mb-1" style="color:#1e40af;">📱 ${booking.mobile}</div>` : ''}
               <div class="text-xs mb-1 font-medium" style="color:#1e40af;">🕐 ${time} - ${endTime}</div>
+              ${typeof booking.price_cents === 'number' ? `<label class="payment-toggle ${booking.is_payment_required ? 'unpaid' : ''}">
+                <input type="checkbox" class="payment-toggle-checkbox" ${!booking.is_payment_required ? 'checked' : ''} data-booking-id="${booking.id}" />
+                <span class="payment-label">
+                  $${(booking.price_cents / 100).toFixed(0)} paid
+                </span>
+              </label>` : ''}
               <div class="mt-1">
                 <select class="booking-status-select text-xs border border-gray-300 rounded px-1 py-0.5 w-full" 
                         data-booking-id="${booking.id}" 
@@ -2029,7 +2071,7 @@
           } else if (detailLevel === 2) {
             // 1.5 hours: Show service, client, address (2 lines), times, mobile. Status on hover.
             const paymentMarker = getPaymentMarker(booking);
-            const transmissionLine2 = `${transmissionType} - ${durationHours}h${paymentMarker}`;
+            const transmissionLine2 = `${titleText}${paymentMarker}`;
             summaryHTML = `
               <div class="font-semibold" style="color:#111827;">${transmissionLine2}</div>
               <!-- Client name removed from web summary to prioritise address -->
@@ -2039,9 +2081,15 @@
             `;
             detailsHTML = `
               <div class="text-sm font-semibold mb-1" style="color:#111827;">${transmissionLine2}</div>
-              ${booking.pickup_location ? `<div class=\"text-xs mb-1\" style=\"color:#374151;\">📍 ${booking.pickup_location}</div>` : ''}
+              ${booking.pickup_location ? `<div class="text-xs mb-1" style="color:#374151;">📍 ${booking.pickup_location}</div>` : ''}
               <div class="text-sm font-semibold mb-1" style="color:#111827;">${clientName}</div>
-              ${booking.mobile ? `<div class=\"text-xs mb-1\" style=\"color:#374151;\">📱 ${booking.mobile}</div>` : ''}
+              ${booking.mobile ? `<div class="text-xs mb-1" style="color:#374151;">📱 ${booking.mobile}</div>` : ''}
+              ${typeof booking.price_cents === 'number' ? `<label class="payment-toggle ${booking.is_payment_required ? 'unpaid' : ''}">
+                <input type="checkbox" class="payment-toggle-checkbox" ${!booking.is_payment_required ? 'checked' : ''} data-booking-id="${booking.id}" />
+                <span class="payment-label">
+                  $${(booking.price_cents / 100).toFixed(0)} paid
+                </span>
+              </label>` : ''}
               <div class="mt-1">
                 <select class="booking-status-select text-xs border border-gray-300 rounded px-1 py-0.5 w-full" 
                         data-booking-id="${booking.id}" 
@@ -2057,7 +2105,7 @@
           } else {
             // 2+ hours: Show all info including status
             const paymentMarker = getPaymentMarker(booking);
-            const transmissionLine3 = `${transmissionType} - ${durationHours}h${paymentMarker}`;
+            const transmissionLine3 = `${titleText}${paymentMarker}`;
             summaryHTML = `
               <div class="font-semibold" style="color:#111827;">${transmissionLine3}</div>
               <!-- Client name removed from web summary to prioritise address -->
@@ -2078,9 +2126,15 @@
             `;
             detailsHTML = `
               <div class="text-sm font-semibold mb-1" style="color:#111827;">${transmissionLine3}</div>
-              ${booking.pickup_location ? `<div class=\"text-xs mb-1\" style=\"color:#374151;\">📍 ${booking.pickup_location}</div>` : ''}
+              ${booking.pickup_location ? `<div class="text-xs mb-1" style="color:#374151;">📍 ${booking.pickup_location}</div>` : ''}
               <div class="text-sm font-semibold mb-1" style="color:#111827;">${clientName}</div>
-              ${booking.mobile ? `<div class=\"text-xs mb-1\" style=\"color:#374151;\">📱 ${booking.mobile}</div>` : ''}
+              ${booking.mobile ? `<div class="text-xs mb-1" style="color:#374151;">📱 ${booking.mobile}</div>` : ''}
+              ${typeof booking.price_cents === 'number' ? `<label class="payment-toggle ${booking.is_payment_required ? 'unpaid' : ''}">
+                <input type="checkbox" class="payment-toggle-checkbox" ${!booking.is_payment_required ? 'checked' : ''} data-booking-id="${booking.id}" />
+                <span class="payment-label">
+                  $${(booking.price_cents / 100).toFixed(0)} paid
+                </span>
+              </label>` : ''}
               <div class="mt-1">
                 <select class="booking-status-select text-xs border border-gray-300 rounded px-1 py-0.5 w-full" 
                         data-booking-id="${booking.id}" 
@@ -2185,6 +2239,78 @@
       });
     });
     
+    // Add event listeners to payment toggle checkboxes
+    document.querySelectorAll('.payment-toggle-checkbox').forEach(checkbox => {
+      checkbox.addEventListener('change', async function(e) {
+        const bookingId = this.getAttribute('data-booking-id');
+        const isPaid = this.checked;
+        const isRequired = !isPaid; // Checkbox true = paid => is_payment_required = false
+        
+        console.log('[payment-toggle] Updating booking', bookingId, 'isPaid:', isPaid, 'is_payment_required:', isRequired);
+        
+        // Find the toggle container and store original state
+        const toggleLabel = this.closest('.payment-toggle');
+        const originalChecked = this.checked;
+        const originalClass = toggleLabel.className;
+        
+        // Update UI optimistically
+        if (isPaid) {
+          toggleLabel.classList.remove('unpaid');
+        } else {
+          toggleLabel.classList.add('unpaid');
+        }
+        
+        // Also update the $ marker in the title
+        const bookingCard = this.closest('.booking-card');
+        const titleElements = bookingCard.querySelectorAll('.booking-summary > div, .booking-details > div');
+        titleElements.forEach(el => {
+          const markerSpan = el.querySelector('.payment-marker');
+          if (markerSpan) {
+            markerSpan.style.display = isRequired ? 'inline' : 'none';
+          }
+        });
+        
+        try {
+          // Update in Supabase
+          const { error } = await window.supabaseClient
+            .from('booking')
+            .update({ is_payment_required: isRequired })
+            .eq('id', bookingId);
+          
+          if (error) {
+            console.error('[payment-toggle] Failed to update payment status:', error);
+            // Revert UI on error
+            this.checked = !originalChecked;
+            toggleLabel.className = originalClass;
+            
+            // Revert $ marker
+            titleElements.forEach(el => {
+              const markerSpan = el.querySelector('.payment-marker');
+              if (markerSpan) {
+                markerSpan.style.display = !isRequired ? 'inline' : 'none';
+              }
+            });
+            
+            alert('Failed to update payment status. Please try again.');
+          } else {
+            console.log('[payment-toggle] Successfully updated payment status');
+            
+            // Update the booking object in memory so it stays in sync
+            const bookingIndex = bookings.findIndex(b => b.id === bookingId);
+            if (bookingIndex !== -1) {
+              bookings[bookingIndex].is_payment_required = isRequired;
+            }
+          }
+        } catch (err) {
+          console.error('[payment-toggle] Exception updating payment status:', err);
+          // Revert UI on exception
+          this.checked = !originalChecked;
+          toggleLabel.className = originalClass;
+          alert('An error occurred. Please try again.');
+        }
+      });
+    });
+    
     // Wrap mobile setup in a function so it can be called on resize
     function setupMobileInteractions() {
       const isMobile = window.matchMedia('(max-width: 768px)').matches;
@@ -2269,10 +2395,11 @@
         card.dataset.mobileListenerAdded = 'true';
         card.addEventListener('click', (e) => {
           console.log('[mobile] Card clicked');
-          // Ignore clicks on the status dropdowns, close button, or cancel button
+          // Ignore clicks on the status dropdowns, close button, cancel button, or payment toggle
           if (e.target.closest('.booking-status-select')) return;
           if (e.target.closest('.booking-close-btn')) return;
           if (e.target.closest('.booking-cancel-btn')) return;
+          if (e.target.closest('.payment-toggle')) return;
 
           e.stopPropagation();
 

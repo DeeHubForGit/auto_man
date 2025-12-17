@@ -1,20 +1,52 @@
 <style>
-  /* Admin Booking cards – match portal bookings styling */
   #adminBookingsList .booking-card {
     background-color: #dbeafe !important;   /* bg-blue-100 */
     border: 2px solid #3b82f6 !important;   /* blue-500 edge */
     border-radius: 0.5rem;
-    color: #111827 !important;              /* dark text */
+    color: #111827 !important;              /* default dark text */
   }
 
-  /* Inside the card, keep text dark, but let error text keep its red */
-  #adminBookingsList .booking-card *:not(.text-red-600):not(.text-red-600 *):not(button) {
+  /* Force most text dark, but allow special classes to override */
+  #adminBookingsList .booking-card *:not(.text-red-600):not(.text-red-600 *):not(button):not(.payment-label):not(.payment-icon) {
     color: #111827 !important;
   }
 
   /* Icon colour like portal bookings */
   #adminBookingsList .booking-card svg {
     color: #4b5563 !important;              /* gray-600 icons */
+  }
+
+  /* Payment toggle checkbox and label */
+  #adminBookingsList .payment-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  #adminBookingsList .payment-toggle-checkbox {
+    transform: scale(1.0);
+  }
+
+  #adminBookingsList .payment-label {
+    font-weight: 600;
+  }
+
+  /* Payment label colours in the Bookings list */
+  #adminBookingsList .payment-label.payment-owing {
+    color: #ff4d4d !important;  /* RED when payment still required */
+  }
+
+  #adminBookingsList .payment-label.payment-paid {
+    color: #000000 !important;  /* BLACK when paid */
+  }
+
+  /* Red $ icon in booking card title */
+  #adminBookingsList .payment-icon {
+    color: #ff4d4d !important;
+    font-weight: 700;
+    margin-left: 6px;
+    font-size: 1.1rem;
   }
 </style>
 
@@ -36,6 +68,12 @@
           <option value="all" selected>Valid and Invalid</option>
           <option value="invalid">Invalid Only</option>
           <option value="valid">Valid Only</option>
+        </select>
+
+        <select id="bookingFilterPayment" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[160px]" onchange="loadAdminBookings()">
+          <option value="all" selected>All payments</option>
+          <option value="required">Payment required only</option>
+          <option value="paid">Paid only</option>
         </select>
       </div>
     </div>
@@ -244,6 +282,7 @@
 
     const filterChecked = document.getElementById('bookingFilterChecked')?.value || 'unchecked';
     const filterValid = document.getElementById('bookingFilterValid')?.value || 'all';
+    const filterPayment = document.getElementById('bookingFilterPayment')?.value || 'all';
     
     // Base query
     let query = window.supabaseClient
@@ -267,6 +306,13 @@
     } else if (filterValid === 'valid') {
       // Show bookings where both mobile AND pickup are explicitly true
       query = query.eq('is_mobile_valid', true).eq('is_pickup_location_valid', true);
+    }
+
+    // Apply Payment Filter
+    if (filterPayment === 'required') {
+      query = query.eq('is_payment_required', true);
+    } else if (filterPayment === 'paid') {
+      query = query.eq('is_payment_required', false);
     }
 
     const { data, error } = await query;
@@ -348,7 +394,9 @@
           
           <!-- Header: Service, Duration & Client Name -->
           <div class="mb-2">
-            <h3 class="text-sm sm:text-base font-semibold text-gray-900">${serviceName} ${durationStr} (${clientName})</h3>
+            <h3 class="text-sm sm:text-base font-semibold text-gray-900">
+              ${serviceName} ${durationStr} (${clientName})${booking.is_payment_required ? '<span class="payment-icon">$</span>' : ''}
+            </h3>
           </div>
 
           <!-- Info Rows -->
@@ -430,6 +478,22 @@
                 </div>
               </div>
             </div>
+
+            <!-- Payment Status -->
+            ${typeof booking.price_cents === 'number' ? `
+            <div class="flex items-center gap-2 pt-1">
+              <label class="payment-toggle cursor-pointer">
+                <input type="checkbox" 
+                  class="payment-toggle-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500 border-gray-300"
+                  ${!booking.is_payment_required ? 'checked' : ''}
+                  onchange="togglePaymentStatus('${booking.id}', this.checked)"
+                >
+                <span class="payment-label text-sm ${booking.is_payment_required ? 'payment-owing' : 'payment-paid'}">
+                  $${(booking.price_cents / 100).toFixed(0)} paid
+                </span>
+              </label>
+            </div>
+            ` : ''}
 
             <!-- Admin Checked -->
             <div class="flex items-center gap-2 pt-1">
@@ -567,6 +631,40 @@
       console.error('[admin-bookings] Admin checked toggle failed:', error);
     } else {
       await loadAdminBookings();
+      if (window.updateNotificationBadges) {
+        await window.updateNotificationBadges();
+      }
+    }
+  };
+
+  window.togglePaymentStatus = async function(id, isPaid) {
+    // Checkbox true = paid => is_payment_required = false
+    const isRequired = !isPaid;
+    console.log('[admin-bookings] Payment status toggled:', { isPaid, isRequired });
+    
+    // Find booking in memory
+    const booking = adminBookings.find(b => String(b.id) === String(id));
+    if (!booking) return;
+    
+    const previous = booking.is_payment_required;
+    
+    // Update UI optimistically
+    booking.is_payment_required = isRequired;
+    
+    const { error } = await window.supabaseClient
+      .from('booking')
+      .update({ is_payment_required: isRequired })
+      .eq('id', id);
+      
+    if (error) {
+      console.error('[admin-bookings] Payment status toggle failed:', error);
+      // Revert on error
+      booking.is_payment_required = previous;
+      await loadAdminBookings();
+    } else {
+      // Re-render to update UI
+      await loadAdminBookings();
+      // Update notification badges (payments count)
       if (window.updateNotificationBadges) {
         await window.updateNotificationBadges();
       }

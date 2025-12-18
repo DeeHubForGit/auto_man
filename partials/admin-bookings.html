@@ -562,6 +562,18 @@
       return;
     }
 
+    // Update Google Calendar event (mobile and/or pickup_location)
+    if (field === 'mobile' || field === 'pickup_location') {
+      try {
+        await window.supabaseClient.functions.invoke('update-booking-in-google', {
+          body: { booking_id: id, fields: [field] }
+        });
+        console.log(`[admin-bookings] Google Calendar updated for ${field}`);
+      } catch (e) {
+        console.warn(`[admin-bookings] Failed to update Google Calendar for ${field}:`, e);
+      }
+    }
+
     // For pickup, trigger edge function and reload
     if (field === 'pickup_location') {
       try {
@@ -612,6 +624,17 @@
           .from('booking')
           .update({ pickup_location: suggestion, is_pickup_location_valid: true }) // Assume valid if suggestion taken
           .eq('id', id);
+      
+      // Update Google Calendar event with new pickup location
+      try {
+        await window.supabaseClient.functions.invoke('update-booking-in-google', {
+          body: { booking_id: id, fields: ['pickup_location'] }
+        });
+        console.log('[admin-bookings] Google Calendar updated with suggested address');
+      } catch (e) {
+        console.warn('[admin-bookings] Failed to update Google Calendar:', e);
+      }
+      
       await loadAdminBookings();
       // Update notification badges
       if (window.updateNotificationBadges) {

@@ -210,8 +210,8 @@
   <script>
     let currentStep = 1;
     const totalSteps = 3;
-    const CACHE_KEY = 'onboarding_form_data';
-    const STEP_KEY = 'onboarding_current_step';
+    let currentClientId = null; // Store client ID for DB operations
+    let debounceTimer = null; // For debouncing text input
 
     // Wait for the SHARED Supabase client (from auth-scripts or supabaseClient.js)
     async function waitForSupabaseClient(timeoutMs = 5000) {
@@ -225,131 +225,286 @@
       return window.supabaseClient;
     }
 
-    // Fetch booking data to pre-populate form if blank
-    async function fetchBookingData() {
+    // Get current client ID
+    async function getClientId() {
+      if (currentClientId) return currentClientId;
+      
       const supabase = await waitForSupabaseClient();
-      if (!supabase) {
-        console.log('[intake] ❌ Supabase not initialized');
-        return null;
-      }
+      if (!supabase) return null;
       
       try {
-        // Get current user
         const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError || !user) {
-          console.log('[intake] ❌ No user logged in:', userError);
-          return null;
-        }
+        if (userError || !user) return null;
         
-        console.log('[intake] ✅ User logged in:', user.email);
-
-        // Get client ID
         const { data: client, error: clientError } = await supabase
           .from('client')
           .select('id')
           .eq('email', user.email)
           .single();
         
-        if (clientError || !client?.id) {
-          console.log('[intake] ❌ Client not found:', clientError);
+        if (clientError || !client?.id) return null;
+        
+        currentClientId = client.id;
+        console.log('[intake] ✅ Client ID:', currentClientId);
+        return currentClientId;
+      } catch (err) {
+        console.error('[intake] ❌ Error getting client ID:', err);
+        return null;
+      }
+    }
+
+    // Fetch intake data from DB and populate form
+    async function loadIntakeDataFromDb() {
+      console.log('[intake] 📥 Loading intake data from DB...');
+      
+      const supabase = await waitForSupabaseClient();
+      if (!supabase) {
+        console.log('[intake] ❌ Supabase not initialized');
+        return null;
+      }
+      
+      const clientId = await getClientId();
+      if (!clientId) {
+        console.log('[intake] ❌ No client ID found');
+        return null;
+      }
+      
+      try {
+        const { data: client, error } = await supabase
+          .from('client')
+          .select('first_name, last_name, mobile, learner_permit_number, medical_conditions, is_beginner, is_anxious_nervous, is_senior, learning_needs_other, intake_step, intake_completed')
+          .eq('id', clientId)
+          .single();
+        
+        if (error) {
+          console.error('[intake] ❌ Error fetching client data:', error);
           return null;
         }
         
-        console.log('[intake] ✅ Client ID:', client.id);
-
-        // Get the most recent booking for this client
-        const { data: bookings, error: bookingError } = await supabase
-          .from('booking')
-          .select('first_name, last_name, mobile')
-          .eq('client_id', client.id)
-          .order('start_time', { ascending: false })
-          .limit(1);
-
-        if (bookingError) {
-          console.log('[intake] ❌ Booking query error:', bookingError);
-          return null;
-        }
-        
-        console.log('[intake] 📋 Bookings found:', bookings);
-
-        if (bookings && bookings.length > 0) {
-          const booking = bookings[0];
-          console.log('[intake] 📋 Latest booking:', booking);
+        if (client) {
+          console.log('[intake] ✅ DB data loaded:', client);
           
-          const result = {
-            firstName: booking.first_name || '',
-            lastName: booking.last_name || '',
-            mobile: booking.mobile || ''
-          };
+          // Populate hidden fields
+          document.getElementById('firstName').value = client.first_name || '';
+          document.getElementById('lastName').value = client.last_name || '';
+          document.getElementById('mobile').value = client.mobile || '';
           
-          console.log('[intake] ✅ Extracted data:', result);
-          return result;
-        } else {
-          console.log('[intake] ⚠️ No bookings found for this client');
+          // Populate intake fields
+          document.getElementById('licenseNumber').value = client.learner_permit_number || '';
+          document.getElementById('medicalConditions').value = client.medical_conditions || '';
+          document.getElementById('isBeginner').checked = client.is_beginner || false;
+          document.getElementById('isAnxious').checked = client.is_anxious_nervous || false;
+          document.getElementById('isSenior').checked = client.is_senior || false;
+          
+          // Handle other needs
+          if (client.learning_needs_other) {
+            document.getElementById('isOther').checked = true;
+            document.getElementById('otherDetails').value = client.learning_needs_other;
+            document.getElementById('otherDetails').disabled = false;
+          } else {
+            document.getElementById('isOther').checked = false;
+            document.getElementById('otherDetails').value = '';
+            document.getElementById('otherDetails').disabled = true;
+          }
+          
+          return client;
         }
       } catch (err) {
-        console.error('[intake] ❌ Error fetching booking data:', err);
+        console.error('[intake] ❌ Error loading intake data:', err);
       }
       
       return null;
     }
 
-    // Save form data to localStorage
-    function saveToCache() {
-      const formData = {
-        firstName: document.getElementById('firstName').value,
-        lastName: document.getElementById('lastName').value,
-        mobile: document.getElementById('mobile').value,
-        licenseNumber: document.getElementById('licenseNumber').value,
-        medicalConditions: document.getElementById('medicalConditions').value,
-        isBeginner: document.getElementById('isBeginner').checked,
-        isAnxious: document.getElementById('isAnxious').checked,
-        isSenior: document.getElementById('isSenior').checked,
-        isOther: document.getElementById('isOther').checked,
-        otherDetails: document.getElementById('otherDetails').value
-      };
-      localStorage.setItem(CACHE_KEY, JSON.stringify(formData));
-      localStorage.setItem(STEP_KEY, currentStep.toString());
+    // Fetch booking data to pre-populate name/mobile if DB is blank
+    async function fetchBookingDataIfNeeded() {
+      const supabase = await waitForSupabaseClient();
+      if (!supabase) return;
+      
+      const clientId = await getClientId();
+      if (!clientId) return;
+      
+      try {
+        // Get the most recent booking for this client
+        const { data: bookings, error: bookingError } = await supabase
+          .from('booking')
+          .select('first_name, last_name, mobile')
+          .eq('client_id', clientId)
+          .order('start_time', { ascending: false })
+          .limit(1);
+
+        if (!bookingError && bookings && bookings.length > 0) {
+          const booking = bookings[0];
+          console.log('[intake] 📋 Latest booking:', booking);
+          
+          // Only update if fields are empty
+          const firstNameInput = document.getElementById('firstName');
+          const lastNameInput = document.getElementById('lastName');
+          const mobileInput = document.getElementById('mobile');
+          
+          if (!firstNameInput.value && booking.first_name) firstNameInput.value = booking.first_name;
+          if (!lastNameInput.value && booking.last_name) lastNameInput.value = booking.last_name;
+          if (!mobileInput.value && booking.mobile) mobileInput.value = booking.mobile;
+        }
+      } catch (err) {
+        console.error('[intake] ❌ Error fetching booking data:', err);
+      }
     }
 
-    // Load form data from localStorage
-    function loadFromCache() {
-      const cached = localStorage.getItem(CACHE_KEY);
-      if (cached) {
-        try {
-          const data = JSON.parse(cached);
-          document.getElementById('firstName').value = data.firstName || '';
-          document.getElementById('lastName').value = data.lastName || '';
-          document.getElementById('mobile').value = data.mobile || '';
-          document.getElementById('licenseNumber').value = data.licenseNumber || '';
-          document.getElementById('medicalConditions').value = data.medicalConditions || '';
-          document.getElementById('isBeginner').checked = data.isBeginner || false;
-          document.getElementById('isAnxious').checked = data.isAnxious || false;
-          document.getElementById('isSenior').checked = data.isSenior || false;
-          document.getElementById('isOther').checked = data.isOther || false;
-          document.getElementById('otherDetails').value = data.otherDetails || '';
-          
-          // Enable/disable other textbox based on checkbox
-          document.getElementById('otherDetails').disabled = !data.isOther;
-        } catch (e) {
-          console.error('Error loading cached data:', e);
+    // Update intake_step in DB
+    async function updateStepInDb(step) {
+      console.log(`[intake] 💾 Updating step to ${step} in DB...`);
+      
+      const supabase = await waitForSupabaseClient();
+      if (!supabase) return false;
+      
+      const clientId = await getClientId();
+      if (!clientId) return false;
+      
+      try {
+        const { error } = await supabase
+          .from('client')
+          .update({
+            intake_step: step,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', clientId);
+        
+        if (error) {
+          console.error('[intake] ❌ Error updating step:', error);
+          return false;
         }
+        
+        console.log(`[intake] ✅ Step updated to ${step}`);
+        return true;
+      } catch (err) {
+        console.error('[intake] ❌ Error updating step:', err);
+        return false;
+      }
+    }
+
+    // Save Step 1 data to DB
+    async function saveStep1ToDb() {
+      console.log('[intake] 💾 Saving Step 1 to DB...');
+      
+      const supabase = await waitForSupabaseClient();
+      if (!supabase) {
+        Modal.error('Unable to connect to database. Please try again.');
+        return false;
       }
       
-      // Restore step
-      const savedStep = localStorage.getItem(STEP_KEY);
-      if (savedStep) {
-        const step = parseInt(savedStep, 10);
-        if (step >= 1 && step <= totalSteps) {
-          showStep(step);
+      const clientId = await getClientId();
+      if (!clientId) {
+        Modal.error('Client ID not found. Please refresh and try again.');
+        return false;
+      }
+      
+      const licenseNumber = document.getElementById('licenseNumber').value.trim().toUpperCase();
+      
+      try {
+        const { error } = await supabase
+          .from('client')
+          .update({
+            learner_permit_number: licenseNumber,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', clientId);
+        
+        if (error) {
+          console.error('[intake] ❌ Error saving Step 1:', error);
+          Modal.error('Failed to save. Please try again.');
+          return false;
         }
+        
+        console.log('[intake] ✅ Step 1 saved successfully');
+        return true;
+      } catch (err) {
+        console.error('[intake] ❌ Error saving Step 1:', err);
+        Modal.error('An error occurred. Please try again.');
+        return false;
       }
     }
 
-    // Clear cache after successful submission
-    function clearCache() {
-      localStorage.removeItem(CACHE_KEY);
-      localStorage.removeItem(STEP_KEY);
+    // Save Step 2 data to DB
+    async function saveStep2ToDb() {
+      console.log('[intake] 💾 Saving Step 2 to DB...');
+      
+      const supabase = await waitForSupabaseClient();
+      if (!supabase) {
+        Modal.error('Unable to connect to database. Please try again.');
+        return false;
+      }
+      
+      const clientId = await getClientId();
+      if (!clientId) {
+        Modal.error('Client ID not found. Please refresh and try again.');
+        return false;
+      }
+      
+      const medicalConditions = document.getElementById('medicalConditions').value.trim() || null;
+      
+      try {
+        const { error } = await supabase
+          .from('client')
+          .update({
+            medical_conditions: medicalConditions,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', clientId);
+        
+        if (error) {
+          console.error('[intake] ❌ Error saving Step 2:', error);
+          Modal.error('Failed to save. Please try again.');
+          return false;
+        }
+        
+        console.log('[intake] ✅ Step 2 saved successfully');
+        return true;
+      } catch (err) {
+        console.error('[intake] ❌ Error saving Step 2:', err);
+        Modal.error('An error occurred. Please try again.');
+        return false;
+      }
+    }
+
+    // Save Step 3 checkbox to DB immediately
+    async function saveCheckboxToDb(field, value) {
+      console.log(`[intake] 💾 Saving ${field} = ${value} to DB...`);
+      
+      const supabase = await waitForSupabaseClient();
+      if (!supabase) return;
+      
+      const clientId = await getClientId();
+      if (!clientId) return;
+      
+      try {
+        const updateData = {
+          [field]: value,
+          updated_at: new Date().toISOString()
+        };
+        
+        const { error } = await supabase
+          .from('client')
+          .update(updateData)
+          .eq('id', clientId);
+        
+        if (error) {
+          console.error(`[intake] ❌ Error saving ${field}:`, error);
+        } else {
+          console.log(`[intake] ✅ ${field} saved successfully`);
+        }
+      } catch (err) {
+        console.error(`[intake] ❌ Error saving ${field}:`, err);
+      }
+    }
+
+    // Save other details text to DB (debounced)
+    function saveOtherDetailsToDb() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(async () => {
+        const otherDetails = document.getElementById('otherDetails').value.trim() || null;
+        await saveCheckboxToDb('learning_needs_other', otherDetails);
+      }, 1000); // 1 second debounce
     }
 
     function updateProgress() {
@@ -358,13 +513,21 @@
       document.getElementById('stepIndicator').textContent = `Step ${currentStep} of ${totalSteps}`;
     }
 
-    function showStep(step) {
+    async function showStep(step, skipDbUpdate = false) {
       document.querySelectorAll('.wizard-step').forEach(el => el.classList.remove('active'));
       const stepEl = document.querySelector(`[data-step="${step}"]`);
       if (stepEl) stepEl.classList.add('active');
       currentStep = step;
       updateProgress();
-      saveToCache(); // Save step progress
+      
+      // Load fresh data from DB when showing a step
+      await loadIntakeDataFromDb();
+      
+      // Update step in DB (unless this is initial load)
+      if (!skipDbUpdate) {
+        await updateStepInDb(step);
+      }
+      
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -381,9 +544,21 @@
       return true;
     }
 
-    function nextStep() {
+    async function nextStep() {
       if (!validateStep(currentStep)) return;
-      saveToCache(); // Save before moving to next step
+      
+      // Save to DB before advancing
+      let saved = false;
+      if (currentStep === 1) {
+        saved = await saveStep1ToDb();
+      } else if (currentStep === 2) {
+        saved = await saveStep2ToDb();
+      } else {
+        saved = true; // Step 3 saves happen on checkbox change
+      }
+      
+      if (!saved) return; // Don't advance if save failed
+      
       if (currentStep < totalSteps) {
         showStep(currentStep + 1);
       }
@@ -402,26 +577,70 @@
       window.location.href = 'portal.html';
     }
 
-    function resetFormOnly() {
-      // Clear localStorage cache
-      localStorage.removeItem(CACHE_KEY);
-      localStorage.removeItem(STEP_KEY);
+    async function resetFormOnly() {
+      // True reset: Wipe DB intake fields back to NULL
+      console.log('[intake] 🔄 Resetting form (wiping DB intake fields to NULL)...');
       
-      // Clear all form fields
-      document.getElementById('licenseNumber').value = '';
-      document.getElementById('medicalConditions').value = '';
-      document.getElementById('isBeginner').checked = false;
-      document.getElementById('isAnxious').checked = false;
-      document.getElementById('isSenior').checked = false;
-      document.getElementById('isOther').checked = false;
-      document.getElementById('otherDetails').value = '';
-      document.getElementById('otherDetails').disabled = true;
+      const supabase = await waitForSupabaseClient();
+      if (!supabase) {
+        alert('Unable to connect to database.');
+        return;
+      }
       
-      // Go back to step 1
-      showStep(1);
+      const clientId = await getClientId();
+      if (!clientId) {
+        alert('Client ID not found.');
+        return;
+      }
       
-      alert('Form and cache cleared!');
-      document.getElementById('licenseNumber').focus();
+      if (!confirm('This will permanently clear all your intake form data. Continue?')) {
+        return;
+      }
+      
+      try {
+        const { error } = await supabase
+          .from('client')
+          .update({
+            learner_permit_number: null,
+            medical_conditions: null,
+            is_beginner: false,
+            is_anxious_nervous: false,
+            is_senior: false,
+            learning_needs_other: null,
+            intake_completed: false,
+            intake_step: 1,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', clientId);
+        
+        if (error) {
+          console.error('[intake] ❌ Error resetting form:', error);
+          alert('Failed to reset form. Please try again.');
+          return;
+        }
+        
+        console.log('[intake] ✅ Form reset successfully, DB wiped');
+        
+        // Clear all form fields
+        document.getElementById('licenseNumber').value = '';
+        document.getElementById('medicalConditions').value = '';
+        document.getElementById('isBeginner').checked = false;
+        document.getElementById('isAnxious').checked = false;
+        document.getElementById('isSenior').checked = false;
+        document.getElementById('isOther').checked = false;
+        document.getElementById('otherDetails').value = '';
+        document.getElementById('otherDetails').disabled = true;
+        
+        // Go back to step 1
+        currentStep = 1;
+        await showStep(1, true); // Skip DB update since we just set it to 1
+        
+        alert('Form reset complete! All intake data has been cleared.');
+        document.getElementById('licenseNumber').focus();
+      } catch (err) {
+        console.error('[intake] ❌ Error resetting form:', err);
+        alert('An error occurred. Please try again.');
+      }
     }
 
     function toggleOtherText() {
@@ -432,8 +651,9 @@
         textbox.focus();
       } else {
         textbox.value = '';
+        // Clear the DB field if unchecked
+        saveCheckboxToDb('learning_needs_other', null);
       }
-      saveToCache(); // Save when checkbox changes
     }
 
     async function submitForm() {
@@ -459,27 +679,21 @@
       };
 
       try {
-        // Check if Supabase is initialized
-        if (!supabase) {
-          Modal.error('Configuration error. Please contact support.', 'Setup Required');
+        // Get client ID
+        const clientId = await getClientId();
+        if (!clientId) {
+          Modal.error('Client ID not found. Please refresh and try again.');
           return;
         }
 
-        // Get current user
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError || !user) {
-          Modal.error('Please log in to complete your profile', 'Authentication Required');
-          setTimeout(() => { window.location.href = 'login.html'; }, 2000);
-          return;
-        }
-
-        // Use upsert to handle both insert and update (using email as the unique key)
+        // Update client record using ID and reset step to 1
         const { error } = await supabase
           .from('client')
-          .upsert(
-            { ...formData, email: user.email },
-            { onConflict: 'email' }
-          );
+          .update({
+            ...formData,
+            intake_step: 1
+          })
+          .eq('id', clientId);
 
         if (error) {
           console.error('Error updating profile:', error);
@@ -487,9 +701,6 @@
           return;
         }
 
-        // Clear cache on successful submission
-        clearCache();
-        
         // Clear the skip flag since they completed it
         sessionStorage.removeItem('intake_skipped');
         
@@ -525,51 +736,65 @@
       this.value = this.value.toUpperCase();
     });
 
-    // Auto-save on input change
-    document.addEventListener('input', (e) => {
-      if (e.target.matches('input, textarea')) {
-        saveToCache();
+    // Step 3: Save checkboxes immediately to DB
+    document.getElementById('isBeginner').addEventListener('change', function() {
+      if (currentStep === 3) {
+        saveCheckboxToDb('is_beginner', this.checked);
       }
     });
 
-    // Auto-save on checkbox change
-    document.addEventListener('change', (e) => {
-      if (e.target.matches('input[type="checkbox"]')) {
-        saveToCache();
+    document.getElementById('isAnxious').addEventListener('change', function() {
+      if (currentStep === 3) {
+        saveCheckboxToDb('is_anxious_nervous', this.checked);
       }
     });
 
-    // Load cached data and focus first input on page load
+    document.getElementById('isSenior').addEventListener('change', function() {
+      if (currentStep === 3) {
+        saveCheckboxToDb('is_senior', this.checked);
+      }
+    });
+
+    document.getElementById('isOther').addEventListener('change', function() {
+      toggleOtherText();
+    });
+
+    // Debounce text input for other details
+    document.getElementById('otherDetails').addEventListener('input', function() {
+      if (currentStep === 3 && !this.disabled) {
+        saveOtherDetailsToDb();
+      }
+    });
+
+    // Load intake data from DB on page load
     window.addEventListener('DOMContentLoaded', async () => {
       console.log('[intake] 🚀 Page loaded, starting initialization...');
       
-      loadFromCache();
+      // Wait for auth to initialize
+      await new Promise(r => setTimeout(r, 500));
       
-      // Pre-populate hidden fields from booking data (name and mobile come from booking)
-      const firstNameInput = document.getElementById('firstName');
-      const lastNameInput = document.getElementById('lastName');
-      const mobileInput = document.getElementById('mobile');
+      // Load all intake data from DB (source of truth)
+      const clientData = await loadIntakeDataFromDb();
       
-      const isFormBlank = !firstNameInput.value && !lastNameInput.value && !mobileInput.value;
-      
-      console.log('[intake] 📝 Hidden fields blank?', isFormBlank);
-      
-      if (isFormBlank) {
-        console.log('[intake] 🔍 Fetching name and mobile from booking data...');
-        
-        // Wait a bit for auth to initialize properly
-        await new Promise(r => setTimeout(r, 500));
-        
-        const bookingData = await fetchBookingData();
-        if (bookingData) {
-          console.log('[intake] ✅ Populating hidden fields with:', bookingData);
-          if (bookingData.firstName) firstNameInput.value = bookingData.firstName;
-          if (bookingData.lastName) lastNameInput.value = bookingData.lastName;
-          if (bookingData.mobile) mobileInput.value = bookingData.mobile;
+      // Determine which step to show
+      let resumeStep = 1;
+      if (clientData) {
+        if (clientData.intake_completed) {
+          // If completed, start fresh at step 1
+          resumeStep = 1;
+          console.log('[intake] ✅ Intake already completed, starting at step 1');
         } else {
-          console.log('[intake] ⚠️ No booking data available');
+          // Resume at saved step (clamped to 1-3)
+          resumeStep = Math.max(1, Math.min(3, clientData.intake_step || 1));
+          console.log(`[intake] 📍 Resuming at step ${resumeStep}`);
         }
       }
+      
+      // Show the appropriate step (skip DB update on initial load)
+      await showStep(resumeStep, true);
+      
+      // If name/mobile still blank, try to get from booking
+      await fetchBookingDataIfNeeded();
       
       document.getElementById('licenseNumber').focus();
     });

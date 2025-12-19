@@ -761,6 +761,19 @@
     }
     // window.applyPickupSuggestion = applyPickupSuggestion;
 
+    // Helper to patch Google Calendar after client edits
+    async function patchGoogleAfterClientEdit(bookingId, fields) {
+      try {
+        await window.supabaseClient.functions.invoke('update-booking-in-google', {
+          body: { booking_id: bookingId, fields }
+        });
+        console.log(`[portal] Google Calendar updated for fields:`, fields);
+      } catch (e) {
+        // Do not block the UI, DB is the source of truth here
+        console.warn('[portal] Google patch failed:', e);
+      }
+    }
+
     async function savePickupLocationAndRevalidate(bookingId, newValue, suggestionPanel, issueEl) {
       const { error } = await window.supabaseClient
         .from('booking')
@@ -776,6 +789,9 @@
       if (!error) {
         if (suggestionPanel) suggestionPanel.classList.add('hidden');
         if (issueEl) issueEl.textContent = '';
+
+        // Update Google Calendar with new pickup location
+        await patchGoogleAfterClientEdit(bookingId, ['pickup_location']);
 
         try {
           await window.supabaseClient.functions.invoke('validate-bookings', {
@@ -1443,6 +1459,11 @@
           .select();
 
         if (error) throw error;
+
+        // Update Google Calendar after successful DB update
+        if (fieldName === 'mobile' || fieldName === 'pickup_location') {
+          await patchGoogleAfterClientEdit(bookingId, [fieldName]);
+        }
 
         // Trigger server-side validation immediately if we just reset the flags
         if (fieldName === 'pickup_location' && isValid && newValue) {

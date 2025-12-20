@@ -149,29 +149,49 @@ function parseDescriptionFields(descHtml: string | null | undefined) {
  *  - attendees list (first non-self) as fallback for email
  */
 function extractFieldsFromEvent(e: any) {
-  // 1. Start with HTML description parsing (most reliable for Google appointment bookings)
-  const fromDesc = parseDescriptionFields(e.description);
-  let { first_name, last_name, email, mobile, pickup } = fromDesc;
+  // PRIORITY ORDER (highest to lowest):
+  // 1. extendedProperties.shared (stable, immune to Google UI quirks)
+  // 2. description parsing (legacy fallback)
+  // 3. location field (pickup fallback)
+  // 4. title/attendees (name/email fallback)
 
-  // 2. Use top-level 'location' field as fallback for pickup
+  // Start with extendedProperties.shared (stable source of truth)
+  const shared = e.extendedProperties?.shared || {};
+  let mobile = shared.mobile?.trim() || null;
+  let pickup = shared.pickup_location?.trim() || null;
+  
+  // Parse description fields (will be overridden by extendedProperties if present)
+  const fromDesc = parseDescriptionFields(e.description);
+  let { first_name, last_name, email } = fromDesc;
+  
+  // Only use description mobile/pickup if extendedProperties don't have them (legacy fallback)
+  if (!mobile && fromDesc.mobile) {
+    mobile = fromDesc.mobile;
+  }
+  if (!pickup && fromDesc.pickup) {
+    pickup = fromDesc.pickup;
+  }
+
+  // Use top-level 'location' field as fallback for pickup
   if (!pickup && e.location?.trim()) {
     pickup = e.location.trim();
   }
 
-  // 3. Override with extended properties if they exist (highest priority)
-  const ep = e.extendedProperties?.private || e.extendedProperties?.shared || {};
+  // Check extendedProperties.private for any additional fields (legacy support)
+  const ep = e.extendedProperties?.private || {};
   for (const [k, v] of Object.entries(ep)) {
     if (typeof v !== "string" || !v.trim()) continue;
     const val = v.trim();
     const key = k.toLowerCase();
-    if (key.includes("first")) first_name = val;
-    else if (key.includes("last")) last_name = val;
-    else if (key.includes("email")) email = val;
-    else if (key.includes("mobile") || key.includes("phone")) mobile = val;
-    else if (key.includes("pickup")) pickup = val;
+    if (key.includes("first") && !first_name) first_name = val;
+    else if (key.includes("last") && !last_name) last_name = val;
+    else if (key.includes("email") && !email) email = val;
+    // Note: mobile and pickup from .private only if .shared didn't have them
+    else if ((key.includes("mobile") || key.includes("phone")) && !mobile) mobile = val;
+    else if (key.includes("pickup") && !pickup) pickup = val;
   }
 
-  // 4. Fallback for name from event title, e.g., "Lesson (John Smith)"
+  // Fallback for name from event title, e.g., "Lesson (John Smith)"
   if (!first_name && typeof e.summary === "string") {
     const match = e.summary.match(/\(([^)]+)\)/);
     if (match) {
@@ -183,13 +203,13 @@ function extractFieldsFromEvent(e: any) {
     }
   }
 
-  // 5. Final fallback for email from attendee list
+  // Final fallback for email from attendee list
   if (!email && Array.isArray(e.attendees)) {
     const guest = e.attendees.find((a: any) => a.email && !a.self);
     if (guest) email = guest.email;
   }
 
-  // 6. Final cleanup
+  // Final cleanup
   if (email && !email.includes("@")) email = null;
 
   // Keep whatever mobile was entered so we can see what the customer typed.

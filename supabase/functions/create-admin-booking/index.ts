@@ -181,8 +181,6 @@ Deno.serve(async (req) => {
       `${safeEmail}\n` +
       `<br><b>Mobile</b>\n` +
       `${safeMobile}\n` +
-      `<br><b>Pickup Address</b>\n` +
-      `${safePickup}\n` +
       CANCELLATION_POLICY_HTML + `\n` +
       SERVICE_DESCRIPTION;
 
@@ -215,6 +213,8 @@ Deno.serve(async (req) => {
           created_by: "admin",
           is_payment_required: isPaymentRequired ? "true" : "false",
           is_booking: "true", // Mark as booking so gcal-sync colors it correctly
+          mobile: safeMobile, // Stable source - immune to Google UI description corruption
+          pickup_location: safePickup, // Stable source - immune to Google UI description corruption
         },
       },
     };

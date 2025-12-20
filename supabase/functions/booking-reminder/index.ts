@@ -83,6 +83,8 @@ function smsEnabled(): boolean {
 }
 
 serve(async (req) => {
+  console.log("[booking-reminder] invoked", req.method, new Date().toISOString());
+  
   if (req.method === "OPTIONS") return json({ ok: true });
   if (req.method !== "POST") return json({ error: "Method Not Allowed" }, 405);
 

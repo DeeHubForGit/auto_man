@@ -373,6 +373,23 @@
     scrollbar-color: #cbd5e1 #f1f5f9;
   }
   
+  /* Mini spinner for new booking status */
+  #section-calendar .mini-spinner {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(107, 114, 128, 0.35);
+    border-top-color: rgba(107, 114, 128, 1);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: -2px;
+    margin-right: 8px;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  
   /* Mobile: narrower columns so all 7 days fit */
   @media (max-width: 768px) {
   /* Always hide elements marked web-only on mobile (even when expanded) */
@@ -573,6 +590,7 @@
           </svg>
           <span class="hidden sm:inline ml-1">New appointment</span>
         </button>
+        <span id="newBookingStatus" class="ml-3 text-sm text-gray-500 hidden" aria-live="polite"></span>
       </div>
     </div>
   </div>
@@ -594,9 +612,6 @@
         <button type="button" id="appointment-modal-close" class="admin-modal-close">&times;</button>
       </div>
 
-      <p class="text-xs text-gray-400 mb-2">
-        After an appointment is saved, it may take a few seconds to appear in your calendar.
-      </p>
 
       <form id="appointment-form" class="admin-modal-body">
         <!-- Appointment Type -->
@@ -926,6 +941,30 @@
     if (suggestionBtn) {
       suggestionBtn.classList.add('hidden');
     }
+  }
+
+  // New booking status helpers
+  function showNewBookingStatus(message) {
+    const el = document.getElementById('newBookingStatus');
+    if (!el) return;
+    el.innerHTML = `<span class="mini-spinner"></span>${message}`;
+    el.classList.remove('hidden');
+  }
+
+  function setNewBookingStatusText(message) {
+    const el = document.getElementById('newBookingStatus');
+    if (!el) return;
+    // Keep spinner if already present
+    const hasSpinner = el.querySelector('.mini-spinner');
+    el.innerHTML = `${hasSpinner ? '<span class="mini-spinner"></span>' : ''}${message}`;
+    el.classList.remove('hidden');
+  }
+
+  function hideNewBookingStatus() {
+    const el = document.getElementById('newBookingStatus');
+    if (!el) return;
+    el.classList.add('hidden');
+    el.innerHTML = '';
   }
 
   // Apply pickup address suggestion
@@ -1430,6 +1469,7 @@
       
       const pollForEvent = async () => {
         pollAttempts++;
+        setNewBookingStatusText(`Waiting for new booking...  (${pollAttempts}/${maxPolls})`);
         console.log(`[appointment] Checking database for new event (attempt ${pollAttempts}/${maxPolls})...`);
         
         try {
@@ -1443,6 +1483,7 @@
           if (booking) {
             // Event found in database!
             console.log(`[appointment] ✅ Event found in database! Refreshing calendar once.`, booking);
+            hideNewBookingStatus();
             renderWeek(weekStart);
             return; // Stop polling
           }
@@ -1458,6 +1499,7 @@
             setTimeout(pollForEvent, 3000);
           } else {
             console.warn(`[appointment] ⚠️ Event not found after ${maxPolls} attempts. Webhook may be delayed.`);
+            hideNewBookingStatus();
             // Do one final refresh anyway
             renderWeek(weekStart);
           }
@@ -1465,11 +1507,14 @@
           console.error('[appointment] Error polling for event:', err);
           if (pollAttempts < maxPolls) {
             setTimeout(pollForEvent, 3000);
+          } else {
+            hideNewBookingStatus();
           }
         }
       };
       
       // Start polling after 2 seconds (give webhook a head start)
+      showNewBookingStatus('Waiting for new booking...');
       setTimeout(pollForEvent, 2000);
     } catch (err) {
       console.error("[appointment] Failed to create appointment", err);
@@ -1671,6 +1716,7 @@
       
       const pollForEvent = async () => {
         pollAttempts++;
+        setNewBookingStatusText(`Waiting for new booking...  (${pollAttempts}/${maxPolls})`);
         console.log(`[booking] Checking database for new event (attempt ${pollAttempts}/${maxPolls})...`);
         
         try {
@@ -1682,6 +1728,7 @@
           
           if (booking) {
             console.log(`[booking] ✅ Event found in database! Refreshing calendar.`, booking);
+            hideNewBookingStatus();
             renderWeek(weekStart);
             return;
           }
@@ -1695,17 +1742,21 @@
             setTimeout(pollForEvent, 3000);
           } else {
             console.warn(`[booking] ⚠️ Event not found after ${maxPolls} attempts.`);
+            hideNewBookingStatus();
             renderWeek(weekStart);
           }
         } catch (err) {
           console.error('[booking] Error polling for event:', err);
           if (pollAttempts < maxPolls) {
             setTimeout(pollForEvent, 3000);
+          } else {
+            hideNewBookingStatus();
           }
         }
       };
       
       // Start polling after 2 seconds
+      showNewBookingStatus('Waiting for new booking...');
       setTimeout(pollForEvent, 2000);
     } catch (err) {
       console.error("[booking] Error creating booking:", err);

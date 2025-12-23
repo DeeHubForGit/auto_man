@@ -593,6 +593,17 @@ header #nav-services-menu a:hover { color: #ffffff !important; }
   filter: drop-shadow(0 0 2px rgba(255,255,255,0.15)); /* mild depth */
 }
 
+/* Glow panel - shared gradient for What to Expect and similar panels */
+.glow-panel {
+  background:
+    radial-gradient(circle at top left, rgba(96,165,250,0.10), transparent),
+    linear-gradient(145deg, rgba(59,130,246,0.08), rgba(15,23,42,0.85));
+  border-color: rgba(148,163,253,0.25);
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 26px rgba(0,0,0,0.35);
+  transition: all 0.22s ease;
+}
+
 /* Our Ethos cards – scoped & safe */
 #ethos .grid .rounded-xl.border {
   background:

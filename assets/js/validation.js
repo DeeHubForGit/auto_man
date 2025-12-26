@@ -9,22 +9,50 @@
     return (v || '').replace(/\D+/g, '');
   }
 
-  // Validate Australian mobile number
-  function isValidAuMobile(v) {
-    if (!v) return false;
-    const cleaned = v.trim();
-    const digits = digitsOnly(cleaned);
+  // Check if mobile has allowed characters only
+  function isAllowedMobileChars(raw) {
+    if (!raw) return false;
+    const str = raw.toString();
+
+    // If + exists and is not at position 0, reject
+    const plusIndex = str.indexOf('+');
+    if (plusIndex > 0) return false;
+
+    // Allow only: digits, spaces, brackets, and + at start
+    return /^[0-9()+\s]*$/.test(str);
+  }
+  
+  // Normalise mobile to canonical storage format (0404096768 or +61404096768)
+  function normaliseMobileForStorage(raw) {
+    if (!raw) return '';
+    const trimmed = raw.trim();
     
-    // Must be exactly 10 digits starting with 04, or 11 digits starting with 614
-    if (!/^(04\d{8}|614\d{8})$/.test(digits)) return false;
+    if (trimmed.startsWith('+')) {
+      // International format: must be +61
+      const digitsAfterPlus = digitsOnly(trimmed.substring(1));
+      
+      // Must be 11 digits starting with 614
+      if (digitsAfterPlus.length === 11 && digitsAfterPlus.startsWith('614')) {
+        return '+' + digitsAfterPlus;
+      }
+      return '';
+    } else {
+      // Local format: must be 10 digits starting with 04
+      const digits = digitsOnly(trimmed);
+      if (digits.length === 10 && digits.startsWith('04')) {
+        return digits;
+      }
+      return '';
+    }
+  }
+
+  // Validate Australian mobile number (supports 0404... and +61404...)
+  function isValidAuMobile(raw) {
+    if (!raw) return false;
+    if (!isAllowedMobileChars(raw)) return false;
     
-    // Ensure no invalid characters (only digits, spaces, +, -, parentheses)
-    if (!/^[\d\s+\-()]+$/.test(cleaned)) return false;
-    
-    // If starts with +, must be +61
-    if (cleaned.startsWith('+') && !cleaned.startsWith('+61')) return false;
-    
-    return true;
+    const stored = normaliseMobileForStorage(raw);
+    return stored !== '';
   }
 
   // Validate Australian landline number
@@ -87,13 +115,95 @@
     });
   }
 
+  // Format AU mobile for display (0404 096 768 or +61 404 096 768)
+  function formatAuMobileDisplay(stored) {
+    if (!stored) return '';
+    
+    // Handle +61 format
+    if (stored.startsWith('+61')) {
+      const digitsAfter61 = stored.substring(3);
+      if (digitsAfter61.length === 9) {
+        return `+61 ${digitsAfter61.slice(0,3)} ${digitsAfter61.slice(3,6)} ${digitsAfter61.slice(6,9)}`;
+      }
+      return stored;
+    }
+    
+    // Handle local 04 format
+    const clean = digitsOnly(stored);
+    if (clean.length === 10 && clean.startsWith('04')) {
+      return `${clean.slice(0,4)} ${clean.slice(4,7)} ${clean.slice(7,10)}`;
+    }
+    
+    return stored;
+  }
+
+  // Format AU phone (mobile or landline) for display
+  function formatAuPhoneDisplay(stored) {
+    if (!stored) return '';
+    
+    // If it's a mobile, use mobile formatter
+    if (stored.startsWith('+61') || (stored.startsWith('04') && digitsOnly(stored).length === 10)) {
+      return formatAuMobileDisplay(stored);
+    }
+    
+    const digits = digitsOnly(stored);
+    
+    // 10-digit landline: (0X) XXXX XXXX
+    if (digits.length === 10 && /^0[2378]/.test(digits)) {
+      return `(${digits.slice(0,2)}) ${digits.slice(2,6)} ${digits.slice(6,10)}`;
+    }
+    
+    // 8-digit local landline: XXXX XXXX
+    if (digits.length === 8) {
+      return `${digits.slice(0,4)} ${digits.slice(4,8)}`;
+    }
+    
+    return stored;
+  }
+
+  // Normalise phone (mobile or landline) for storage
+  function normalisePhoneForStorage(raw) {
+    if (!raw) return '';
+    const trimmed = raw.trim();
+    
+    // Check allowed characters
+    const str = trimmed.toString();
+    const plusIndex = str.indexOf('+');
+    if (plusIndex > 0) return '';
+    if (!/^[0-9()+\s-]*$/.test(str)) return '';
+    
+    // Try mobile first
+    const mobileStored = normaliseMobileForStorage(trimmed);
+    if (mobileStored) return mobileStored;
+    
+    // Try landline
+    const digits = digitsOnly(trimmed);
+    
+    // 10-digit landline starting with 02/03/07/08
+    if (digits.length === 10 && /^0[2378]/.test(digits)) {
+      return digits;
+    }
+    
+    // 8-digit local landline
+    if (digits.length === 8) {
+      return digits;
+    }
+    
+    return '';
+  }
+
   // Export to window for global access
   window.Validation = {
     digitsOnly: digitsOnly,
+    isAllowedMobileChars: isAllowedMobileChars,
+    normaliseMobileForStorage: normaliseMobileForStorage,
+    normalisePhoneForStorage: normalisePhoneForStorage,
     isValidAuMobile: isValidAuMobile,
     isValidAuLandline: isValidAuLandline,
     isValidAuPhone: isValidAuPhone,
     isValidEmail: isValidEmail,
-    sanitizePhoneInput: sanitizePhoneInput
+    sanitizePhoneInput: sanitizePhoneInput,
+    formatAuMobileDisplay: formatAuMobileDisplay,
+    formatAuPhoneDisplay: formatAuPhoneDisplay
   };
 })();

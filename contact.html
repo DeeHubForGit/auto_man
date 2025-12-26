@@ -8,6 +8,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="assets/theme.css" rel="stylesheet" />
   <script src="assets/config.js"></script>
+  <script src="assets/js/validation.js"></script>
   <script src="assets/include.js" defer></script>
 </head>
 <body>
@@ -184,49 +185,6 @@
   <div data-include="partials/footer.html"></div>
 
   <script>
-    // Phone validators (same as portal-details)
-    function normaliseDigits(v){ return (v||'').replace(/\D+/g,''); }
-    
-    function isValidAuMobile(v){
-      if (!v) return false;
-      const cleaned = v.trim();
-      const digits = normaliseDigits(cleaned);
-      
-      // Must be exactly 10 digits starting with 04, or 11 digits starting with 614
-      if (!/^(04\d{8}|614\d{8})$/.test(digits)) return false;
-      
-      // Ensure no invalid characters (only digits, spaces, +, -, parentheses)
-      if (!/^[\d\s+\-()]+$/.test(cleaned)) return false;
-      
-      // If starts with +, must be +61
-      if (cleaned.startsWith('+') && !cleaned.startsWith('+61')) return false;
-      
-      return true;
-    }
-    
-    function isValidAuLandline(v){
-      if (!v) return false;
-      const cleaned = v.trim();
-      const digits = normaliseDigits(cleaned);
-      
-      // Accept: 8-digit local, 10-digit national (0X), or 11-digit international (61X)
-      if (!/^(\d{8}|0[2-9]\d{8}|61[2-9]\d{8})$/.test(digits)) return false;
-      
-      // Ensure no invalid characters (only digits, spaces, +, -, parentheses)
-      if (!/^[\d\s+\-()]+$/.test(cleaned)) return false;
-      
-      // If starts with +, must be +61
-      if (cleaned.startsWith('+') && !cleaned.startsWith('+61')) return false;
-      
-      return true;
-    }
-    
-    // Accept either mobile or landline
-    function isValidAuPhone(v){
-      if (!v) return true; // Optional field
-      return isValidAuMobile(v) || isValidAuLandline(v);
-    }
-    
     // Helper functions for showing/hiding errors
     function showError(inputId, errorId, message) {
       const input = document.getElementById(inputId);
@@ -246,31 +204,6 @@
         error.textContent = '';
         error.classList.add('hidden');
       }
-    }
-    
-    // Sanitize phone input
-    function sanitizePhoneInput(input, errorId) {
-      input.addEventListener('input', function() {
-        let val = this.value;
-        
-        // Remove any characters that aren't digits, spaces, +, -, or parentheses
-        val = val.replace(/[^\d\s+\-()]/g, '');
-        
-        // Only allow + at the start
-        const hasPlus = val.startsWith('+');
-        val = val.replace(/\+/g, '');
-        if (hasPlus) val = '+' + val;
-        
-        // Remove trailing special characters
-        val = val.replace(/[\s\-()]+$/, '');
-        
-        this.value = val;
-        
-        // Clear error if value becomes valid or empty
-        if (!val || isValidAuPhone(val)) {
-          clearError(input.id, errorId);
-        }
-      });
     }
     
     // Setup validation
@@ -300,7 +233,7 @@
       const val = this.value.trim();
       if (!val) {
         showError('email', 'emailError', 'Email is required');
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+      } else if (!Validation.isValidEmail(val)) {
         showError('email', 'emailError', 'Enter a valid email address');
       } else {
         clearError('email', 'emailError');
@@ -315,11 +248,11 @@
     
     // Phone validation
     if (phoneInput) {
-      sanitizePhoneInput(phoneInput, 'phoneError');
+      Validation.sanitizePhoneInput(phoneInput, 'phoneError');
       
       phoneInput.addEventListener('blur', function() {
         const val = this.value.trim();
-        if (val && !isValidAuPhone(val)) {
+        if (val && !Validation.isValidAuPhone(val)) {
           showError('phone', 'phoneError', 'Enter a valid Australian mobile (04XX XXX XXX) or landline (0X XXXX XXXX)');
         } else {
           clearError('phone', 'phoneError');
@@ -372,12 +305,12 @@
       if (!email) {
         showError('email', 'emailError', 'Email is required');
         hasError = true;
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      } else if (!Validation.isValidEmail(email)) {
         showError('email', 'emailError', 'Enter a valid email address');
         hasError = true;
       }
       
-      if (phone && !isValidAuPhone(phone)) {
+      if (phone && !Validation.isValidAuPhone(phone)) {
         showError('phone', 'phoneError', 'Enter a valid Australian mobile or landline');
         hasError = true;
       }
@@ -394,7 +327,7 @@
       const formData = {
         name: name,
         email: email,
-        phone: phone ? normaliseDigits(phone) : '', // Strip formatting
+        phone: phone ? Validation.digitsOnly(phone) : '', // Strip formatting
         message: message,
       };
 

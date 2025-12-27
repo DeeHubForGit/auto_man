@@ -23,8 +23,9 @@
   }
   
   // Normalise mobile to canonical storage format (0404096768 or +61404096768)
+  // Returns {ok: boolean, value: string}
   function normaliseMobileForStorage(raw) {
-    if (!raw) return '';
+    if (!raw) return { ok: false, value: '' };
     const trimmed = raw.trim();
     
     if (trimmed.startsWith('+')) {
@@ -33,26 +34,30 @@
       
       // Must be 11 digits starting with 614
       if (digitsAfterPlus.length === 11 && digitsAfterPlus.startsWith('614')) {
-        return '+' + digitsAfterPlus;
+        return { ok: true, value: '+' + digitsAfterPlus };
       }
-      return '';
+      return { ok: false, value: '' };
     } else {
       // Local format: must be 10 digits starting with 04
       const digits = digitsOnly(trimmed);
       if (digits.length === 10 && digits.startsWith('04')) {
-        return digits;
+        return { ok: true, value: digits };
       }
-      return '';
+      return { ok: false, value: '' };
     }
   }
+  
+  // Alias for consistency with naming convention
+  const normaliseAuMobileForStorage = normaliseMobileForStorage;
+  const formatAuMobileForDisplay = formatAuMobileDisplay;
 
   // Validate Australian mobile number (supports 0404... and +61404...)
   function isValidAuMobile(raw) {
     if (!raw) return false;
     if (!isAllowedMobileChars(raw)) return false;
     
-    const stored = normaliseMobileForStorage(raw);
-    return stored !== '';
+    const result = normaliseMobileForStorage(raw);
+    return result.ok;
   }
 
   // Validate Australian landline number
@@ -90,16 +95,16 @@
     input.addEventListener('input', function() {
       let val = this.value;
       
-      // Remove any characters that aren't digits, spaces, +, -, or parentheses
-      val = val.replace(/[^\d\s+\-()]/g, '');
+      // Remove any characters that aren't digits, spaces, +, or parentheses (no hyphens)
+      val = val.replace(/[^\d\s+()]/g, '');
       
       // Only allow + at the start
       const hasPlus = val.startsWith('+');
       val = val.replace(/\+/g, '');
       if (hasPlus) val = '+' + val;
       
-      // Remove trailing special characters
-      val = val.replace(/[\s\-()]+$/, '');
+      // Remove trailing brackets only (keep spaces for typing)
+      val = val.replace(/[()]+$/, '');
       
       this.value = val;
       
@@ -173,8 +178,8 @@
     if (!/^[0-9()+\s-]*$/.test(str)) return '';
     
     // Try mobile first
-    const mobileStored = normaliseMobileForStorage(trimmed);
-    if (mobileStored) return mobileStored;
+    const mobileResult = normaliseMobileForStorage(trimmed);
+    if (mobileResult.ok) return mobileResult.value;
     
     // Try landline
     const digits = digitsOnly(trimmed);
@@ -197,6 +202,7 @@
     digitsOnly: digitsOnly,
     isAllowedMobileChars: isAllowedMobileChars,
     normaliseMobileForStorage: normaliseMobileForStorage,
+    normaliseAuMobileForStorage: normaliseAuMobileForStorage,
     normalisePhoneForStorage: normalisePhoneForStorage,
     isValidAuMobile: isValidAuMobile,
     isValidAuLandline: isValidAuLandline,
@@ -204,6 +210,7 @@
     isValidEmail: isValidEmail,
     sanitizePhoneInput: sanitizePhoneInput,
     formatAuMobileDisplay: formatAuMobileDisplay,
+    formatAuMobileForDisplay: formatAuMobileForDisplay,
     formatAuPhoneDisplay: formatAuPhoneDisplay
   };
 })();

@@ -886,6 +886,11 @@
         return '';
       }
       
+      // Format mobile for display
+      const mobileDisplay = window.Validation?.formatAuMobileDisplay
+        ? window.Validation.formatAuMobileDisplay(booking.mobile || '')
+        : (booking.mobile || '');
+      
       const startTime = new Date(booking.start_time);
       const endTime = new Date(booking.end_time);
       const now = new Date();
@@ -1025,7 +1030,7 @@
                       </div>
                       <div id="mobile-error-${booking.id}" class="text-xs text-red-600 mt-1 ${booking.is_mobile_valid === false || !booking.mobile || booking.mobile.trim() === '' ? '' : 'hidden'}">${!booking.mobile || booking.mobile.trim() === '' ? 'Mobile number is required' : 'Invalid mobile format - please update'}</div>
                     ` : ` 
-                      <span class="${booking.is_mobile_valid === false ? 'text-red-600 font-medium' : 'text-gray-900'} break-words">${booking.mobile || 'No mobile number'}</span>
+                      <span class="${booking.is_mobile_valid === false ? 'text-red-600 font-medium' : 'text-gray-900'} break-words">${mobileDisplay || 'No mobile number'}</span>
                       ${booking.is_mobile_valid === false ? `
                         <div class="text-xs text-red-600 mt-1">Invalid mobile format</div>
                       ` : ''}
@@ -1248,20 +1253,6 @@
     // ===== END BOOKINGS MANAGEMENT =====
 
     // Validation helpers for booking fields
-    function isValidAuMobileBooking(mobile) {
-      if (!mobile) return false;
-
-      const trimmed = mobile.trim();
-
-      // Only allow digits, spaces and optional leading +
-      if (!/^\+?\d[\d\s]*$/.test(trimmed)) {
-        return false;
-      }
-
-      const digits = trimmed.replace(/\D+/g, '');
-      return /^04\d{8}$/.test(digits) || /^614\d{8}$/.test(digits);
-    }
-
     function isValidAddress(address) {
       if (!address) return false;
       const trimmed = address.trim();
@@ -1305,12 +1296,12 @@
         return false;
       }
       
-      // Validate format
-      if (!isValidAuMobileBooking(value)) {
+      // Validate format using centralized validator
+      if (!Validation.isValidAuMobile(value)) {
         inputElement.classList.add('border-red-400', 'text-red-600');
         inputElement.classList.remove('border-gray-300', 'text-gray-900');
         if (errorElement) {
-          errorElement.textContent = 'Enter a valid AU mobile (e.g. 04XX XXX XXX)';
+          errorElement.textContent = 'Enter a valid AU mobile (e.g. 04XX XXX XXX or +61 4XX XXX XXX)';
           errorElement.classList.remove('hidden');
         }
         if (iconElement) iconElement.style.display = 'block';
@@ -1419,7 +1410,19 @@
       
       // Save to database
       try {
-        const updateData = { [fieldName]: newValue || null };
+        // For mobile: normalize if valid, otherwise save raw trimmed value
+        const raw = inputElement.value ?? '';
+        const trimmed = raw.trim();
+        let valueToStore = trimmed;
+        
+        if (fieldName === 'mobile' && window.Validation?.normaliseAuMobileForStorage) {
+          const norm = window.Validation.normaliseAuMobileForStorage(trimmed);
+          if (norm?.ok) {
+            valueToStore = norm.value; // "0404096768" or "+61404096768" (no spaces)
+          }
+        }
+        
+        const updateData = { [fieldName]: valueToStore || null };
         
         // Set validation flags based on actual validity
         if (fieldName === 'mobile') {
@@ -1673,14 +1676,11 @@
         const last  = document.getElementById('lastName')?.value.trim() || '';
         const mobile= document.getElementById('mobile')?.value.trim() || '';
         const ePhone= document.getElementById('emergencyContactPhone')?.value.trim() || '';
-        function digits(v){ return (v||'').replace(/\D+/g,''); }
-        function isValidAuMobile(v){ const d=digits(v); return /^04\d{8}$/.test(d)||/^614\d{8}$/.test(d); }
-        function isValidAuPhone(v){ const d=digits(v); return /^0\d{9}$/.test(d)||/^61\d{9}$/.test(d); }
         let bad = false;
         if (!first) { bad = true; }
         if (!last)  { bad = true; }
-        if (!mobile || !isValidAuMobile(mobile)) { bad = true; }
-        if (ePhone && !isValidAuPhone(ePhone)) { bad = true; }
+        if (!mobile || !Validation.isValidAuMobile(mobile)) { bad = true; }
+        if (ePhone && !Validation.isValidAuPhone(ePhone)) { bad = true; }
         if (bad) { ev.preventDefault(); ev.stopImmediatePropagation(); console.log('Guard blocked submit (fallback validator)'); }
       }, true);
 
@@ -1732,17 +1732,13 @@
           const mobile= document.getElementById('mobile')?.value.trim() || '';
           const ePhone= document.getElementById('emergencyContactPhone')?.value.trim() || '';
 
-          function digits(v){ return (v||'').replace(/\D+/g,''); }
-          function isValidAuMobile(v){ const d=digits(v); return /^04\d{8}$/.test(d)||/^614\d{8}$/.test(d); }
-          function isValidAuPhone(v){ const d=digits(v); return /^0\d{9}$/.test(d)||/^61\d{9}$/.test(d); }
-
           let hasError = false;
           clearAllErrors();
           if (!first) { showFieldError('firstName','firstNameError','First name is required'); hasError = true; }
           if (!last)  { showFieldError('lastName','lastNameError','Last name is required');   hasError = true; }
           if (!mobile) { showFieldError('mobile','mobileError','Mobile number is required'); hasError = true; }
-          else if (!isValidAuMobile(mobile)) { showFieldError('mobile','mobileError','Enter a valid AU mobile (e.g. 04XX XXX XXX)'); hasError = true; }
-          if (ePhone && !isValidAuPhone(ePhone)) { showFieldError('emergencyContactPhone','emergencyContactPhoneError','Enter a valid AU phone number'); hasError = true; }
+          else if (!Validation.isValidAuMobile(mobile)) { showFieldError('mobile','mobileError','Enter a valid AU mobile (e.g. 04XX XXX XXX or +61 4XX XXX XXX)'); hasError = true; }
+          if (ePhone && !Validation.isValidAuPhone(ePhone)) { showFieldError('emergencyContactPhone','emergencyContactPhoneError','Enter a valid AU phone number'); hasError = true; }
 
           if (hasError) { console.log('Validation failed, stopping'); return; }
         }

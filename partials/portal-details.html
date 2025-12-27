@@ -387,7 +387,7 @@
     const mobileRaw = document.getElementById('mobile').value.trim();
     const emergencyPhoneRaw = document.getElementById('emergencyContactPhone').value.trim();
     
-    const storedMobile = Validation.normaliseMobileForStorage(mobileRaw);
+    const storedMobile = Validation.normaliseMobileForStorage(mobileRaw).value || '';
     const storedEmergencyPhone = emergencyPhoneRaw ? Validation.normalisePhoneForStorage(emergencyPhoneRaw) : null;
     
     const formData = {

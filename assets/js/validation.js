@@ -124,34 +124,50 @@
   function formatAuMobileDisplay(stored) {
     if (!stored) return '';
     
+    // Handle {ok, value} object from normaliseAuMobileForStorage
+    if (typeof stored === 'object' && stored.value !== undefined) {
+      stored = stored.value;
+    }
+    
+    // Ensure stored is a string
+    const str = String(stored);
+    
     // Handle +61 format
-    if (stored.startsWith('+61')) {
-      const digitsAfter61 = stored.substring(3);
+    if (str.startsWith('+61')) {
+      const digitsAfter61 = str.substring(3);
       if (digitsAfter61.length === 9) {
         return `+61 ${digitsAfter61.slice(0,3)} ${digitsAfter61.slice(3,6)} ${digitsAfter61.slice(6,9)}`;
       }
-      return stored;
+      return str;
     }
     
     // Handle local 04 format
-    const clean = digitsOnly(stored);
+    const clean = digitsOnly(str);
     if (clean.length === 10 && clean.startsWith('04')) {
       return `${clean.slice(0,4)} ${clean.slice(4,7)} ${clean.slice(7,10)}`;
     }
     
-    return stored;
+    return str;
   }
 
   // Format AU phone (mobile or landline) for display
   function formatAuPhoneDisplay(stored) {
     if (!stored) return '';
     
-    // If it's a mobile, use mobile formatter
-    if (stored.startsWith('+61') || (stored.startsWith('04') && digitsOnly(stored).length === 10)) {
-      return formatAuMobileDisplay(stored);
+    // Handle {ok, value} object from normaliseAuMobileForStorage
+    if (typeof stored === 'object' && stored.value !== undefined) {
+      stored = stored.value;
     }
     
-    const digits = digitsOnly(stored);
+    // Ensure stored is a string
+    const str = String(stored);
+    
+    // If it's a mobile, use mobile formatter
+    if (str.startsWith('+61') || (str.startsWith('04') && digitsOnly(str).length === 10)) {
+      return formatAuMobileDisplay(str);
+    }
+    
+    const digits = digitsOnly(str);
     
     // 10-digit landline: (0X) XXXX XXXX
     if (digits.length === 10 && /^0[2378]/.test(digits)) {

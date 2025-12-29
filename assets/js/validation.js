@@ -213,6 +213,106 @@
     return '';
   }
 
+  // Maps backend issue codes to human-friendly messages for the client portal
+  const PICKUP_LOCATION_ISSUE_MESSAGES = {
+    partial_match:
+      'We found a similar address but it is not an exact match. Please check the street number and suburb.',
+    street_mismatch:
+      'We could not match this street or suffix (road, drive, etc). Please check the spelling of the street name or suffix.',
+    suburb_mismatch:
+      'We matched the street, but the suburb looks different. Please check the suburb.',
+    not_found:
+      'We could not find this address in Google Maps. Please check the number, street and suburb.',
+    test_data:
+      'This looks like a test address. Please enter your real pickup address.',
+    unknown:
+      'Please provide a valid address so we can find you for your lesson.',
+  };
+
+  // Get human-friendly message from backend issue code
+  function getPickupLocationIssueMessage(issueCode) {
+    if (!issueCode) return PICKUP_LOCATION_ISSUE_MESSAGES.unknown;
+    return PICKUP_LOCATION_ISSUE_MESSAGES[issueCode] || PICKUP_LOCATION_ISSUE_MESSAGES.unknown;
+  }
+
+  // Check if value is blank or "none" (valid user choices)
+  function isBlankOrNone(value) {
+    if (!value) return true;
+    const trimmed = value.trim().toLowerCase();
+    return trimmed === '' || trimmed === 'none';
+  }
+
+  // Lightweight Australian address validation
+  function isProbablyValidAuAddress(value) {
+    if (isBlankOrNone(value)) return true;
+    
+    const trimmed = value.trim();
+    if (trimmed.length < 8) return false;
+    
+    const hasDigit = /\d/.test(trimmed);
+    const hasLetter = /[a-zA-Z]/.test(trimmed);
+    
+    if (!hasDigit || !hasLetter) return false;
+    
+    return true;
+  }
+
+  // Full address validation via Supabase Edge Function (async)
+  async function validateAuAddressAsync(value) {
+    if (isBlankOrNone(value)) {
+      return { valid: true, skipped: true };
+    }
+
+    if (!window.supabaseClient || !window.supabaseClient.functions) {
+      return {
+        valid: isProbablyValidAuAddress(value),
+        fallback: true,
+        reason: 'Supabase client not available'
+      };
+    }
+
+    try {
+      const { data, error } = await window.supabaseClient.functions.invoke('validate-bookings', {
+        body: {
+          validate_address_only: true,
+          address: value
+        }
+      });
+
+      if (error) {
+        return {
+          valid: isProbablyValidAuAddress(value),
+          fallback: true,
+          reason: error.message || 'Address validation failed'
+        };
+      }
+
+      if (data && data.validation_result) {
+        const result = data.validation_result;
+        const valid = result.isValid === true;
+
+        return {
+          valid: valid,
+          reason: result.issue && !valid ? result.issue : undefined,
+          formatted: result.suggestion ? result.suggestion : undefined,
+          raw: data
+        };
+      }
+
+      return {
+        valid: isProbablyValidAuAddress(value),
+        fallback: true,
+        reason: 'No validation result from server'
+      };
+    } catch (e) {
+      return {
+        valid: isProbablyValidAuAddress(value),
+        fallback: true,
+        reason: e && e.message ? e.message : 'Address validation error'
+      };
+    }
+  }
+
   // Export to window for global access
   window.Validation = {
     digitsOnly: digitsOnly,
@@ -227,6 +327,10 @@
     sanitizePhoneInput: sanitizePhoneInput,
     formatAuMobileDisplay: formatAuMobileDisplay,
     formatAuMobileForDisplay: formatAuMobileForDisplay,
-    formatAuPhoneDisplay: formatAuPhoneDisplay
+    formatAuPhoneDisplay: formatAuPhoneDisplay,
+    isBlankOrNone: isBlankOrNone,
+    isProbablyValidAuAddress: isProbablyValidAuAddress,
+    validateAuAddressAsync: validateAuAddressAsync,
+    getPickupLocationIssueMessage: getPickupLocationIssueMessage
   };
 })();

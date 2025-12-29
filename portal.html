@@ -736,26 +736,7 @@
       return '';
     }
 
-    // Maps backend issue codes to human-friendly messages for the client portal
-    const PICKUP_LOCATION_ISSUE_MESSAGES = {
-      partial_match:
-        'We found a similar address but it is not an exact match. Please check the street number and suburb.',
-      street_mismatch:
-        'We could not match this street or suffix (road, drive, etc). Please check the spelling of the street name or suffix.',
-      suburb_mismatch:
-        'We matched the street, but the suburb looks different. Please check the suburb.',
-      not_found:
-        'We could not find this address in Google Maps. Please check the number, street and suburb.',
-      test_data:
-        'This looks like a test address. Please enter your real pickup address.',
-      unknown:
-        'Please provide a valid address so we can find you for your lesson.',
-    };
-
-    function getPickupIssueMessage(issueCode) {
-      if (!issueCode) return null;
-      return PICKUP_LOCATION_ISSUE_MESSAGES[issueCode] || PICKUP_LOCATION_ISSUE_MESSAGES.unknown;
-    }
+    // Using centralized validation from assets/js/validation.js
 
     function applyPickupSuggestion(bookingId, suggestion) {
         // Deprecated - handled by initPickupValidationUI
@@ -812,7 +793,9 @@
       if (!pickupInput || !issueEl || !suggestionPanel || !suggestionTextEl) return;
 
       // ----- issue message -----
-      const issueMessage = getPickupIssueMessage(booking.pickup_location_issue);
+      const issueMessage = window.Validation?.getPickupLocationIssueMessage
+        ? window.Validation.getPickupLocationIssueMessage(booking.pickup_location_issue)
+        : null;
       if (booking.is_pickup_location_valid === false && issueMessage) {
         issueEl.textContent = issueMessage;
       } else {
@@ -846,12 +829,17 @@
       pickupInput.addEventListener('input', () => {
         const newValue = pickupInput.value.trim();
         
+        // Use centralized validation
+        const isValid = window.Validation?.isProbablyValidAuAddress
+          ? window.Validation.isProbablyValidAuAddress(newValue)
+          : true;
+        
         // Basic local validation while typing (optional but nice)
         if (!newValue) {
           // Empty – show "required" styling but DO NOT call backend.
           pickupInput.classList.add('border-red-400', 'text-red-600');
           pickupInput.classList.remove('border-gray-300', 'text-gray-900');
-        } else if (!isValidAddress(newValue)) {
+        } else if (!isValid) {
           // Looks dodgy – keep red border, still no backend call yet.
           pickupInput.classList.add('border-red-400', 'text-red-600');
           pickupInput.classList.remove('border-gray-300', 'text-gray-900');
@@ -922,8 +910,10 @@
       let statusBadge = renderStatusChip(booking.status);
       let cancelButton = '';
       
-      // Determine pickup error message
-      const issueMessage = getPickupIssueMessage(booking.pickup_location_issue);
+      // Determine pickup error message using centralized validation
+      const issueMessage = window.Validation?.getPickupLocationIssueMessage
+        ? window.Validation.getPickupLocationIssueMessage(booking.pickup_location_issue)
+        : null;
       let pickupHelpText = '';
       if (booking.is_pickup_location_valid === false) {
           if (!booking.pickup_location || booking.pickup_location.trim() === '') {
@@ -1252,31 +1242,7 @@
     }
     // ===== END BOOKINGS MANAGEMENT =====
 
-    // Validation helpers for booking fields
-    function isValidAddress(address) {
-      if (!address) return false;
-      const trimmed = address.trim();
-      if (trimmed.length < 5) return false;
-      if (!/[a-zA-Z]{2,}/.test(trimmed)) return false;
-      
-      // Only reject obvious placeholder data (at start or as whole value)
-      // Allow "Test Street" etc as real street names
-      const lowerAddress = trimmed.toLowerCase();
-      const invalidPatterns = [
-        /^test$/i,           // Just "test"
-        /^asdf/i,            // Starts with asdf
-        /^qwerty/i,          // Starts with qwerty
-        /^xxx/i,             // Starts with xxx
-        /^temp$/i,           // Just "temp"
-        /^sample$/i,         // Just "sample"
-        /^n\/?a$/i,          // n/a or na
-        /^tbd$/i,            // tbd
-        /^none$/i            // none
-      ];
-      
-      if (invalidPatterns.some(pattern => pattern.test(trimmed))) return false;
-      return true;
-    }
+    // Using centralized validation from assets/js/validation.js
 
     function validateBookingMobile(inputElement) {
       const value = inputElement.value.trim();
@@ -1316,45 +1282,10 @@
       return true;
     }
 
-    function validateBookingAddress(inputElement) {
-      const value = inputElement.value.trim();
-      const bookingId = inputElement.dataset.bookingId;
-      const errorElement = document.getElementById(`pickup-error-${bookingId}`);
-      const iconElement = inputElement.parentElement.querySelector('svg[fill="#dc2626"]');
-      
-      // Pickup location is required - show error if empty
-      if (!value) {
-        inputElement.classList.add('border-red-400', 'text-red-600');
-        inputElement.classList.remove('border-gray-300', 'text-gray-900');
-        if (errorElement) {
-          errorElement.textContent = 'Pickup address is required';
-          errorElement.classList.remove('hidden');
-        }
-        if (iconElement) iconElement.style.display = 'block';
-        return false;
-      }
-      
-      // Validate format
-      if (!isValidAddress(value)) {
-        inputElement.classList.add('border-red-400', 'text-red-600');
-        inputElement.classList.remove('border-gray-300', 'text-gray-900');
-        if (errorElement) {
-          errorElement.textContent = 'Please provide a valid address (minimum 5 characters)';
-          errorElement.classList.remove('hidden');
-        }
-        if (iconElement) iconElement.style.display = 'block';
-        return false;
-      }
-      
-      // Valid
-      inputElement.classList.remove('border-red-400', 'text-red-600');
-      inputElement.classList.add('border-gray-300', 'text-gray-900');
-      if (errorElement) errorElement.classList.add('hidden');
-      if (iconElement) iconElement.style.display = 'none';
-      return true;
-    }
+    // Using centralized validation from assets/js/validation.js
+    // The actual validation is now handled by initPickupValidationUI
     window.validateBookingMobile = validateBookingMobile;
-    window.validateBookingAddress = validateBookingAddress;
+    // validateBookingAddress is now handled by initPickupValidationUI
 
     // Save booking field (inline editing)
     async function saveBookingField(inputElement) {
@@ -1402,7 +1333,7 @@
       if (fieldName === 'mobile') {
         isValid = validateBookingMobile(inputElement);
       } else if (fieldName === 'pickup_location') {
-        isValid = validateBookingAddress(inputElement);
+        isValid = await validateBookingAddress(inputElement);
       }
       
       // Always save changes (auto-save), even if validation shows errors

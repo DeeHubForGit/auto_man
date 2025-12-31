@@ -613,7 +613,7 @@
       </div>
 
 
-      <form id="appointment-form" class="admin-modal-body">
+      <form id="appointment-form" class="admin-modal-body" novalidate>
         <!-- Appointment Type -->
         <div class="form-group">
           <label>Type<span class="text-red-500">*</span></label>
@@ -992,6 +992,12 @@
   // Track changes to form inputs and clear errors on input
   apptForm.addEventListener("input", (e) => {
     formHasChanges = true;
+    
+    // Clear browser validation state
+    if (e.target.setCustomValidity) {
+      e.target.setCustomValidity('');
+    }
+    
     // Clear error for the field being edited
     if (e.target.id) {
       clearApptError(e.target.id);
@@ -1220,148 +1226,58 @@
     }
   });
 
-  // Helper function to validate address format (matches validate-bookings Edge Function)
+  // Helper function to validate address format (delegates to validation.js)
   function isValidAddress(addr) {
-    if (!addr || addr.trim().length < 5) return false;
-    
-    const trimmed = addr.trim();
-    
-    // Must have at least 2 consecutive letters
-    if (!/[a-zA-Z]{2,}/.test(trimmed)) return false;
-    
-    // Check for obvious test data
-    const testPatterns = [
-      /^test$/i,
-      /^asdf/i,
-      /^qwerty/i,
-      /^xxx/i,
-      /^temp$/i,
-      /^sample$/i,
-      /^n\/?a$/i,
-      /^tbd$/i,
-      /^none$/i,
-      /^dsffdsa$/i  // Matches the user's screenshot
-    ];
-    
-    if (testPatterns.some(pattern => pattern.test(trimmed))) {
-      return false;
-    }
-    
-    return true;
+    return window.Validation?.isProbablyValidAuAddress?.(addr) ?? false;
   }
 
-  // Enhanced pickup validation with helpful error messages
+  // Enhanced pickup validation with helpful error messages (uses validation.js)
   function validatePickupAddressForBooking(addr) {
     if (!addr || addr.trim() === '') {
       return { valid: false, message: 'Pickup address is required' };
     }
     
-    const trimmed = addr.trim();
+    const isValid = window.Validation?.isProbablyValidAuAddress?.(addr) ?? false;
     
-    if (trimmed.length < 5) {
-      return { valid: false, message: 'Address is too short (minimum 5 characters)' };
-    }
-    
-    if (!/[a-zA-Z]{2,}/.test(trimmed)) {
-      return { valid: false, message: 'Address must contain at least 2 consecutive letters' };
-    }
-    
-    // Check for test data
-    const testPatterns = [
-      { pattern: /^test$/i, name: 'test' },
-      { pattern: /^asdf/i, name: 'test keyboard input' },
-      { pattern: /^qwerty/i, name: 'test keyboard input' },
-      { pattern: /^xxx/i, name: 'placeholder' },
-      { pattern: /^temp$/i, name: 'temporary' },
-      { pattern: /^sample$/i, name: 'sample' },
-      { pattern: /^n\/?a$/i, name: 'N/A' },
-      { pattern: /^tbd$/i, name: 'TBD' },
-      { pattern: /^none$/i, name: 'none' },
-      { pattern: /^dsffdsa$/i, name: 'test' },
-      { pattern: /^pickup\s*(location|address)?$/i, name: 'placeholder' },
-      { pattern: /^address$/i, name: 'placeholder' },
-      { pattern: /^location$/i, name: 'placeholder' }
-    ];
-    
-    for (const { pattern, name } of testPatterns) {
-      if (pattern.test(trimmed)) {
-        return { valid: false, message: `This looks like ${name} data. Please enter a real pickup address.` };
-      }
+    if (!isValid) {
+      return { valid: false, message: 'Please provide a valid address (minimum 5 characters)' };
     }
     
     return { valid: true, message: null };
   }
 
-  // Validate address with Google Maps via Edge Function (like Admin Bookings)
+  // Validate address with Google Maps via Edge Function (delegates to validation.js)
   async function validateAddressWithBackend(address) {
-    try {
-      // Call the validate-bookings Edge Function with address-only mode
-      const { data, error } = await window.supabaseClient.functions.invoke('validate-bookings', {
-        body: { 
-          validate_address_only: true,
-          address: address 
-        }
-      });
-      
-      if (error) {
-        console.error('[admin-calendar] Address validation error:', error);
-        return { 
-          valid: false, 
-          message: 'Could not validate address. Please check your internet connection.',
-          issue: 'network_error'
+    const result = await window.Validation.validateAuAddressAsync(address, window.supabaseClient);
+
+    const isValid = !!result?.valid;
+    const suggestion = result?.formatted || null;
+
+    // If Google can resolve it but returns a different formatted address,
+    // require the admin to accept the suggestion (treat as not valid yet).
+    if (isValid && suggestion) {
+      const typed = (address || '').trim().replace(/\s+/g, ' ').toLowerCase();
+      const formatted = (suggestion || '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+      if (typed !== formatted) {
+        return {
+          valid: false,
+          message: 'Please tap the suggested address to use the correct spelling.',
+          issue: 'use_suggested_address',
+          suggestion
         };
       }
-      
-      if (data && data.validation_result) {
-        const result = data.validation_result;
-        
-        if (result.isValid) {
-          return { valid: true, message: null };
-        } else {
-          // Map issue codes to user-friendly messages (matching Admin Bookings)
-          const issueMessages = {
-            'partial_match': 'We found a similar address but it is not an exact match. Please check the street number and suburb.',
-            'street_mismatch': 'We could not match this street or suffix (road, drive, etc). Please check the spelling.',
-            'suburb_mismatch': 'We matched the street, but the suburb looks different. Please check the suburb.',
-            'street_number_mismatch': 'The street number doesn\'t match. Please check the number.',
-            'not_found': 'We could not find this address in Google Maps. Please check the number, street and suburb.',
-            'google_no_result': 'Address not found on Google Maps. Please enter a valid address.',
-            'too_short': 'Address is too short. Please enter a complete address.',
-            'not_enough_letters': 'Address must contain more letters.',
-            'test_data': 'This looks like test data. Please enter a real address.',
-            'empty': 'Address is required.',
-            'unknown': 'Please provide a valid address.'
-          };
-          
-          const message = issueMessages[result.issue] || 'Please provide a valid address.';
-          
-          return {
-            valid: false,
-            message: message,
-            issue: result.issue,
-            suggestion: result.suggestion
-          };
-        }
-      }
-      
-      // If no result from backend, treat as validation failure (fail secure)
-      console.error('[admin-calendar] No validation_result in response, treating as invalid');
-      return { 
-        valid: false, 
-        message: 'Could not validate address with Google Maps. Please check the address and try again.',
-        issue: 'no_result'
-      };
-      
-    } catch (err) {
-      console.error('[admin-calendar] Address validation exception:', err);
-      return { 
-        valid: false, 
-        message: 'Could not validate address. Please try again.',
-        issue: 'exception'
-      };
     }
-  }
 
+    // Convert validation.js format to our format
+    return {
+      valid: isValid,
+      message: isValid ? null : (window.Validation.getPickupLocationIssueMessage(result?.reason) || 'Please provide a valid address.'),
+      issue: result?.reason || 'unknown',
+      suggestion
+    };
+  }
+  
   // Helper function to convert 24-hour time to 12-hour format with AM/PM
   function convert24To12Hour(time24) {
     const [hours, minutes] = time24.split(':').map(Number);
@@ -1603,12 +1519,18 @@
         showApptError("newClientLastName", "Last name is required");
         hasError = true;
       }
-      if (!email || !email.includes('@')) {
-        showApptError("newClientEmail", "Valid email is required");
+      if (!email) {
+        showApptError("newClientEmail", "Email is required");
+        hasError = true;
+      } else if (!window.Validation?.isValidEmail?.(email)) {
+        showApptError("newClientEmail", "Please enter a valid email address");
         hasError = true;
       }
       if (!mobile) {
         showApptError("newClientMobile", "Mobile is required");
+        hasError = true;
+      } else if (!window.Validation?.isValidAuMobile?.(mobile)) {
+        showApptError("newClientMobile", "Enter a valid AU mobile (e.g. 04XX XXX XXX or +61 4XX XXX XXX)");
         hasError = true;
       }
     }

@@ -226,9 +226,9 @@
     test_data:
       'This looks like a test address. Please enter your real pickup address.',
     unknown:
-      'Please provide a valid address so we can find you for your lesson.',
+      'Please provide a valid pickup address.',
   };
-
+  
   // Get human-friendly message from backend issue code
   function getPickupLocationIssueMessage(issueCode) {
     if (!issueCode) return PICKUP_LOCATION_ISSUE_MESSAGES.unknown;

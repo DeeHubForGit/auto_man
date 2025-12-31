@@ -97,43 +97,13 @@
   let mobileDebounceTimers = {};
   let pickupDebounceTimers = {};
 
-  // Helper for mobile validation (AU regex)
-  function isValidAuMobile(mobile) {
-    if (!mobile) return false;
-    const cleaned = mobile.replace(/\s+/g, '');
-    return /^(\+61|0)[4-5]\d{8}$/.test(cleaned);
-  }
-
-  // Helper for address validation (from portal)
-  function isValidAddress(address) {
-    if (!address) return false;
-    const trimmed = address.trim();
-    return trimmed.length >= 5;
-  }
-
-  // Pickup location issue messages (from portal)
-  const PICKUP_LOCATION_ISSUE_MESSAGES = {
-    partial_match: 'We found a similar address but it is not an exact match. Please check the street number and suburb.',
-    street_mismatch: 'We could not match this street or suffix (road, drive, etc). Please check the spelling of the street name or suffix.',
-    suburb_mismatch: 'We matched the street, but the suburb looks different. Please check the suburb.',
-    not_found: 'We could not find this address in Google Maps. Please check the number, street and suburb.',
-    google_no_result: 'Address not found on Google Maps. Please check the address.',
-    empty: 'Address is required.',
-    test_data: 'This looks like a test address. Please enter a real pickup address.',
-    unknown: 'Please provide a valid address so we can find you for your lesson.'
-  };
-
-  function getPickupIssueMessage(issueCode) {
-    if (!issueCode) return null;
-    return PICKUP_LOCATION_ISSUE_MESSAGES[issueCode] || PICKUP_LOCATION_ISSUE_MESSAGES.unknown;
-  }
-
   // Validate mobile with debounce (pause typing detection)
   function validateAdminMobile(inputElement, bookingId) {
     
     const value = inputElement.value.trim();
     const row = document.getElementById(`mobile-row-${bookingId}`);
     const icon = document.getElementById(`mobile-error-icon-${bookingId}`);
+    const errorElement = document.getElementById(`mobile-error-${bookingId}`);
     const checkbox = row?.querySelector('input[type="checkbox"]');
 
     // ----- local styling (immediate feedback) -----
@@ -142,19 +112,28 @@
       inputElement.classList.add('border-red-400', 'text-red-600');
       inputElement.classList.remove('border-gray-300', 'text-gray-900');
       if (icon) icon.classList.remove('hidden');
+      if (errorElement) {
+        errorElement.textContent = 'Enter a valid AU mobile (e.g. 04XX XXX XXX or +61 4XX XXX XXX)';
+        errorElement.classList.remove('hidden');
+      }
       if (checkbox) checkbox.checked = false;
     } else {
-      // Check format
-      const isValid = isValidAuMobile(value);
+      // Check format using validation.js
+      const isValid = window.Validation?.isValidAuMobile?.(value) ?? false;
       if (isValid) {
         inputElement.classList.remove('border-red-400', 'text-red-600');
         inputElement.classList.add('border-gray-300', 'text-gray-900');
         if (icon) icon.classList.add('hidden');
+        if (errorElement) errorElement.classList.add('hidden');
         if (checkbox) checkbox.checked = true;
       } else {
         inputElement.classList.add('border-red-400', 'text-red-600');
         inputElement.classList.remove('border-gray-300', 'text-gray-900');
         if (icon) icon.classList.remove('hidden');
+        if (errorElement) {
+          errorElement.textContent = 'Enter a valid AU mobile (e.g. 04XX XXX XXX or +61 4XX XXX XXX)';
+          errorElement.classList.remove('hidden');
+        }
         if (checkbox) checkbox.checked = false;
       }
     }
@@ -198,7 +177,7 @@
     const errorText = document.getElementById(`pickup-error-text-${bookingId}`);
     const checkbox = row?.querySelector('input[type="checkbox"]');
 
-    // ----- local styling (same as before) -----
+    // ----- local styling using validation.js -----
     if (!value) {
       // Empty – show "required" styling
       inputElement.classList.add('border-red-400', 'text-red-600');
@@ -209,8 +188,8 @@
         errorText.classList.remove('hidden');
       }
       if (checkbox) checkbox.checked = false;
-    } else if (!isValidAddress(value)) {
-      // Too short / looks dodgy
+    } else if (!(window.Validation?.isProbablyValidAuAddress?.(value) ?? true)) {
+      // Looks dodgy using validation.js
       inputElement.classList.add('border-red-400', 'text-red-600');
       inputElement.classList.remove('border-gray-300', 'text-gray-900');
       if (icon) icon.classList.remove('hidden');
@@ -385,8 +364,8 @@
     const isMobileInvalid = booking.is_mobile_valid === false;
     const isPickupInvalid = booking.is_pickup_location_valid === false;
     
-    // Pickup Error Text - use issue message mapping
-    const pickupErrorText = getPickupIssueMessage(booking.pickup_location_issue) || 'Address invalid';
+    // Pickup Error Text - use validation.js
+    const pickupErrorText = (window.Validation?.getPickupLocationIssueMessage?.(booking.pickup_location_issue)) || 'Address invalid';
 
     return `
       <div class="booking-card p-3 sm:p-4 mb-4 transition-all duration-200 group" id="booking-card-${booking.id}">
@@ -433,6 +412,9 @@
                     >
                     <span class="text-xs text-gray-700">Valid</span>
                   </label>
+                </div>
+                <div id="mobile-error-${booking.id}" class="text-xs text-red-600 mt-1 ${isMobileInvalid ? '' : 'hidden'}" data-field-error="mobile">
+                  Enter a valid AU mobile (e.g. 04XX XXX XXX or +61 4XX XXX XXX)
                 </div>
               </div>
             </div>
@@ -515,27 +497,51 @@
 
   // Global handlers
   window.updateAdminBookingField = async function(id, field, value) {
-    const updates = { [field]: value };
+    // Store original value for display
+    let valueToStore = value;
+    const updates = {};
     
-    // 1) Mobile: Check if invalid locally
+    // 1) Mobile: Normalize and validate using validation.js
     if (field === 'mobile') {
-      const valid = isValidAuMobile(value);
-      updates.is_mobile_valid = valid ? true : false;
+      const trimmed = (value || '').trim();
+      let valid = false;
+      
+      if (trimmed && window.Validation?.normaliseAuMobileForStorage) {
+        const normalized = window.Validation.normaliseAuMobileForStorage(trimmed);
+        if (normalized?.ok) {
+          valueToStore = normalized.value;
+          valid = true;
+        }
+      }
+      
+      updates.mobile = valueToStore || null;
+      updates.is_mobile_valid = valid;
+      if (!valid) {
+        updates.validation_checked_at = new Date().toISOString();
+      } else {
+        updates.validation_checked_at = null;
+      }
       
       // Visual update immediately
       const row = document.getElementById(`mobile-row-${id}`);
       if (row) {
         const input = row.querySelector('input[type="text"]');
         const icon = document.getElementById(`mobile-error-icon-${id}`);
+        const errorElement = document.getElementById(`mobile-error-${id}`);
         
         if (valid) {
           input.classList.remove('border-red-400', 'text-red-600', 'font-medium', 'bg-red-50');
           input.classList.add('border-gray-300', 'text-gray-900', 'bg-white');
           if (icon) icon.classList.add('hidden');
+          if (errorElement) errorElement.classList.add('hidden');
         } else {
           input.classList.add('border-red-400', 'text-red-600', 'font-medium', 'bg-red-50');
           input.classList.remove('border-gray-300', 'text-gray-900', 'bg-white');
           if (icon) icon.classList.remove('hidden');
+          if (errorElement) {
+            errorElement.textContent = 'Enter a valid AU mobile (e.g. 04XX XXX XXX or +61 4XX XXX XXX)';
+            errorElement.classList.remove('hidden');
+          }
         }
         
         // Update validation checkbox
@@ -546,9 +552,11 @@
 
     // 2) Pickup: Reset validity and trigger backend validation
     if (field === 'pickup_location') {
+      updates.pickup_location = value || null;
       updates.is_pickup_location_valid = null; // Reset to pending
       updates.pickup_location_suggestion = null;
       updates.pickup_location_issue = null;
+      updates.validation_checked_at = null;
     }
     
     const { error } = await window.supabaseClient
@@ -620,9 +628,16 @@
   };
   
   window.applyAdminSuggestion = async function(id, suggestion) {
+      // Reset validation flags and save suggestion
       await window.supabaseClient
           .from('booking')
-          .update({ pickup_location: suggestion, is_pickup_location_valid: true }) // Assume valid if suggestion taken
+          .update({ 
+            pickup_location: suggestion,
+            is_pickup_location_valid: null,
+            pickup_location_issue: null,
+            pickup_location_suggestion: null,
+            validation_checked_at: null
+          })
           .eq('id', id);
       
       // Update Google Calendar event with new pickup location
@@ -633,6 +648,16 @@
         console.log('[admin-bookings] Google Calendar updated with suggested address');
       } catch (e) {
         console.warn('[admin-bookings] Failed to update Google Calendar:', e);
+      }
+      
+      // Trigger server-side validation
+      try {
+        await window.supabaseClient.functions.invoke('validate-bookings', {
+          body: { id: id }
+        });
+        console.log('[admin-bookings] Validation triggered for suggested address');
+      } catch (e) {
+        console.warn('[admin-bookings] Validation trigger failed:', e);
       }
       
       await loadAdminBookings();

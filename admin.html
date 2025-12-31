@@ -8,6 +8,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="assets/theme.css" rel="stylesheet">
   <script src="assets/config.js"></script>
+  <script src="assets/js/validation.js"></script>
   <script src="assets/render-helpers.js" defer></script>
   <script src="assets/include.js" defer></script>
   <script src="assets/js/modal.js"></script>
@@ -368,19 +369,26 @@
         // Count each invalid field separately: mobile + pickup can = 2 invalid fields per booking
         // Count ALL invalid fields regardless of admin checked status (users can invalidate after checking)
         
-        const { data: invalidBookings, error: invalidError } = await window.supabaseClient
+        const { data: allUpcomingBookings, error: invalidError } = await window.supabaseClient
           .from('booking')
-          .select('id, mobile, pickup_location, is_mobile_valid, is_pickup_location_valid, is_admin_checked, start_time')
+          .select('id, mobile, pickup_location, is_mobile_valid, is_pickup_location_valid, status, start_time')
           .eq('is_booking', true)
-          .gte('start_time', today)
-          .or('is_mobile_valid.eq.false,is_pickup_location_valid.eq.false');
+          .gte('start_time', today);
         
-        // Count individual invalid fields
+        // Count individual invalid fields using the same logic as the user's spec
         let invalidCount = 0;
-        if (invalidBookings && invalidBookings.length > 0) {
-          invalidBookings.forEach(b => {
-            if (b.is_mobile_valid === false) invalidCount++;
-            if (b.is_pickup_location_valid === false) invalidCount++;
+        if (allUpcomingBookings && allUpcomingBookings.length > 0) {
+          allUpcomingBookings.forEach(b => {
+            // Only count confirmed bookings
+            if ((b.status || '').toLowerCase() !== 'confirmed') return;
+            
+            // Mobile invalid = +1 (false flag OR blank)
+            const mobileBlank = !b.mobile || b.mobile.trim() === '';
+            if (b.is_mobile_valid === false || mobileBlank) invalidCount++;
+            
+            // Pickup invalid = +1 (false flag OR blank)
+            const pickupBlank = !b.pickup_location || b.pickup_location.trim() === '';
+            if (b.is_pickup_location_valid === false || pickupBlank) invalidCount++;
           });
         }
 

@@ -49,6 +49,16 @@ function stripTrailingCountry(address?: string | null): string | null {
   return address.replace(/,?\s*Australia$/i, '');
 }
 
+// Normalise place name for strict comparison (removes punctuation, collapses spaces)
+function normalisePlaceName(value: string | null): string | null {
+  if (!value) return null;
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')   // remove punctuation
+    .replace(/\s+/g, ' ')         // collapse spaces
+    .trim();
+}
+
 // Normalise common street suffixes so we can compare Street vs Road etc.
 function normaliseStreetType(value: string | null): string | null {
   if (!value) return null;
@@ -209,12 +219,12 @@ async function validateAddressWithGoogle(address: string): Promise<PickupValidat
         // in the address string (handles with or without comma).
         let suburbLooksOk = addressLower.includes(googleLower);
 
-        // If we have a parsed suburb (from a comma), keep the old
-        // lenient comparison as a backup.
+        // If we have a parsed suburb (from a comma), use strict
+        // normalised comparison as a backup.
         if (!suburbLooksOk && inputSuburb) {
-          const inputLower = inputSuburb.toLowerCase();
-          suburbLooksOk =
-            googleLower.includes(inputLower) || inputLower.includes(googleLower);
+          const inputNorm = normalisePlaceName(inputSuburb);
+          const googleNorm = normalisePlaceName(googleSuburb);
+          suburbLooksOk = !!(inputNorm && googleNorm && inputNorm === googleNorm);
         }
 
         if (!suburbLooksOk) {

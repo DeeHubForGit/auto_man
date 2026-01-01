@@ -448,7 +448,12 @@
 
           let invalid = 0;
           if (b.is_mobile_valid === false || !b.mobile || b.mobile.trim() === '') invalid++;
-          if (b.is_pickup_location_valid === false || !b.pickup_location || b.pickup_location.trim() === '') invalid++;
+          
+          // Treat pending pickup validation as invalid
+          const hasPickup = !!(b.pickup_location && b.pickup_location.trim() !== '');
+          const pickupPending = hasPickup && b.is_pickup_location_valid == null; // null or undefined
+          const pickupInvalid = (b.is_pickup_location_valid === false) || !hasPickup || pickupPending;
+          if (pickupInvalid) invalid++;
 
           return count + invalid;
         }, 0);
@@ -457,6 +462,17 @@
     // Shared function to refresh badge and persistent banner
     function refreshUpcomingValidationUI() {
       const invalidCount = getUpcomingInvalidCount(allBookings);
+      
+      // Check if any upcoming confirmed bookings have pending validation
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const hasPending = allBookings.some(b => {
+        if (!b.start_time) return false;
+        const bookingDate = new Date(b.start_time);
+        if (bookingDate < now || b.status === 'cancelled' || b.status?.toLowerCase() !== 'confirmed') return false;
+        const hasPickup = !!(b.pickup_location && b.pickup_location.trim() !== '');
+        return hasPickup && b.is_pickup_location_valid == null;
+      });
 
       // Update nav badge
       const badge = document.getElementById('validationBadge');
@@ -470,7 +486,9 @@
       }
 
       // Update persistent banner
-      if (invalidCount > 0) {
+      if (hasPending) {
+        setMyBookingsTopBanner('validating');
+      } else if (invalidCount > 0) {
         setMyBookingsTopBanner('error', { invalidCount });
       } else {
         setMyBookingsTopBanner('ok');
@@ -688,7 +706,7 @@
         refreshUpcomingValidationUI();
         renderBookings();
       } catch (err) {
-        console.error('Error loading bookings');
+        console.error('Error loading bookings:', err);
         const list = document.getElementById('upcoming-list');
         if (list) {
           list.innerHTML = `
@@ -818,7 +836,27 @@
       }
     }
 
+    async function flushMobileIfDirty(bookingId) {
+      const mobileEl = document.getElementById(`mobile-input-${bookingId}`);
+      if (!mobileEl) return;
+
+      const newVal = (mobileEl.value || '').trim();
+      const origVal = (mobileEl.dataset.original || '').trim();
+
+      if (newVal === origVal) return;
+
+      // Force a save and WAIT for it to finish before we refresh bookings
+      try {
+        await saveBookingField(mobileEl);
+      } catch (e) {
+        console.warn('[portal] flushMobileIfDirty failed', e);
+      }
+    }
+
     async function savePickupLocationAndRevalidate(bookingId, newValue, suggestionPanel, issueEl) {
+      // NEW: ensure mobile is saved first if the user just edited it
+      await flushMobileIfDirty(bookingId);
+
       const { error } = await window.supabaseClient
         .from('booking')
         .update({
@@ -839,9 +877,11 @@
 
         try {
           await window.supabaseClient.functions.invoke('validate-bookings', {
-            body: { id: bookingId }
+            body: { id: bookingId, booking_id: bookingId }
           });
-          loadBookings();
+          console.log('[portal] validate-bookings invoked for booking_id:', bookingId);
+          
+          await loadBookings();
         } catch (e) { console.warn('Validation trigger failed', e); }
       }
     }
@@ -853,6 +893,12 @@
       const suggestionTextEl = cardEl.querySelector('.pickup-suggestion-text');
 
       if (!pickupInput || !issueEl || !suggestionPanel || !suggestionTextEl) return;
+
+      // Force mobile field to blur (and save) when pickup field is focused
+      pickupInput.addEventListener('focus', () => {
+        const mobileEl = document.getElementById(`mobile-input-${booking.id}`);
+        if (mobileEl && document.activeElement === mobileEl) mobileEl.blur();
+      });
 
       // ----- issue message -----
       const issueMessage = window.Validation?.getPickupLocationIssueMessage
@@ -882,9 +928,34 @@
       suggestionPanel.onclick = async () => {
         if (!suggestion) return;
 
+        // Prevent double clicks
+        suggestionPanel.disabled = true;
+
         // Update input immediately
         pickupInput.value = suggestion;
-        savePickupLocationAndRevalidate(booking.id, suggestion, suggestionPanel, issueEl);
+
+        // ✅ Optimistic update so any re-render does NOT revert the UI
+        const idx = allBookings.findIndex(b => b.id === booking.id);
+        if (idx !== -1) {
+          allBookings[idx] = {
+            ...allBookings[idx],
+            pickup_location: suggestion,
+            is_pickup_location_valid: null,
+            pickup_location_issue: null,
+            pickup_location_suggestion: null,
+            validation_checked_at: null,
+          };
+        }
+
+        // Hide suggestion + refresh banner/badge immediately
+        suggestionPanel.classList.add('hidden');
+        refreshUpcomingValidationUI();
+
+        try {
+          await savePickupLocationAndRevalidate(booking.id, suggestion, suggestionPanel, issueEl);
+        } finally {
+          suggestionPanel.disabled = false;
+        }
       };
 
       // When user edits the address manually, also clear validation & re-run
@@ -921,8 +992,11 @@
         
         // Debounce backend update + Google validation
         pickupDebounceTimers[booking.id] = setTimeout(() => {
-          // Only call backend if the value actually changed from what we originally had
-          if (newValue !== (booking.pickup_location || '').trim()) {
+          // Use current booking data, not stale closure
+          const current = allBookings.find(b => b.id === booking.id);
+          const prev = (current?.pickup_location || '').trim();
+
+          if (newValue !== prev) {
             savePickupLocationAndRevalidate(booking.id, newValue, suggestionPanel, issueEl);
           }
         }, 600); // 600ms of no typing
@@ -938,6 +1012,15 @@
 
       // History guard: true for Past/Cancelled tabs
       const isHistoryTab = !isUpcoming;
+      
+      // Only show validation UI on upcoming bookings
+      const showValidation = !!isUpcoming;
+
+      // Pickup pending state for icon display
+      const hasPickup = !!(booking.pickup_location && booking.pickup_location.trim() !== '');
+      const pickupPending = hasPickup && booking.is_pickup_location_valid == null;
+      const pickupShowIcon = showValidation && (!hasPickup || booking.is_pickup_location_valid === false || pickupPending);
+      const pickupIconFill = pickupPending ? '#2563eb' : '#dc2626'; // blue for pending, red for invalid
 
       // Format mobile for display
       const mobileDisplay = window.Validation?.formatAuMobileDisplay
@@ -1079,13 +1162,18 @@
                           placeholder="+61 or 04XX XXX XXX"
                           id="mobile-input-${booking.id}"
                         />
-                        <svg class="w-5 h-5 flex-shrink-0 ${booking.is_mobile_valid === false || !booking.mobile || booking.mobile.trim() === '' ? '' : 'hidden'}" fill="#dc2626" viewBox="0 0 20 20">
+                        <svg class="w-5 h-5 flex-shrink-0 ${showValidation && (booking.is_mobile_valid === false || !booking.mobile || booking.mobile.trim() === '') ? '' : 'hidden'}" fill="#dc2626" viewBox="0 0 20 20">
                           <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
                         </svg>
                       </div>
-                      <div id="mobile-error-${booking.id}" class="text-xs text-red-600 mt-1 ${booking.is_mobile_valid === false || !booking.mobile || booking.mobile.trim() === '' ? '' : 'hidden'}">${!booking.mobile || booking.mobile.trim() === '' ? 'Mobile number is required' : 'Invalid mobile format - please update'}</div>
+                      <div id="mobile-error-${booking.id}" class="text-xs text-red-600 mt-1 ${showValidation && (booking.is_mobile_valid === false || !booking.mobile || booking.mobile.trim() === '') ? '' : 'hidden'}">${!booking.mobile || booking.mobile.trim() === '' ? 'Mobile number is required' : 'Invalid mobile format - please update'}</div>
                     ` : `
-                      <span class="text-gray-900 break-words">${mobileDisplay || 'No mobile number'}</span>
+                      <div class="flex items-center gap-2">
+                        <span class="text-gray-900 break-words">${mobileDisplay || 'No mobile number'}</span>
+                        <svg class="w-5 h-5 flex-shrink-0 ${showValidation && (booking.is_mobile_valid === false || !booking.mobile || booking.mobile.trim() === '') ? '' : 'hidden'}" fill="#dc2626" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
+                      </div>
                     `}
                   </div>
                 </div>
@@ -1103,10 +1191,10 @@
                           <input 
                             type="text" 
                             value="${booking.pickup_location || ''}"
-                            class="pickup-address-input w-full px-2 py-1 text-sm ${booking.is_pickup_location_valid === false || !booking.pickup_location || booking.pickup_location.trim() === '' ? 'text-red-600 border-red-400' : 'text-gray-900 border-gray-300'} border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            class="pickup-address-input w-full px-2 py-1 text-sm ${!booking.pickup_location || booking.pickup_location.trim() === '' ? 'text-red-600 border-red-400' : booking.is_pickup_location_valid === false ? 'text-red-600 border-red-400' : booking.is_pickup_location_valid == null ? 'text-blue-600 border-blue-400' : 'text-gray-900 border-gray-300'} border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="Enter full address"
                           />
-                          <svg class="w-5 h-5 flex-shrink-0 ${booking.is_pickup_location_valid === false || !booking.pickup_location || booking.pickup_location.trim() === '' ? '' : 'hidden'}" fill="#dc2626" viewBox="0 0 20 20">
+                          <svg class="w-5 h-5 flex-shrink-0 ${pickupShowIcon ? '' : 'hidden'}" fill="${pickupIconFill}" viewBox="0 0 20 20">
                             <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
                           </svg>
                         </div>
@@ -1124,7 +1212,12 @@
                         </button>
                       </div>
                     ` : `
-                      <span class="text-gray-900 break-words">${booking.pickup_location || 'No pickup address'}</span>
+                      <div class="flex items-center gap-2">
+                        <span class="text-gray-900 break-words">${booking.pickup_location || 'No pickup address'}</span>
+                        <svg class="w-5 h-5 flex-shrink-0 ${pickupShowIcon ? '' : 'hidden'}" fill="${pickupIconFill}" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
+                      </div>
                     `}
                   </div>
                 </div>
@@ -1383,12 +1476,21 @@
         return;
       }
       
-      // Validate for UI feedback only (don't block save)
+      // Validate fields for local format checking
       let isValid = true;
       if (fieldName === 'mobile') {
-        isValid = validateBookingMobile(inputElement);
+        isValid = window.Validation?.isValidAuMobile
+          ? window.Validation.isValidAuMobile(newValue)
+          : true; // fallback
       } else if (fieldName === 'pickup_location') {
-        isValid = await validateBookingAddress(inputElement);
+        isValid = window.Validation?.isProbablyValidAuAddress
+          ? window.Validation.isProbablyValidAuAddress(newValue)
+          : true; // fallback
+      }
+      
+      // Also run UI validation for mobile (for visual feedback)
+      if (fieldName === 'mobile') {
+        validateBookingMobile(inputElement);
       }
       
       // Always save changes (auto-save), even if validation shows errors
@@ -1456,11 +1558,11 @@
         }
 
         // Trigger server-side validation immediately if we just reset the flags
-        if (fieldName === 'pickup_location' && isValid && newValue) {
+        if (fieldName === 'pickup_location' && newValue) {
           try {
             console.log('Triggering server-side validation...');
             await window.supabaseClient.functions.invoke('validate-bookings', {
-              body: { id: bookingId }
+              body: { id: bookingId, booking_id: bookingId }
             });
           } catch (valErr) {
             console.warn('Validation trigger failed (will be picked up by background job):', valErr);

@@ -5,7 +5,15 @@
       <h2 class="text-2xl font-bold text-gray-900">My Details</h2>
       <p class="text-sm text-gray-600 mt-1">Manage your personal information and preferences</p>
     </div>
-    <div>
+    <div class="flex items-center gap-3">
+      <span
+        id="detailsSaveStatusTop"
+        class="hidden text-sm"
+        style="color: #60a5fa;"
+        aria-live="polite"
+      >
+        Saved
+      </span>
       <button
         type="submit"
         form="clientDetailsForm"
@@ -213,13 +221,21 @@
     </div>
 
     <!-- Action Buttons -->
-    <div class="flex gap-3 pt-6">
+    <div class="flex items-center gap-3 pt-6">
       <button 
         type="submit" 
         class="px-6 py-3 btn-primary rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
       >
         Save
       </button>
+      <span
+        id="detailsSaveStatusBottom"
+        class="hidden text-sm"
+        style="color: #60a5fa;"
+        aria-live="polite"
+      >
+        Saved
+      </span>
     </div>
 
     <p class="text-xs text-gray-500">
@@ -425,7 +441,9 @@
         document.getElementById('emergencyContactPhone').value = Validation.formatAuPhoneDisplay(storedEmergencyPhone);
       }
 
-      Modal.success('Your details have been saved successfully!', 'Details Updated');
+      if (window.showDetailsSavedMessage) {
+        window.showDetailsSavedMessage();
+      }
     } catch (err) {
       console.error('Error saving details:', err);
       Modal.error('Could not save your details. Please try again.', 'Save Failed');

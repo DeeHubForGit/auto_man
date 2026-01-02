@@ -96,6 +96,32 @@
   let adminBookings = [];
   let mobileDebounceTimers = {};
   let pickupDebounceTimers = {};
+  let lastActiveField = null;   // 'pickup' | 'mobile'
+  let lastActiveBookingId = null;
+
+  // Flush pending mobile changes before pickup address update to prevent race condition
+  async function flushAdminMobileIfDirty() {
+    // Cancel any pending mobile debounces and save immediately
+    for (const [bookingId, timer] of Object.entries(mobileDebounceTimers)) {
+      if (timer) {
+        clearTimeout(timer);
+        delete mobileDebounceTimers[bookingId];
+        
+        // Check if mobile field has unsaved changes
+        const rowInput = document.querySelector(`#mobile-row-${bookingId} input[type="text"]`);
+        if (!rowInput) continue;
+        
+        const currentValue = rowInput.value.trim();
+        const booking = adminBookings.find(b => String(b.id) === String(bookingId));
+        const originalValue = (booking?.mobile || '').trim();
+        
+        // If different from DB, save immediately
+        if (currentValue && currentValue !== originalValue) {
+          await window.updateAdminBookingField(bookingId, 'mobile', currentValue);
+        }
+      }
+    }
+  }
 
   // Validate mobile with debounce (pause typing detection)
   function validateAdminMobile(inputElement, bookingId) {
@@ -204,7 +230,8 @@
       inputElement.classList.add('border-gray-300', 'text-gray-900');
       if (icon) icon.classList.add('hidden');
       if (errorText) errorText.classList.add('hidden');
-      // Do not auto-tick checkbox – we wait for server validation
+      // Untick checkbox - show pending state until server validates
+      if (checkbox) checkbox.checked = false;
     }
 
     // ----- debounce backend save + validation -----
@@ -231,14 +258,55 @@
       const original = (booking?.pickup_location || '').trim();
       if (latest === original) return;
 
-      // Update pickup_location, trigger validation, reload bookings, and update badges
-      await window.updateAdminBookingField(bookingId, 'pickup_location', latest);
+      // Show processing state and hide suggestion panel
+      const spinner = document.getElementById(`pickup-processing-${bookingId}`);
+      const suggestionBtn = document.getElementById(`suggestion-btn-${bookingId}`);
+      if (spinner) spinner.classList.remove('hidden');
+      if (suggestionBtn) suggestionBtn.classList.add('hidden');
+      if (rowInput) rowInput.disabled = true;
+      
+      try {
+        // Flush any pending mobile changes before pickup update to prevent data loss
+        await flushAdminMobileIfDirty();
+
+        // Update pickup_location, trigger validation, reload bookings, and update badges
+        await window.updateAdminBookingField(bookingId, 'pickup_location', latest);
+      } finally {
+        // Hide processing state
+        if (spinner) spinner.classList.add('hidden');
+        if (rowInput) rowInput.disabled = false;
+      }
     }, 600);
   }
 
   // Expose validation functions globally
   window.validateAdminMobile = validateAdminMobile;
   window.validateAdminPickup = validateAdminPickup;
+
+  // Focus management
+  window.setAdminActiveField = function(bookingId, field) {
+    lastActiveBookingId = String(bookingId);
+    lastActiveField = field;
+  };
+
+  function restoreAdminFocus() {
+    if (!lastActiveBookingId || !lastActiveField) return;
+
+    const rowId = lastActiveField === 'mobile'
+      ? `mobile-row-${lastActiveBookingId}`
+      : `pickup-row-${lastActiveBookingId}`;
+
+    const row = document.getElementById(rowId);
+    const input = row ? row.querySelector('input[type="text"]') : null;
+    if (!input) return;
+
+    // Restore focus without jumping the page around too much
+    input.focus({ preventScroll: true });
+
+    // Put cursor at end
+    const len = input.value.length;
+    try { input.setSelectionRange(len, len); } catch (e) {}
+  }
 
   // Load bookings function
   window.loadAdminBookings = async function() {
@@ -329,6 +397,7 @@
     }
 
     container.innerHTML = adminBookings.map(booking => renderAdminBookingCard(booking)).join('');
+    restoreAdminFocus();
   }
 
   // Render single card
@@ -362,10 +431,24 @@
 
     // Validation states
     const isMobileInvalid = booking.is_mobile_valid === false;
+    
+    // Pickup validation - match Portal logic exactly
     const isPickupInvalid = booking.is_pickup_location_valid === false;
     
+    // Suggestion display logic - match Portal (only show when invalid AND suggestion differs from current)
+    const suggestion = booking.pickup_location_suggestion;
+    const shouldShowSuggestion = booking.is_pickup_location_valid === false && 
+      suggestion && 
+      suggestion !== booking.pickup_location;
+    
     // Pickup Error Text - use validation.js
-    const pickupErrorText = (window.Validation?.getPickupLocationIssueMessage?.(booking.pickup_location_issue)) || 'Address invalid';
+    let pickupErrorText =
+      (window.Validation?.getPickupLocationIssueMessage?.(booking.pickup_location_issue)) ||
+      'Please provide a valid pickup address.';
+
+    if (!booking.pickup_location_issue && shouldShowSuggestion) {
+      pickupErrorText = 'Please tap the suggested address to use the correct spelling.';
+    }
 
     return `
       <div class="booking-card p-3 sm:p-4 mb-4 transition-all duration-200 group" id="booking-card-${booking.id}">
@@ -399,6 +482,7 @@
                     value="${booking.mobile || ''}" 
                     class="max-w-[280px] px-2 py-1 text-sm ${isMobileInvalid ? 'border-red-400 text-red-600' : 'border-gray-300 text-gray-900'} border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     oninput="validateAdminMobile(this, '${booking.id}')"
+                    onfocus="setAdminActiveField('${booking.id}', 'mobile')"
                     placeholder="Mobile"
                   >
                   <svg class="w-5 h-5 flex-shrink-0 ${isMobileInvalid ? '' : 'hidden'}" id="mobile-error-icon-${booking.id}" fill="#dc2626" viewBox="0 0 20 20">
@@ -406,7 +490,7 @@
                   </svg>
                   <label class="flex items-center gap-1.5 ml-1">
                     <input type="checkbox" 
-                      class="w-4 h-4 text-green-600 rounded focus:ring-green-500 border-gray-300"
+                      class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
                       ${booking.is_mobile_valid ? 'checked' : ''} 
                       onchange="toggleAdminValidation('${booking.id}', 'is_mobile_valid', this.checked)"
                     >
@@ -432,6 +516,7 @@
                       value="${booking.pickup_location || ''}" 
                       class="w-full px-2 py-1 text-sm ${isPickupInvalid ? 'border-red-400 text-red-600' : 'border-gray-300 text-gray-900'} border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       oninput="validateAdminPickup(this, '${booking.id}')"
+                      onfocus="setAdminActiveField('${booking.id}', 'pickup')"
                       placeholder="Pickup address"
                     >
                     <svg class="w-5 h-5 flex-shrink-0 ${isPickupInvalid ? '' : 'hidden'}" id="pickup-error-icon-${booking.id}" fill="#dc2626" viewBox="0 0 20 20">
@@ -439,8 +524,8 @@
                     </svg>
                     <label class="flex items-center gap-1.5 ml-1">
                       <input type="checkbox" 
-                        class="w-4 h-4 text-green-600 rounded focus:ring-green-500 border-gray-300"
-                        ${booking.is_pickup_location_valid ? 'checked' : ''} 
+                        class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+                        ${(booking.is_pickup_location_valid === true && !booking.pickup_location_issue) ? 'checked' : ''} 
                         onchange="toggleAdminValidation('${booking.id}', 'is_pickup_location_valid', this.checked)"
                       >
                       <span class="text-xs text-gray-700">Valid</span>
@@ -449,10 +534,20 @@
                   
                   ${isPickupInvalid ? `<p id="pickup-error-text-${booking.id}" class="text-xs text-red-600 mt-1">${pickupErrorText}</p>` : `<p id="pickup-error-text-${booking.id}" class="text-xs text-red-600 mt-1 hidden"></p>`}
                   
-                  ${booking.pickup_location_suggestion ? `
+                  <!-- Processing spinner -->
+                  <div id="pickup-processing-${booking.id}" class="hidden flex items-center gap-2 mt-2 text-xs text-blue-600">
+                    <svg class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span id="pickup-processing-text-${booking.id}">Validating address...</span>
+                  </div>
+                  
+                  ${shouldShowSuggestion ? `
                     <button type="button"
+                      id="suggestion-btn-${booking.id}"
                       onclick="applyAdminSuggestion('${booking.id}', '${booking.pickup_location_suggestion.replace(/'/g, "\\'")}')"
-                      class="mt-2 w-full rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-left text-sm text-blue-900 hover:bg-blue-100 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400">
+                      class="mt-2 w-full rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-left text-sm text-blue-900 hover:bg-100 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400">
                       <div class="font-semibold mb-0.5 text-xs text-blue-800">Suggested address (tap to use)</div>
                       <div class="truncate text-blue-700">${booking.pickup_location_suggestion}</div>
                     </button>
@@ -466,7 +561,7 @@
             <div class="flex items-center gap-2 pt-1">
               <label class="payment-toggle cursor-pointer">
                 <input type="checkbox" 
-                  class="payment-toggle-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500 border-gray-300"
+                  class="payment-toggle-checkbox w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
                   ${!booking.is_payment_required ? 'checked' : ''}
                   onchange="togglePaymentStatus('${booking.id}', this.checked)"
                 >
@@ -485,7 +580,7 @@
                   ${booking.is_admin_checked ? 'checked' : ''}
                   onchange="toggleAdminChecked('${booking.id}', this.checked)"
                 >
-                <span class="text-sm ${booking.is_admin_checked ? 'text-green-700 font-medium' : 'text-gray-900'}">Admin Checked</span>
+                <span class="text-sm ${booking.is_admin_checked ? 'text-blue-700 font-medium' : 'text-gray-900'}">Admin Checked</span>
               </label>
             </div>
 
@@ -628,43 +723,20 @@
   };
   
   window.applyAdminSuggestion = async function(id, suggestion) {
-      // Reset validation flags and save suggestion
-      await window.supabaseClient
-          .from('booking')
-          .update({ 
-            pickup_location: suggestion,
-            is_pickup_location_valid: null,
-            pickup_location_issue: null,
-            pickup_location_suggestion: null,
-            validation_checked_at: null
-          })
-          .eq('id', id);
-      
-      // Update Google Calendar event with new pickup location
-      try {
-        await window.supabaseClient.functions.invoke('update-booking-in-google', {
-          body: { booking_id: id, fields: ['pickup_location'] }
-        });
-        console.log('[admin-bookings] Google Calendar updated with suggested address');
-      } catch (e) {
-        console.warn('[admin-bookings] Failed to update Google Calendar:', e);
-      }
-      
-      // Trigger server-side validation
-      try {
-        await window.supabaseClient.functions.invoke('validate-bookings', {
-          body: { id: id }
-        });
-        console.log('[admin-bookings] Validation triggered for suggested address');
-      } catch (e) {
-        console.warn('[admin-bookings] Validation trigger failed:', e);
-      }
-      
-      await loadAdminBookings();
-      // Update notification badges
-      if (window.updateNotificationBadges) {
-        await window.updateNotificationBadges();
-      }
+    // Show processing indicator
+    const spinner = document.getElementById(`pickup-processing-${id}`);
+    const spinnerText = document.getElementById(`pickup-processing-text-${id}`);
+    const suggestionBtn = document.getElementById(`suggestion-btn-${id}`);
+    
+    if (spinner) spinner.classList.remove('hidden');
+    if (spinnerText) spinnerText.textContent = 'Applying suggestion...';
+    if (suggestionBtn) suggestionBtn.disabled = true;
+    
+    // Flush any pending mobile changes before pickup update to prevent data loss
+    await flushAdminMobileIfDirty();
+
+    // Use the single, existing pickup save path (DB update + Google update + validate + reload)
+    await window.updateAdminBookingField(id, 'pickup_location', suggestion);
   };
 
   window.toggleAdminChecked = async function(id, isChecked) {

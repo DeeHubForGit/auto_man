@@ -1,4 +1,5 @@
-<script src="/js/validation.js"></script>
+<script src="/assets/js/validation.js"></script>
+<script src="/assets/js/messaging.js"></script>
 <!-- Admin Send SMS & Email Section -->
 <style>
   /* Force white backgrounds and black text for messaging inputs - override dark theme */
@@ -42,11 +43,11 @@
       <label class="block text-sm font-medium mt-3 mb-2 text-gray-900">Message</label>
       <textarea id="smsBody" class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="3" placeholder="Your message..."></textarea>
       <div id="smsBodyMsg" class="text-sm mt-2"></div>
-      <div class="mt-3 flex gap-2">
+      <div class="mt-3 flex flex-wrap items-center gap-2">
         <button id="sendSms" class="btn-primary px-5 py-2.5 rounded-lg">Send SMS</button>
         <button id="clearSms" class="btn-secondary px-5 py-2.5 rounded-lg">Clear</button>
 
-        <span id="smsStatusMsg" class="text-sm ml-1"></span>
+        <span id="smsStatusMsg" class="text-sm ml-1 w-full sm:w-auto"></span>
       </div>
     </div>
     <div class="border-t pt-4">
@@ -77,19 +78,17 @@
     const to = (document.getElementById('smsTo').value || '').trim();
     const message = (document.getElementById('smsBody').value || '').trim();
     
-    const toEl = document.getElementById('smsTo');
-    const bodyEl = document.getElementById('smsBody');
-    
     const toMsgEl = document.getElementById('smsMsg');         // mobile validation only
     const bodyMsgEl = document.getElementById('smsBodyMsg');   // message validation only
     const statusEl = document.getElementById('smsStatusMsg');  // sending/sent/errors
 
     // clear previous messages
-    [toMsgEl, bodyMsgEl, statusEl].forEach(el => {
-      if (!el) return;
-      el.textContent = '';
-      el.className = 'text-sm mt-2';
-    });
+    toMsgEl.textContent = '';
+    toMsgEl.className = 'text-sm mt-2';
+    bodyMsgEl.textContent = '';
+    bodyMsgEl.className = 'text-sm mt-2';
+    statusEl.textContent = '';
+    statusEl.className = 'text-sm';
 
     let hasError = false;
 
@@ -117,48 +116,36 @@
     // Clear bodyMsg before sending
     bodyMsgEl.textContent = '';
     
-    statusEl.textContent = 'Sending...';
-    statusEl.className = 'text-sm mt-2 text-blue-400';
-    try{
-      // invoker adds the auth headers for you
-      const { data, error } = await window.supabaseClient.functions.invoke('sms', {
-        body: { to, message },
-        headers: {
-          apikey: window.SITE_CONFIG.SUPABASE_ANON_KEY
-        }
-      });
-      
-      console.log('[admin-messaging] SMS response:', data);
-
-      if (error) {
-        statusEl.textContent = 'Error: ' + (error.message || 'failed');
-        statusEl.className = 'text-sm mt-2 text-red-600';
-      } else if (data?.ok) {
-        // Handle both old (data.data) and new (data.clicksend) response formats
-        const cs = data.clicksend || data.data;
-        console.log('[admin-messaging] ClickSend data:', cs);
-        
-        if (cs?.response_code === 'SUCCESS' || cs?.http_code === 200) {
-          statusEl.textContent = '✓ Sent';
-          statusEl.className = 'text-sm mt-2 text-blue-400';
-        } else if (cs?.response_msg) {
-          statusEl.textContent = `ClickSend: ${cs.response_msg} (code: ${cs.response_code || 'unknown'})`;
-          statusEl.className = 'text-sm mt-2 text-red-600';
-        } else {
-          statusEl.textContent = 'Unexpected response. Check console for details.';
-          statusEl.className = 'text-sm mt-2 text-red-600';
-          console.log('[admin-messaging] Full ClickSend response:', cs);
-        }
-      } else {
-        statusEl.textContent = 'Unexpected response. Check console for details.';
-        statusEl.className = 'text-sm mt-2 text-red-600';
-        console.log('[admin-messaging] Full response:', data);
-      }
-    } catch(e){
-      console.error('[admin-messaging] SMS error:', e);
-      statusEl.textContent = 'Error sending: ' + (e.message || 'Unknown error');
-      statusEl.className = 'text-sm mt-2 text-red-600';
+    if (!window.Messaging?.sendSms) {
+      statusEl.textContent = 'Error: messaging.js not loaded';
+      statusEl.className = 'text-sm text-red-600';
+      return;
     }
+
+    statusEl.textContent = 'Sending...';
+    statusEl.className = 'text-sm text-blue-400';
+
+    const result = await window.Messaging.sendSms({ to, message });
+
+    if (!result.ok) {
+      if (result.error === 'MISSING_TO') {
+        toMsgEl.textContent = 'Please enter mobile.';
+        toMsgEl.className = 'text-sm mt-2 text-red-600';
+      } else if (result.error === 'INVALID_MOBILE') {
+        toMsgEl.textContent = 'Please enter a valid AU mobile (e.g. 04XX XXX XXX or +614XX XXX XXX)';
+        toMsgEl.className = 'text-sm mt-2 text-red-600';
+      } else if (result.error === 'MISSING_MESSAGE') {
+        bodyMsgEl.textContent = 'Please enter a message.';
+        bodyMsgEl.className = 'text-sm mt-2 text-red-600';
+      } else {
+        statusEl.textContent = 'Error: ' + result.error;
+        statusEl.className = 'text-sm text-red-600';
+      }
+      return;
+    }
+
+    statusEl.textContent = '✓ Sent';
+    statusEl.className = 'text-sm text-blue-400';
   }
 
   async function sendEmail(){
@@ -179,7 +166,7 @@
     toMsgEl.className = 'text-sm mt-2';
     subjMsgEl.className = 'text-sm mt-2';
     bodyMsgEl.className = 'text-sm mt-2';
-    statusEl.className = 'text-sm mt-2';
+    statusEl.className = 'text-sm';
 
     let hasError = false;
 
@@ -214,42 +201,43 @@
     subjMsgEl.textContent = '';
     bodyMsgEl.textContent = '';
 
-    const html = `<p>${text.replace(/\n/g, '<br>')}</p>`;
-    const fnUrl = `${window.SITE_CONFIG.SUPABASE_URL}/functions/v1/email`;
+    if (!window.Messaging?.sendEmail) {
+      statusEl.textContent = 'Error: messaging.js not loaded';
+      statusEl.className = 'text-sm text-red-600';
+      return;
+    }
 
     statusEl.textContent = 'Sending...';
-    statusEl.className = 'text-sm mt-2 text-blue-400';
+    statusEl.className = 'text-sm text-blue-400';
 
-    try {
-      // direct fetch to the Edge Function (matches the working console/dashboard tests)
-      const resp = await fetch(fnUrl, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'authorization': 'Bearer ' + window.SITE_CONFIG.SUPABASE_ANON_KEY,
-          'apikey': window.SITE_CONFIG.SUPABASE_ANON_KEY
-        },
-        body: JSON.stringify({ to, subject, html })
-      });
+    const result = await window.Messaging.sendEmail({
+      to,
+      subject,
+      text
+    });
 
-      const data = await resp.json().catch(() => null);
-      console.log('[admin-messaging] Email response:', { status: resp.status, data });
-
-      if (!resp.ok) {
-        statusEl.textContent = `Error: HTTP ${resp.status}`;
-        statusEl.className = 'text-sm mt-2 text-red-600';
-      } else if (data?.ok) {
-        statusEl.textContent = '✓ Email sent';
-        statusEl.className = 'text-sm mt-2 text-blue-400';
+    if (!result.ok) {
+      if (result.error === 'MISSING_TO') {
+        toMsgEl.textContent = 'Please enter email address.';
+        toMsgEl.className = 'text-sm mt-2 text-red-600';
+      } else if (result.error === 'INVALID_EMAIL') {
+        toMsgEl.textContent = 'Please enter a valid email address.';
+        toMsgEl.className = 'text-sm mt-2 text-red-600';
+      } else if (result.error === 'MISSING_SUBJECT') {
+        subjMsgEl.textContent = 'Please enter subject.';
+        subjMsgEl.className = 'text-sm mt-2 text-red-600';
+      } else if (result.error === 'MISSING_BODY') {
+        bodyMsgEl.textContent = 'Please enter message body.';
+        bodyMsgEl.className = 'text-sm mt-2 text-red-600';
       } else {
-        statusEl.textContent = 'Unexpected response. Check console.';
-        statusEl.className = 'text-sm mt-2 text-red-600';
+        statusEl.textContent = 'Error: ' + result.error;
+        statusEl.className = 'text-sm text-red-600';
       }
-    } catch (e) {
-      console.error('[admin-messaging] Email exception:', e);
-      statusEl.textContent = 'Error: ' + (e.message || 'Unknown error');
-      statusEl.className = 'text-sm mt-2 text-red-600';
+      return;
     }
+
+    statusEl.textContent = '✓ Email sent';
+    statusEl.className = 'text-sm text-blue-400';
   }
 
   function clearSms() {

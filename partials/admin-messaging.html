@@ -1,3 +1,4 @@
+<script src="/js/validation.js"></script>
 <!-- Admin Send SMS & Email Section -->
 <style>
   /* Force white backgrounds and black text for messaging inputs - override dark theme */
@@ -36,80 +37,88 @@
     <div>
       <label class="block text-sm font-medium mb-2 text-gray-900">Mobile (AU)</label>
       <input id="smsTo" type="text" class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="04XXXXXXXX or +614XXXXXXXX" />
+      <div id="smsMsg" class="text-sm mt-2"></div>
+
       <label class="block text-sm font-medium mt-3 mb-2 text-gray-900">Message</label>
       <textarea id="smsBody" class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="3" placeholder="Your message..."></textarea>
+      <div id="smsBodyMsg" class="text-sm mt-2"></div>
       <div class="mt-3 flex gap-2">
         <button id="sendSms" class="btn-primary px-5 py-2.5 rounded-lg">Send SMS</button>
         <button id="clearSms" class="btn-secondary px-5 py-2.5 rounded-lg">Clear</button>
+
+        <span id="smsStatusMsg" class="text-sm ml-1"></span>
       </div>
-      <div id="smsMsg" class="text-sm mt-2"></div>
     </div>
     <div class="border-t pt-4">
       <label class="block text-sm font-medium mb-2 text-gray-900">Email</label>
       <input id="emailTo" type="email" class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="you@example.com" />
+      <div id="emailMsg" class="text-sm mt-2"></div>
+
       <label class="block text-sm font-medium mt-3 mb-2 text-gray-900">Subject</label>
       <input id="emailSubj" class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Subject" />
+      <div id="emailSubjMsg" class="text-sm mt-2"></div>
       <label class="block text-sm font-medium mt-3 mb-2 text-gray-900">Body</label>
       <textarea id="emailBody" class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="4" placeholder="Email text..."></textarea>
-      <div class="mt-3 flex gap-2">
+      <div id="emailBodyMsg" class="text-sm mt-2"></div>
+      <div class="mt-3 flex flex-wrap items-center gap-2">
         <button id="sendEmail" class="btn-primary px-5 py-2.5 rounded-lg">Send Email</button>
         <button id="clearEmail" class="btn-secondary px-5 py-2.5 rounded-lg">Clear</button>
+
+        <span id="emailStatusMsg" class="text-sm ml-1 w-full sm:w-auto"></span>
       </div>
-      <div id="emailMsg" class="text-sm mt-2"></div>
     </div>
   </div>
 </section>
 
 <script>
 (function() {
-  // Phone validators (from portal-details)
-  function normaliseDigits(v){ return (v||'').replace(/\D+/g,''); }
-  
-  function isValidAuMobile(v){
-    if (!v) return false;
-    const cleaned = v.trim();
-    const digits = normaliseDigits(cleaned);
-    
-    // Must be exactly 10 digits starting with 04, or 11 digits starting with 614
-    if (!/^(04\d{8}|614\d{8})$/.test(digits)) return false;
-    
-    // Ensure no invalid characters (only digits, spaces, +, -, parentheses)
-    if (!/^[\d\s+\-()]+$/.test(cleaned)) return false;
-    
-    // If starts with +, must be +61
-    if (cleaned.startsWith('+') && !cleaned.startsWith('+61')) return false;
-    
-    return true;
-  }
-  
-  // Email validator (from signup)
-  function isValidEmail(email) {
-    if (!email) return false;
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email.trim());
-  }
-
   // Send SMS & Email logic
   async function sendSms(){
     const to = (document.getElementById('smsTo').value || '').trim();
-    const message = (document.getElementById('smsBody').value || '').trim(); // <-- was "body"
-    const msgEl = document.getElementById('smsMsg');
-
-    if (!to || !message) { 
-      msgEl.textContent = 'Please enter mobile and message.'; 
-      msgEl.className = 'text-sm mt-2 text-red-600';
-      return; 
-    }
+    const message = (document.getElementById('smsBody').value || '').trim();
     
-    // Validate mobile number
-    if (!isValidAuMobile(to)) {
-      msgEl.textContent = 'Please enter a valid AU mobile (e.g. 04XX XXX XXX or +614XX XXX XXX)';
-      msgEl.className = 'text-sm mt-2 text-red-600';
-      return;
+    const toEl = document.getElementById('smsTo');
+    const bodyEl = document.getElementById('smsBody');
+    
+    const toMsgEl = document.getElementById('smsMsg');         // mobile validation only
+    const bodyMsgEl = document.getElementById('smsBodyMsg');   // message validation only
+    const statusEl = document.getElementById('smsStatusMsg');  // sending/sent/errors
+
+    // clear previous messages
+    [toMsgEl, bodyMsgEl, statusEl].forEach(el => {
+      if (!el) return;
+      el.textContent = '';
+      el.className = 'text-sm mt-2';
+    });
+
+    let hasError = false;
+
+    if (!to) {
+      toMsgEl.textContent = 'Please enter mobile.';
+      toMsgEl.className = 'text-sm mt-2 text-red-600';
+      hasError = true;
     }
 
-    msgEl.textContent = 'Sending...';
-    msgEl.className = 'text-sm mt-2 text-blue-400';
+    if (!message) {
+      bodyMsgEl.textContent = 'Please enter a message.';
+      bodyMsgEl.className = 'text-sm mt-2 text-red-600';
+      hasError = true;
+    }
+
+    // Validate mobile number (show alongside other errors)
+    if (to && window.Validation?.isValidAuMobile && !window.Validation.isValidAuMobile(to)) {
+      toMsgEl.textContent = 'Please enter a valid AU mobile (e.g. 04XX XXX XXX or +614XX XXX XXX)';
+      toMsgEl.className = 'text-sm mt-2 text-red-600';
+      hasError = true;
+    }
+
+    if (hasError) return;
+
+    // Clear bodyMsg before sending
+    bodyMsgEl.textContent = '';
+    
+    statusEl.textContent = 'Sending...';
+    statusEl.className = 'text-sm mt-2 text-blue-400';
     try{
       // invoker adds the auth headers for you
       const { data, error } = await window.supabaseClient.functions.invoke('sms', {
@@ -122,33 +131,33 @@
       console.log('[admin-messaging] SMS response:', data);
 
       if (error) {
-        msgEl.textContent = 'Error: ' + (error.message || 'failed');
-        msgEl.className = 'text-sm mt-2 text-red-600';
+        statusEl.textContent = 'Error: ' + (error.message || 'failed');
+        statusEl.className = 'text-sm mt-2 text-red-600';
       } else if (data?.ok) {
         // Handle both old (data.data) and new (data.clicksend) response formats
         const cs = data.clicksend || data.data;
         console.log('[admin-messaging] ClickSend data:', cs);
         
         if (cs?.response_code === 'SUCCESS' || cs?.http_code === 200) {
-          msgEl.textContent = '✓ Sent';
-          msgEl.className = 'text-sm mt-2 text-blue-400';
+          statusEl.textContent = '✓ Sent';
+          statusEl.className = 'text-sm mt-2 text-blue-400';
         } else if (cs?.response_msg) {
-          msgEl.textContent = `ClickSend: ${cs.response_msg} (code: ${cs.response_code || 'unknown'})`;
-          msgEl.className = 'text-sm mt-2 text-red-600';
+          statusEl.textContent = `ClickSend: ${cs.response_msg} (code: ${cs.response_code || 'unknown'})`;
+          statusEl.className = 'text-sm mt-2 text-red-600';
         } else {
-          msgEl.textContent = 'Unexpected response. Check console for details.';
-          msgEl.className = 'text-sm mt-2 text-red-600';
+          statusEl.textContent = 'Unexpected response. Check console for details.';
+          statusEl.className = 'text-sm mt-2 text-red-600';
           console.log('[admin-messaging] Full ClickSend response:', cs);
         }
       } else {
-        msgEl.textContent = 'Unexpected response. Check console for details.';
-        msgEl.className = 'text-sm mt-2 text-red-600';
+        statusEl.textContent = 'Unexpected response. Check console for details.';
+        statusEl.className = 'text-sm mt-2 text-red-600';
         console.log('[admin-messaging] Full response:', data);
       }
     } catch(e){
       console.error('[admin-messaging] SMS error:', e);
-      msgEl.textContent = 'Error sending: ' + (e.message || 'Unknown error');
-      msgEl.className = 'text-sm mt-2 text-red-600';
+      statusEl.textContent = 'Error sending: ' + (e.message || 'Unknown error');
+      statusEl.className = 'text-sm mt-2 text-red-600';
     }
   }
 
@@ -156,26 +165,60 @@
     const to = (document.getElementById('emailTo').value||'').trim();
     const subject = (document.getElementById('emailSubj').value||'').trim();
     const text = (document.getElementById('emailBody').value||'').trim();
-    const msgEl = document.getElementById('emailMsg');
-
-    if (!to || !subject || !text) {
-      msgEl.textContent = 'Please fill in all email fields';
-      msgEl.className = 'text-sm mt-2 text-red-600';
-      return;
-    }
     
-    // Validate email address
-    if (!isValidEmail(to)) {
-      msgEl.textContent = 'Please enter a valid email address';
-      msgEl.className = 'text-sm mt-2 text-red-600';
-      return;
+    const toMsgEl = document.getElementById('emailMsg');
+    const subjMsgEl = document.getElementById('emailSubjMsg');
+    const bodyMsgEl = document.getElementById('emailBodyMsg');
+    const statusEl = document.getElementById('emailStatusMsg');
+
+    // clear previous messages
+    toMsgEl.textContent = '';
+    subjMsgEl.textContent = '';
+    bodyMsgEl.textContent = '';
+    statusEl.textContent = '';
+    toMsgEl.className = 'text-sm mt-2';
+    subjMsgEl.className = 'text-sm mt-2';
+    bodyMsgEl.className = 'text-sm mt-2';
+    statusEl.className = 'text-sm mt-2';
+
+    let hasError = false;
+
+    if (!to) {
+      toMsgEl.textContent = 'Please enter email address.';
+      toMsgEl.className = 'text-sm mt-2 text-red-600';
+      hasError = true;
     }
+
+    if (!subject) {
+      subjMsgEl.textContent = 'Please enter subject.';
+      subjMsgEl.className = 'text-sm mt-2 text-red-600';
+      hasError = true;
+    }
+
+    if (!text) {
+      bodyMsgEl.textContent = 'Please enter message body.';
+      bodyMsgEl.className = 'text-sm mt-2 text-red-600';
+      hasError = true;
+    }
+
+    // Validate email address
+    if (to && window.Validation?.isValidEmail && !window.Validation.isValidEmail(to)) {
+      toMsgEl.textContent = 'Please enter a valid email address';
+      toMsgEl.className = 'text-sm mt-2 text-red-600';
+      hasError = true;
+    }
+
+    if (hasError) return;
+
+    // Clear field messages before sending
+    subjMsgEl.textContent = '';
+    bodyMsgEl.textContent = '';
 
     const html = `<p>${text.replace(/\n/g, '<br>')}</p>`;
     const fnUrl = `${window.SITE_CONFIG.SUPABASE_URL}/functions/v1/email`;
 
-    msgEl.textContent = 'Sending...';
-    msgEl.className = 'text-sm mt-2 text-blue-400';
+    statusEl.textContent = 'Sending...';
+    statusEl.className = 'text-sm mt-2 text-blue-400';
 
     try {
       // direct fetch to the Edge Function (matches the working console/dashboard tests)
@@ -193,19 +236,19 @@
       console.log('[admin-messaging] Email response:', { status: resp.status, data });
 
       if (!resp.ok) {
-        msgEl.textContent = `Error: HTTP ${resp.status}`;
-        msgEl.className = 'text-sm mt-2 text-red-600';
+        statusEl.textContent = `Error: HTTP ${resp.status}`;
+        statusEl.className = 'text-sm mt-2 text-red-600';
       } else if (data?.ok) {
-        msgEl.textContent = '✓ Email sent';
-        msgEl.className = 'text-sm mt-2 text-blue-400';
+        statusEl.textContent = '✓ Email sent';
+        statusEl.className = 'text-sm mt-2 text-blue-400';
       } else {
-        msgEl.textContent = 'Unexpected response. Check console.';
-        msgEl.className = 'text-sm mt-2 text-red-600';
+        statusEl.textContent = 'Unexpected response. Check console.';
+        statusEl.className = 'text-sm mt-2 text-red-600';
       }
     } catch (e) {
       console.error('[admin-messaging] Email exception:', e);
-      msgEl.textContent = 'Error: ' + (e.message || 'Unknown error');
-      msgEl.className = 'text-sm mt-2 text-red-600';
+      statusEl.textContent = 'Error: ' + (e.message || 'Unknown error');
+      statusEl.className = 'text-sm mt-2 text-red-600';
     }
   }
 
@@ -213,6 +256,8 @@
     document.getElementById('smsTo').value = '';
     document.getElementById('smsBody').value = '';
     document.getElementById('smsMsg').textContent = '';
+    document.getElementById('smsBodyMsg').textContent = '';
+    document.getElementById('smsStatusMsg').textContent = '';
   }
 
   function clearEmail() {
@@ -220,6 +265,9 @@
     document.getElementById('emailSubj').value = '';
     document.getElementById('emailBody').value = '';
     document.getElementById('emailMsg').textContent = '';
+    document.getElementById('emailSubjMsg').textContent = '';
+    document.getElementById('emailBodyMsg').textContent = '';
+    document.getElementById('emailStatusMsg').textContent = '';
   }
 
   // Wire up when partial loads

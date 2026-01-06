@@ -1268,16 +1268,16 @@
     const suggestion = result?.formatted || null;
 
     // If Google can resolve it but returns a different formatted address,
-    // require the admin to accept the suggestion (treat as not valid yet).
+    // show a suggestion but do NOT block saving.
     if (isValid && suggestion) {
       const typed = (address || '').trim().replace(/\s+/g, ' ').toLowerCase();
       const formatted = (suggestion || '').trim().replace(/\s+/g, ' ').toLowerCase();
 
       if (typed !== formatted) {
         return {
-          valid: false,
-          message: 'Please tap the suggested address to use the correct spelling.',
-          issue: 'use_suggested_address',
+          valid: true,
+          message: null,
+          issue: 'suggestion_available',
           suggestion
         };
       }

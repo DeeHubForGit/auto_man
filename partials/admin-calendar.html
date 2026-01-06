@@ -550,6 +550,19 @@
     }
   }
   
+  /* Fix iOS/real-mobile layout for Start/End time in New appointment modal */
+  .appt-time-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  @media (min-width: 640px) {
+    .appt-time-row {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  
 </style>
 <section id="section-calendar" class="section-content bg-white border rounded-2xl shadow-sm p-5" style="background-color: white !important; color: #111827 !important;">
   <!-- Week range + navigation -->
@@ -654,12 +667,13 @@
         </div>
 
         <!-- Time range -->
-        <div class="form-row">
+        <div class="form-row appt-time-row">
           <div class="form-group">
             <label for="appt-start">Start time<span class="text-red-500">*</span></label>
             <input id="appt-start" name="startTime" type="time" class="form-input" />
             <p id="appt-start-error" class="text-xs text-red-500 mt-1 hidden"></p>
           </div>
+
           <div class="form-group">
             <label for="appt-end" id="appt-end-label">End time</label>
             <input id="appt-end" name="endTime" type="time" class="form-input" />

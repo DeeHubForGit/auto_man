@@ -341,8 +341,15 @@
   .admin-modal-body .form-row {
     display: flex;
     gap: 0.75rem;
+    align-items: flex-start;
+    flex-wrap: wrap;
   }
 
+  .admin-modal-body .form-row > .form-group {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  
   .admin-modal-footer {
     display: flex;
     justify-content: flex-end;

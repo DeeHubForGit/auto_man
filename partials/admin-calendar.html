@@ -241,6 +241,9 @@
     padding: 0.75rem 1.5rem 1.5rem;     /* ↓ smaller top padding */
     max-width: 480px;
     width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     box-shadow: 0 20px 25px rgba(15, 23, 42, 0.5);
   }
 
@@ -562,16 +565,24 @@
       grid-template-columns: 1fr 1fr;
     }
   }
+
+  /* Make sure the modal is always reachable on mobile */
+  @media (max-width: 768px) {
+    .admin-modal-backdrop {
+      align-items: flex-start;
+      padding: 16px;
+    }
+  }
   
 </style>
 <section id="section-calendar" class="section-content bg-white border rounded-2xl shadow-sm p-5" style="background-color: white !important; color: #111827 !important;">
   <!-- Week range + navigation -->
-  <div class="flex items-center justify-between mb-3" role="group" aria-label="Calendar navigation">
-    <div class="flex items-center gap-3">
-      <span id="weekRange" class="text-base sm:text-lg font-bold text-blue-600">
+  <div class="flex flex-wrap items-center justify-between gap-2 mb-3" role="group" aria-label="Calendar navigation">
+    <div class="flex flex-wrap items-center gap-3 min-w-0">
+      <span id="weekRange" class="text-base sm:text-lg font-bold text-blue-600 w-full sm:w-auto">
         Week: 09/11/25 - 15/11/25
       </span>
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2 min-w-0">
         <button id="prevWeek" class="btn btn-primary-light calendar-nav-btn !px-2 !py-1" aria-label="Previous week">←</button>
         <button id="nextWeek" class="btn btn-primary calendar-nav-btn !px-2 !py-1" aria-label="Next week">→</button>
         <button id="todayBtn" class="btn btn-outline-blue calendar-nav-btn !px-2 !py-1" title="Today" aria-label="Jump to today">
@@ -603,7 +614,7 @@
           </svg>
           <span class="hidden sm:inline ml-1">New appointment</span>
         </button>
-        <span id="newBookingStatus" class="ml-3 text-sm text-gray-500 hidden" aria-live="polite"></span>
+        <span id="newBookingStatus" class="ml-0 sm:ml-3 text-sm text-gray-500 hidden w-full sm:w-auto break-words" aria-live="polite"></span>
       </div>
     </div>
   </div>
@@ -1342,11 +1353,7 @@
       showApptError("appt-start", "Start time is required");
       hasError = true;
     }
-    // Location is optional, but if provided, must be valid
-    if (location && !isValidAddress(location)) {
-      showApptError("appt-location", "Please provide a valid address (minimum 5 characters)");
-      hasError = true;
-    }
+    // Location is optional free text, e.g. home, work, etc.  NO VALIDATION.
 
     if (hasError) {
       return;
@@ -1399,7 +1406,7 @@
       
       const pollForEvent = async () => {
         pollAttempts++;
-        setNewBookingStatusText(`Waiting for new booking...  (${pollAttempts}/${maxPolls})`);
+        setNewBookingStatusText(`waiting for new appointment...  (${pollAttempts}/${maxPolls})`);
         console.log(`[appointment] Checking database for new event (attempt ${pollAttempts}/${maxPolls})...`);
         
         try {
@@ -1444,7 +1451,7 @@
       };
       
       // Start polling after 2 seconds (give webhook a head start)
-      showNewBookingStatus('Waiting for new booking...');
+      showNewBookingStatus('waiting for new appointment...');
       setTimeout(pollForEvent, 2000);
     } catch (err) {
       console.error("[appointment] Failed to create appointment", err);
@@ -1652,7 +1659,7 @@
       
       const pollForEvent = async () => {
         pollAttempts++;
-        setNewBookingStatusText(`Waiting for new booking...  (${pollAttempts}/${maxPolls})`);
+        setNewBookingStatusText(`waiting for new appointment...  (${pollAttempts}/${maxPolls})`);
         console.log(`[booking] Checking database for new event (attempt ${pollAttempts}/${maxPolls})...`);
         
         try {
@@ -1692,7 +1699,7 @@
       };
       
       // Start polling after 2 seconds
-      showNewBookingStatus('Waiting for new booking...');
+      showNewBookingStatus('waiting for new appointment...');
       setTimeout(pollForEvent, 2000);
     } catch (err) {
       console.error("[booking] Error creating booking:", err);

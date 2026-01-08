@@ -338,18 +338,28 @@
     box-shadow: 0 0 0 1px #3b82f6;
   }
 
+  /* Time row: keep both columns equal width and aligned */
   .admin-modal-body .form-row {
     display: flex;
     gap: 0.75rem;
     align-items: flex-start;
-    flex-wrap: wrap;
   }
 
-  .admin-modal-body .form-row > .form-group {
-    flex: 1 1 0;
+  .admin-modal-body .form-row .form-group {
+    flex: 1;
     min-width: 0;
   }
-  
+
+  /* Prevent End time (optional) wrapping which causes vertical misalignment */
+  .admin-modal-body .form-row .form-group label {
+    white-space: nowrap;
+  }
+
+  /* Optional: make iOS time inputs consistent height */
+  .admin-modal-body input[type="time"].form-input {
+    height: 42px;
+  }
+
   .admin-modal-footer {
     display: flex;
     justify-content: flex-end;

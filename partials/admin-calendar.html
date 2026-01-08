@@ -651,31 +651,34 @@
     padding: 4px 6px !important;
   }
   
-  /* iPhone Safari: change layout to Date row + Times row (no resizing) */
+  /* iPhone Safari: Date row + Times row (no width changes, prevent overlap) */
   @supports (-webkit-touch-callout: none) {
     @media (max-width: 768px) {
+
+      /* Row 1 = Date, Row 2 = Start + End */
       #section-calendar .appt-datetime-row {
         display: grid !important;
-        grid-template-columns: auto auto !important;
+        grid-template-columns: 1fr 1fr !important;   /* gives Start/End real space */
         grid-template-areas:
           "date  date"
           "start end" !important;
         gap: 10px !important;
-        justify-content: start !important;
         align-items: start !important;
       }
 
+      /* Keep date compact on its row */
       #section-calendar .appt-datetime-row .form-group:nth-child(1) {
         grid-area: date;
-        justify-self: start; /* keep date compact */
+        justify-self: start;
       }
 
-      #section-calendar .appt-datetime-row .form-group:nth-child(2) {
-        grid-area: start;
-      }
+      #section-calendar .appt-datetime-row .form-group:nth-child(2) { grid-area: start; }
+      #section-calendar .appt-datetime-row .form-group:nth-child(3) { grid-area: end; }
 
-      #section-calendar .appt-datetime-row .form-group:nth-child(3) {
-        grid-area: end;
+      /* CRITICAL: allow native time inputs to shrink inside the grid */
+      #section-calendar .appt-datetime-row input[type="time"] {
+        min-width: 0 !important;
+        width: 100% !important;
       }
     }
   }

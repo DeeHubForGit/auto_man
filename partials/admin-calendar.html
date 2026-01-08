@@ -684,6 +684,20 @@
     }
   }
 
+  /* iPhone Safari: vertically centre text inside date/time inputs */
+  @supports (-webkit-touch-callout: none) {
+    @media (max-width: 768px) {
+      #section-calendar #appt-date,
+      #section-calendar #appt-start,
+      #section-calendar #appt-end {
+        height: 32px !important;
+        line-height: 32px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+      }
+    }
+  }
+  
 </style>
 <section id="section-calendar" class="section-content bg-white border rounded-2xl shadow-sm p-5" style="background-color: white !important; color: #111827 !important;">
   <!-- Week range + navigation -->

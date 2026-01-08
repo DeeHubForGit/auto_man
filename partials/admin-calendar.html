@@ -620,13 +620,6 @@
     align-items: start;
   }
 
-  /* Force inputs to respect grid column widths */
-  #section-calendar .appt-datetime-row .form-input {
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-  }
-
   /* Mobile: slightly tighter to fit */
   @media (max-width: 480px) {
     #section-calendar .admin-modal-body .form-input {
@@ -658,35 +651,36 @@
     padding: 4px 6px !important;
   }
 
-  /* iPhone Safari: Date row + Times row (no width changes, prevent overlap) */
+  /* iPhone Safari: Date row then Times row, KEEP FIXED WIDTHS (no expand) */
   @supports (-webkit-touch-callout: none) {
     @media (max-width: 768px) {
 
-      /* Row 1 = Date, Row 2 = Start + End */
+      /* Layout: Date on its own row, Start+End on next row */
       #section-calendar .appt-datetime-row {
         display: grid !important;
-        grid-template-columns: 1fr 1fr !important;   /* gives Start/End real space */
+        grid-template-columns: 1fr 1fr !important;
         grid-template-areas:
           "date  date"
           "start end" !important;
         gap: 10px !important;
         align-items: start !important;
+        justify-content: start !important;
       }
 
-      /* Keep date compact on its row */
-      #section-calendar .appt-datetime-row .form-group:nth-child(1) {
-        grid-area: date;
-        justify-self: start;
-      }
-
+      #section-calendar .appt-datetime-row .form-group:nth-child(1) { grid-area: date; justify-self: start; }
       #section-calendar .appt-datetime-row .form-group:nth-child(2) { grid-area: start; }
       #section-calendar .appt-datetime-row .form-group:nth-child(3) { grid-area: end; }
 
-      /* CRITICAL: allow native time inputs to shrink inside the grid */
-      #section-calendar .appt-datetime-row input[type="time"] {
-        min-width: 0 !important;
-        width: 100% !important;
-      }
+      /* Fixed widths (pick the numbers you want) */
+      #section-calendar #appt-date { width: 120px !important; max-width: 120px !important; }
+      #section-calendar #appt-start,
+      #section-calendar #appt-end  { width: 120px !important; max-width: 120px !important; }
+
+      /* Stop iOS grid children doing weird overflow overlap */
+      #section-calendar .appt-datetime-row .form-group { min-width: 0 !important; }
+      #section-calendar #appt-start,
+      #section-calendar #appt-end,
+      #section-calendar #appt-date { box-sizing: border-box !important; display: block !important; }
     }
   }
 

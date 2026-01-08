@@ -650,6 +650,35 @@
   #section-calendar .admin-modal-body textarea {
     padding: 4px 6px !important;
   }
+  
+  /* iPhone Safari: change layout to Date row + Times row (no resizing) */
+  @supports (-webkit-touch-callout: none) {
+    @media (max-width: 768px) {
+      #section-calendar .appt-datetime-row {
+        display: grid !important;
+        grid-template-columns: auto auto !important;
+        grid-template-areas:
+          "date  date"
+          "start end" !important;
+        gap: 10px !important;
+        justify-content: start !important;
+        align-items: start !important;
+      }
+
+      #section-calendar .appt-datetime-row .form-group:nth-child(1) {
+        grid-area: date;
+        justify-self: start; /* keep date compact */
+      }
+
+      #section-calendar .appt-datetime-row .form-group:nth-child(2) {
+        grid-area: start;
+      }
+
+      #section-calendar .appt-datetime-row .form-group:nth-child(3) {
+        grid-area: end;
+      }
+    }
+  }
 
 </style>
 <section id="section-calendar" class="section-content bg-white border rounded-2xl shadow-sm p-5" style="background-color: white !important; color: #111827 !important;">

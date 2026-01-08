@@ -620,6 +620,13 @@
     align-items: start;
   }
 
+  /* Force inputs to respect grid column widths */
+  #section-calendar .appt-datetime-row .form-input {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
   /* Mobile: slightly tighter to fit */
   @media (max-width: 480px) {
     #section-calendar .admin-modal-body .form-input {
@@ -650,7 +657,7 @@
   #section-calendar .admin-modal-body textarea {
     padding: 4px 6px !important;
   }
-  
+
   /* iPhone Safari: Date row + Times row (no width changes, prevent overlap) */
   @supports (-webkit-touch-callout: none) {
     @media (max-width: 768px) {

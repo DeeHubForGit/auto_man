@@ -1,8 +1,8 @@
 // @ts-nocheck
-// supabase/functions/create-admin-appointment/index.ts
-// Create personal appointment in Google Calendar
-// The gcal-sync function will automatically sync it to the database
-// =================================================================
+// supabase/functions/update-admin-appointment/index.ts
+// Update personal appointment in Google Calendar
+// The gcal-sync function will automatically sync changes to the database
+// ========================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -140,12 +140,12 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { title, date, startTime, endTime, location } = await req.json();
+    const { googleEventId, title, date, startTime, endTime, location } = await req.json();
 
     // Validate required fields
-    if (!title || !date || !startTime) {
+    if (!googleEventId || !title || !date || !startTime) {
       return new Response(
-        JSON.stringify({ error: "Title, date, and start time are required" }),
+        JSON.stringify({ error: "Google Event ID, title, date, and start time are required" }),
         { 
           status: 400, 
           headers: { 
@@ -195,7 +195,7 @@ Deno.serve(async (req) => {
     const startISO = `${date}T${start24}:00`;
     const endISO   = `${endDate}T${end24}:00`;
 
-    console.log("[create-admin-appointment] Creating event:", { title, startISO, endISO, location });
+    console.log("[update-admin-appointment] Updating event:", { googleEventId, title, startISO, endISO, location });
 
     // Get Google Calendar access token
     const token = await getAccessToken();
@@ -205,10 +205,9 @@ Deno.serve(async (req) => {
     if (!calendarIdRaw) throw new Error("Missing env: GCAL_CALENDAR_IDS");
     const calendarId = calendarIdRaw.split(",")[0].trim();
 
-    // Create Google Calendar event
+    // Update Google Calendar event using PATCH
     const eventBody = {
       summary: title,
-      description: "", // Empty for personal appointments
       start: { 
         dateTime: startISO, 
         timeZone: "Australia/Melbourne" 
@@ -218,17 +217,12 @@ Deno.serve(async (req) => {
         timeZone: "Australia/Melbourne" 
       },
       location: location || undefined,
-      extendedProperties: {
-        shared: {
-          is_booking: "false"
-        }
-      }
     };
 
     const gcalRes = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(googleEventId)}?sendUpdates=none`,
       {
-        method: "POST",
+        method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -239,9 +233,9 @@ Deno.serve(async (req) => {
 
     if (!gcalRes.ok) {
       const errorText = await gcalRes.text();
-      console.error("[create-admin-appointment] Google Calendar API error:", gcalRes.status, errorText);
+      console.error("[update-admin-appointment] Google Calendar API error:", gcalRes.status, errorText);
       return new Response(
-        JSON.stringify({ error: "Could not save appointment in Google Calendar. Please try again." }),
+        JSON.stringify({ error: "Could not update appointment in Google Calendar. Please try again." }),
         { 
           status: 500, 
           headers: { 
@@ -253,72 +247,11 @@ Deno.serve(async (req) => {
     }
 
     const event = await gcalRes.json();
-    console.log("[create-admin-appointment] ✓ Google event created:", event.id);
-
-    // Immediately insert booking record into database (don't wait for webhook)
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-    if (!supabaseUrl || !supabaseServiceRoleKey) {
-      console.error("[create-admin-appointment] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
-      // Return success anyway - webhook will eventually sync it
-      return new Response(
-        JSON.stringify({ ok: true, googleEvent: event }),
-        { 
-          status: 200, 
-          headers: { 
-            "Content-Type": "application/json",
-            ...corsHeaders 
-          } 
-        }
-      );
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
-
-    // Prepare booking data
-    const bookingData = {
-      google_event_id: event.id,
-      google_calendar_id: calendarId,
-      // Store as UTC ISO for timestamptz
-      start_time: event?.start?.dateTime ? new Date(event.start.dateTime).toISOString() : startISO,
-      end_time: event?.end?.dateTime ? new Date(event.end.dateTime).toISOString() : endISO,
-      status: 'confirmed',
-      source: 'google',
-      is_booking: false,
-      event_title: title,
-      pickup_location: location || null,
-      google_html_link: event.htmlLink || null,
-      google_ical_uid: event.iCalUID || null,
-    };
-
-    console.log("[create-admin-appointment] Inserting booking record:", bookingData);
-
-    const { data: bookingRecord, error: bookingError } = await supabase
-      .from('booking')
-      .upsert(bookingData, { onConflict: 'google_event_id' })
-      .select('id')
-      .single();
-
-    if (bookingError) {
-      console.error("[create-admin-appointment] Failed to insert booking:", bookingError);
-      // Return success anyway - webhook will eventually sync it
-      return new Response(
-        JSON.stringify({ ok: true, googleEvent: event }),
-        { 
-          status: 200, 
-          headers: { 
-            "Content-Type": "application/json",
-            ...corsHeaders 
-          } 
-        }
-      );
-    }
-
-    console.log("[create-admin-appointment] ✓ Booking record created:", bookingRecord.id);
+    console.log("[update-admin-appointment] ✓ Google event updated:", event.id);
+    console.log("[update-admin-appointment] Event will be synced to database via gcal-sync");
 
     return new Response(
-      JSON.stringify({ ok: true, googleEvent: event, bookingId: bookingRecord.id }),
+      JSON.stringify({ ok: true, googleEvent: event }),
       { 
         status: 200, 
         headers: { 
@@ -329,7 +262,7 @@ Deno.serve(async (req) => {
     );
 
   } catch (err) {
-    console.error("[create-admin-appointment] Unexpected error:", err);
+    console.error("[update-admin-appointment] Unexpected error:", err);
     return new Response(
       JSON.stringify({ error: err.message || "Internal server error" }),
       { 

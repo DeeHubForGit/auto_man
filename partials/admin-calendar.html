@@ -697,7 +697,7 @@
       }
     }
   }
-  
+
 </style>
 <section id="section-calendar" class="section-content bg-white border rounded-2xl shadow-sm p-5" style="background-color: white !important; color: #111827 !important;">
   <!-- Week range + navigation -->
@@ -918,6 +918,10 @@
   function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
   let weekStart = new Date();
 
+  // Edit state for personal appointments
+  let editingPersonalAppt = false;
+  let editingPersonalGoogleEventId = null;
+
   // Service duration configuration (in minutes) – populated from config
   const SERVICE_DURATIONS = {};
 
@@ -938,6 +942,15 @@
     return `${hours}:${minutes}`;
   }
 
+  // Helper: Format date as YYYY-MM-DD for date input (local time, not UTC)
+  function formatDateForInputLocal(dateObj) {
+    if (!dateObj) return '';
+    const yyyy = dateObj.getFullYear();
+    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const dd = String(dateObj.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
   // Helper: Add minutes to a time string (HH:MM format)
   function addMinutesToTime(timeString, date, minutesToAdd) {
     if (!timeString || !date) return '';
@@ -946,6 +959,12 @@
     d.setHours(hours, mins, 0, 0);
     d.setMinutes(d.getMinutes() + minutesToAdd);
     return formatTimeForInput(d);
+  }
+
+  // Reset edit state for personal appointments
+  function resetPersonalEditState() {
+    editingPersonalAppt = false;
+    editingPersonalGoogleEventId = null;
   }
 
   // Modal handling for personal appointments
@@ -959,6 +978,16 @@
   function openAppointmentModal(defaults = {}) {
     // Reset form to defaults
     apptForm.reset();
+    
+    // Reset modal title and button text to defaults
+    const modalTitle = document.querySelector("#appointment-modal-backdrop h2");
+    if (modalTitle) {
+      modalTitle.textContent = "New Appointment";
+    }
+    const submitBtn = document.getElementById("appointment-save");
+    if (submitBtn) {
+      submitBtn.textContent = "Create Appointment";
+    }
     
     // Reset appointment type to "booking" (default)
     const bookingRadio = document.querySelector('input[name="appointmentType"][value="booking"]');
@@ -983,11 +1012,11 @@
     
     // Default date to today if not provided
     const today = new Date();
-    const dateStr = defaults.date || today.toISOString().split('T')[0];
+    const dateStr = defaults.date || formatDateForInputLocal(today);
     
     // Default start time to next 15 minutes if not provided and date is today
     let startTime = defaults.startTime || '';
-    if (!startTime && dateStr === today.toISOString().split('T')[0]) {
+    if (!startTime && dateStr === formatDateForInputLocal(today)) {
       const rounded = roundToNext15Minutes();
       startTime = formatTimeForInput(rounded);
     }
@@ -1051,6 +1080,44 @@
     apptBackdrop.classList.add("hidden");
     apptForm.reset();
     formHasChanges = false;
+    resetPersonalEditState();
+  }
+
+  // Open modal in edit mode for a personal appointment
+  function openEditPersonalAppointmentModal({ googleEventId, title, dateStr, startHHMM, endHHMM, location }) {
+    // Set edit state
+    editingPersonalAppt = true;
+    editingPersonalGoogleEventId = googleEventId;
+    
+    // Fill form fields
+    document.getElementById("appt-title").value = title || '';
+    document.getElementById("appt-date").value = dateStr || '';
+    document.getElementById("appt-start").value = startHHMM || '';
+    document.getElementById("appt-end").value = endHHMM || '';
+    document.getElementById("appt-location").value = location || '';
+    
+    // Force personal appointment mode
+    const radioPersonal = document.querySelector('input[name="appointmentType"][value="personal"]');
+    if (radioPersonal) {
+      radioPersonal.checked = true;
+      radioPersonal.dispatchEvent(new Event('change'));
+    }
+    
+    // Update modal title to indicate editing
+    const modalTitle = document.querySelector("#appointment-modal-backdrop h2");
+    if (modalTitle) {
+      modalTitle.textContent = "Edit Personal Appointment";
+    }
+    
+    // Update submit button text
+    const submitBtn = document.getElementById("appointment-save");
+    if (submitBtn) {
+      submitBtn.textContent = "Update Appointment";
+    }
+    
+    // Open modal
+    formHasChanges = false;
+    apptBackdrop.classList.remove("hidden");
   }
 
   // Validation helper functions
@@ -1437,6 +1504,28 @@
     return `${String(hours12).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${period}`;
   }
 
+  // Update the DB row for a personal appointment immediately after a successful Google update
+  async function updatePersonalAppointmentRowInDb(googleEventId, { title, startIso, endIso, location }) {
+    if (!googleEventId) return;
+
+    const updateData = {
+      event_title: title || null,
+      start_time: startIso,
+      end_time: endIso,
+      pickup_location: location || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await window.supabaseClient
+      .from('booking')
+      .update(updateData)
+      .eq('google_event_id', googleEventId);
+
+    if (error) {
+      console.warn('[appointment] DB update failed (webhook will eventually correct it):', error);
+    }
+  }
+
   // Handle form submission
   apptForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -1486,70 +1575,130 @@
     }
 
     try {
-      console.log("[appointment] Creating personal appointment via edge function");
-
       // Convert 24-hour time to 12-hour format for the edge function
       const startTime12 = convert24To12Hour(startTime);
       const endTime12 = endTime ? convert24To12Hour(endTime) : null;
 
-      // Call edge function to create Google Calendar event and insert into DB
-      const { data, error } = await window.supabaseClient.functions.invoke('create-admin-appointment', {
-        body: { 
-          title,
-          date,
-          startTime: startTime12,
-          endTime: endTime12,
-          location
-        }
-      });
-
-      if (error) {
-        console.error("[appointment] Edge function error:", error);
-        throw new Error(error.message || "Failed to create appointment");
-      }
-
-      if (!data || !data.ok) {
-        console.error("[appointment] Edge function returned error:", data);
-        throw new Error(data?.error || "Failed to create appointment");
-      }
-
-      console.log("[appointment] ✅ Appointment created successfully:", data);
-      const googleEventId = data?.googleEvent?.id;
-
-      closeAppointmentModal(true); // Force close without confirmation since we just saved
-
-      // Show success message
-      if (window.Modal && window.Modal.success) {
-        window.Modal.success("Appointment created successfully!", "Success");
-      }
-
-      // Poll database directly for the new event by Google event ID
-      // This is more efficient than refreshing the UI multiple times
-      console.log("[appointment] Waiting for gcal-sync to process the new event...", googleEventId);
-      
-      let pollAttempts = 0;
-      const maxPolls = 10; // Try for up to 30 seconds (10 attempts x 3 seconds)
-      
-      const pollForEvent = async () => {
-        pollAttempts++;
-        setNewBookingStatusText(`waiting for new appointment...  (${pollAttempts}/${maxPolls})`);
-        console.log(`[appointment] Checking database for new event (attempt ${pollAttempts}/${maxPolls})...`);
+      if (editingPersonalAppt && editingPersonalGoogleEventId) {
+        // UPDATE mode
+        console.log("[appointment] Updating personal appointment via edge function");
         
-        try {
-          // Query database directly for the Google event ID
-          const { data: booking, error } = await window.supabaseClient
-            .from('booking')
-            .select('id, google_event_id')
-            .eq('google_event_id', googleEventId)
-            .maybeSingle();
-          
-          if (booking) {
-            // Event found in database!
-            console.log(`[appointment] ✅ Event found in database! Refreshing calendar once.`, booking);
-            hideNewBookingStatus();
-            renderWeek(weekStart);
-            return; // Stop polling
+        const { data, error } = await window.supabaseClient.functions.invoke('update-admin-appointment', {
+          body: { 
+            googleEventId: editingPersonalGoogleEventId,
+            title,
+            date,
+            startTime: startTime12,
+            endTime: endTime12,
+            location
           }
+        });
+
+        if (error) {
+          console.error("[appointment] Edge function error:", error);
+          throw new Error(error.message || "Failed to update appointment");
+        }
+
+        if (!data || !data.ok) {
+          console.error("[appointment] Edge function returned error:", data);
+          throw new Error(data?.error || "Failed to update appointment");
+        }
+
+        console.log("[appointment] ✅ Appointment updated successfully:", data);
+
+        // Build ISO timestamps for DB (TIMESTAMPTZ)
+        const startIso = new Date(`${date}T${startTime}:00`).toISOString();
+        const endIso = endTime
+          ? new Date(`${date}T${endTime}:00`).toISOString()
+          : new Date(`${date}T${startTime}:00`).toISOString(); // fallback if end omitted
+
+        // Immediate DB update so calendar refresh shows the change right away
+        await updatePersonalAppointmentRowInDb(editingPersonalGoogleEventId, {
+          title,
+          startIso,
+          endIso,
+          location
+        });
+
+        closeAppointmentModal(true); // Force close without confirmation since we just saved
+
+        // Show success message
+        if (window.Modal && window.Modal.success) {
+          window.Modal.success("Appointment updated successfully!", "Success");
+        }
+
+        // Refresh calendar to show updated appointment
+        renderWeek(weekStart);
+        
+      } else {
+        // CREATE mode
+        console.log("[appointment] Creating personal appointment via edge function");
+
+        // Call edge function to create Google Calendar event and insert into DB
+        const { data, error } = await window.supabaseClient.functions.invoke('create-admin-appointment', {
+          body: { 
+            title,
+            date,
+            startTime: startTime12,
+            endTime: endTime12,
+            location
+          }
+        });
+
+        if (error) {
+          console.error("[appointment] Edge function error:", error);
+          throw new Error(error.message || "Failed to create appointment");
+        }
+
+        if (!data || !data.ok) {
+          console.error("[appointment] Edge function returned error:", data);
+          throw new Error(data?.error || "Failed to create appointment");
+        }
+
+        console.log("[appointment] ✅ Appointment created successfully:", data);
+        const googleEventId = data?.googleEvent?.id;
+        const bookingId = data?.bookingId;
+
+        closeAppointmentModal(true); // Force close without confirmation since we just saved
+
+        // Show success message
+        if (window.Modal && window.Modal.success) {
+          window.Modal.success("Appointment created successfully!", "Success");
+        }
+
+        // If bookingId is returned, the DB row already exists - just refresh immediately
+        if (bookingId) {
+          console.log("[appointment] ✓ Booking record created immediately, refreshing calendar...");
+          renderWeek(weekStart);
+          return; // Skip polling
+        }
+
+        // Fallback: Poll database for the new event (in case edge function didn't create the booking)
+        console.log("[appointment] No bookingId returned, waiting for gcal-sync to process...", googleEventId);
+        
+        let pollAttempts = 0;
+        const maxPolls = 10; // Try for up to 30 seconds (10 attempts x 3 seconds)
+        
+        const pollForEvent = async () => {
+          pollAttempts++;
+          setNewBookingStatusText(`waiting for new appointment...  (${pollAttempts}/${maxPolls})`);
+          console.log(`[appointment] Checking database for new event (attempt ${pollAttempts}/${maxPolls})...`);
+          
+          try {
+            // Query database directly for the Google event ID
+            const { data: booking, error } = await window.supabaseClient
+              .from('booking')
+              .select('id, google_event_id')
+              .eq('google_event_id', googleEventId)
+              .maybeSingle();
+            
+            if (booking) {
+              // Event found in database!
+              console.log(`[appointment] ✅ Event found in database! Refreshing calendar once.`, booking);
+              hideNewBookingStatus();
+              renderWeek(weekStart);
+              return; // Stop polling
+            }
           
           if (error && error.code !== 'PGRST116') {
             // PGRST116 is "no rows returned" which is expected, other errors are real issues
@@ -1579,8 +1728,9 @@
       // Start polling after 2 seconds (give webhook a head start)
       showNewBookingStatus('waiting for new appointment...');
       setTimeout(pollForEvent, 2000);
+      }
     } catch (err) {
-      console.error("[appointment] Failed to create appointment", err);
+      console.error("[appointment] Failed to save appointment", err);
       
       // Show user-friendly error message
       if (window.Modal && window.Modal.error) {
@@ -2312,6 +2462,43 @@
               </button>
             </div>
           `;
+          
+          // Add click handler to open edit modal for personal appointments
+          const cardText = bookingDiv.querySelector('.booking-card-text');
+          if (cardText) {
+            cardText.style.cursor = 'pointer';
+            cardText.addEventListener('click', (e) => {
+              // Don't open modal if clicking the cancel button
+              if (e.target.closest('.booking-cancel-btn')) return;
+              
+              // Extract date and time from ISO timestamp strings
+              // booking.start_time and end_time are ISO strings like "2026-01-15T14:30:00+00:00"
+              let dateStr = '';
+              let startHHMM = '';
+              let endHHMM = '';
+              
+              if (booking.start_time) {
+                const startDate = new Date(booking.start_time);
+                dateStr = formatDateForInputLocal(startDate); // YYYY-MM-DD (local)
+                startHHMM = formatTimeForInput(startDate); // HH:MM (local)
+              }
+              
+              if (booking.end_time) {
+                const endDate = new Date(booking.end_time);
+                endHHMM = formatTimeForInput(endDate); // HH:MM
+              }
+              
+              // Open edit modal with booking data
+              openEditPersonalAppointmentModal({
+                googleEventId: booking.google_event_id,
+                title: eventTitle,
+                dateStr: dateStr,
+                startHHMM: startHHMM,
+                endHHMM: endHHMM,
+                location: booking.pickup_location || ''
+              });
+            });
+          }
         }
         
         cell.appendChild(bookingDiv);

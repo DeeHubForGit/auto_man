@@ -4,6 +4,8 @@
 // The gcal-sync function will automatically sync it to the database
 // =================================================================
 
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 // ---------- ACCESS TOKEN LOGIC ----------
 const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar";
 
@@ -22,6 +24,49 @@ function convertTo24Hour(timeStr: string): string {
   if (modifier === "AM" && hours === 12) hours = 0;
 
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function addDaysToDate(dateStr: string, days: number) {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+async function requireAdmin(req: Request) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("Missing env: SUPABASE_URL or SUPABASE_ANON_KEY");
+  }
+
+  const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
+  if (!authHeader) {
+    return { ok: false, status: 401, error: "Missing Authorization header" };
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !userData?.user) {
+    return { ok: false, status: 401, error: "Invalid session" };
+  }
+
+  const { data: isAdmin, error: adminErr } = await supabase.rpc("is_admin");
+  if (adminErr) {
+    return { ok: false, status: 500, error: "Admin check failed" };
+  }
+
+  if (isAdmin !== true) {
+    return { ok: false, status: 403, error: "Forbidden" };
+  }
+
+  return { ok: true, status: 200 };
 }
 
 async function getAccessToken(): Promise<string> {
@@ -90,6 +135,14 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const admin = await requireAdmin(req);
+  if (!admin.ok) {
+    return new Response(
+      JSON.stringify({ error: admin.error }),
+      { status: admin.status, headers: { "Content-Type": "application/json", ...corsHeaders } }
+    );
+  }
+
   try {
     const payload = await req.json();
     const {
@@ -136,24 +189,42 @@ Deno.serve(async (req) => {
     // Convert 12-hour UI time to 24-hour time
     const start24 = convertTo24Hour(startTime);
 
-    // Determine end time
+    // Start minutes
+    const [sh, sm] = start24.split(":").map(Number);
+    const startMins = sh * 60 + sm;
+
     let end24: string;
+    let endDate = date;
+
     if (endTime) {
-      end24 = convertTo24Hour(endTime);
+      const endCandidate24 = convertTo24Hour(endTime);
+      const [eh, em] = endCandidate24.split(":").map(Number);
+      const endMins = eh * 60 + em;
+
+      // If end time is earlier than (or same as) start time, assume it crosses midnight
+      if (endMins <= startMins) {
+        endDate = addDaysToDate(date, 1);
+      }
+
+      end24 = endCandidate24;
     } else {
       // Calculate from service duration
-      const [hStr, mStr] = start24.split(":");
-      const startMinutes = parseInt(hStr, 10) * 60 + parseInt(mStr, 10);
       const delta = SERVICE_DURATION_MINUTES[serviceCode] ?? 60;
-      const totalMinutes = startMinutes + delta;
-      const endH = Math.floor(totalMinutes / 60);
-      const endM = totalMinutes % 60;
+      const totalMinutes = startMins + delta;
+
+      if (totalMinutes >= 24 * 60) {
+        endDate = addDaysToDate(date, 1);
+      }
+
+      const endMins = totalMinutes % (24 * 60);
+      const endH = Math.floor(endMins / 60);
+      const endM = endMins % 60;
       end24 = `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
     }
 
-    // Build local datetime strings (NO toISOString, NO Z)
+    // Build local datetime strings (NO toISOString, NO Z) for Google payload
     const startISO = `${date}T${start24}:00`;
-    const endISO = `${date}T${end24}:00`;
+    const endISO = `${endDate}T${end24}:00`;
 
     console.log("[create-admin-booking] Time conversion:", { startTime, start24, startISO, endTime, end24, endISO });
 
@@ -245,10 +316,56 @@ Deno.serve(async (req) => {
 
     const googleEvent = await gcalRes.json();
     console.log("[create-admin-booking] ✓ Google event created:", googleEvent.id);
-    console.log("[create-admin-booking] Event will be synced to database via gcal-sync");
+
+    // Immediate DB upsert so the UI can show the booking without waiting for gcal-sync
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new Error("Missing env: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+    }
+
+    const adminSupa = createClient(supabaseUrl, serviceRoleKey);
+
+    // Store times as UTC ISO for timestamptz columns
+    const startUtc = googleEvent?.start?.dateTime ? new Date(googleEvent.start.dateTime).toISOString() : null;
+    const endUtc = googleEvent?.end?.dateTime ? new Date(googleEvent.end.dateTime).toISOString() : null;
+
+    const bookingRow: any = {
+      google_event_id: googleEvent.id,
+      google_calendar_id: calendarId,
+      source: "google",
+      status: "confirmed",
+      is_booking: true,
+
+      service_code: serviceCode,
+      start_time: startUtc,
+      end_time: endUtc,
+      pickup_location: pickupLocation || null,
+
+      event_title: googleEvent.summary || summary || null,
+      first_name: clientFirstName || null,
+      last_name: clientLastName || null,
+      email: email || null,
+      mobile: mobile || null,
+
+      google_html_link: googleEvent.htmlLink || null,
+      google_ical_uid: googleEvent.iCalUID || null,
+    };
+
+    const { data: upserted, error: upsertErr } = await adminSupa
+      .from("booking")
+      .upsert(bookingRow, { onConflict: "google_event_id" })
+      .select("id")
+      .maybeSingle();
+
+    if (upsertErr) {
+      console.warn("[create-admin-booking] DB upsert failed (sync will still fix it):", upsertErr);
+    }
+
+    const bookingId = upserted?.id || null;
 
     return new Response(
-      JSON.stringify({ ok: true, googleEvent }),
+      JSON.stringify({ ok: true, googleEvent, bookingId }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
 

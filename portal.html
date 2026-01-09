@@ -432,14 +432,19 @@
         : `${n} invalid fields in your upcoming bookings. Please update your mobile number and/or pickup address to ensure we can contact you.`;
     }
 
+    // Filter out bookings that are not renderable (must match renderBookings guard)
+    function getRenderableBookings(bookings) {
+      return (bookings || []).filter(b => b && b.id && b.start_time && b.end_time);
+    }
+
     // Shared function to count invalid fields in upcoming confirmed bookings
     function getUpcomingInvalidCount(bookings) {
-      const now = new Date();
-      now.setHours(0, 0, 0, 0);
+      const now = new Date(); // IMPORTANT: match renderBookings logic (real "upcoming")
 
-      return bookings
+      const renderable = getRenderableBookings(bookings);
+
+      return renderable
         .filter(b => {
-          if (!b.start_time) return false;
           const bookingDate = new Date(b.start_time);
           return bookingDate >= now && b.status !== 'cancelled';
         })
@@ -447,8 +452,9 @@
           if (b.status?.toLowerCase() !== 'confirmed') return count;
 
           let invalid = 0;
+
           if (b.is_mobile_valid === false || !b.mobile || b.mobile.trim() === '') invalid++;
-          
+
           // Treat pending pickup validation as invalid
           const hasPickup = !!(b.pickup_location && b.pickup_location.trim() !== '');
           const pickupPending = hasPickup && b.is_pickup_location_valid == null; // null or undefined
@@ -461,15 +467,17 @@
 
     // Shared function to refresh badge and persistent banner
     function refreshUpcomingValidationUI() {
-      const invalidCount = getUpcomingInvalidCount(allBookings);
-      
+      const renderable = getRenderableBookings(allBookings);
+
+      const invalidCount = getUpcomingInvalidCount(renderable);
+
       // Check if any upcoming confirmed bookings have pending validation
-      const now = new Date();
-      now.setHours(0, 0, 0, 0);
-      const hasPending = allBookings.some(b => {
-        if (!b.start_time) return false;
+      const now = new Date(); // IMPORTANT: match renderBookings logic (real "upcoming")
+
+      const hasPending = renderable.some(b => {
         const bookingDate = new Date(b.start_time);
         if (bookingDate < now || b.status === 'cancelled' || b.status?.toLowerCase() !== 'confirmed') return false;
+
         const hasPickup = !!(b.pickup_location && b.pickup_location.trim() !== '');
         return hasPickup && b.is_pickup_location_valid == null;
       });

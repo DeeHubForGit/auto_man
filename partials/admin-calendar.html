@@ -136,6 +136,11 @@
     cursor: pointer;
   }
   
+  /* Make disabled but checked radio buttons still visible */
+  #section-calendar input[type="radio"]:disabled:checked {
+    opacity: 1;
+  }
+  
   #section-calendar .payment-label {
     font-weight: 600;
   }
@@ -967,6 +972,33 @@
     editingPersonalGoogleEventId = null;
   }
 
+  // Helper to enable/disable appointment type radio buttons
+  function setAppointmentTypeRadiosDisabled(disabled) {
+    document.querySelectorAll('input[name="appointmentType"]').forEach(r => {
+      r.disabled = !!disabled;
+    });
+  }
+
+  // Helper to control save button loading state
+  let apptSaveOriginalHtml = null;
+
+  function setAppointmentSaveLoading(isLoading, labelText) {
+    const btn = document.getElementById('appointment-save');
+    if (!btn) return;
+
+    if (isLoading) {
+      if (apptSaveOriginalHtml == null) apptSaveOriginalHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = `<span class="mini-spinner"></span>${labelText || 'Processing...'}`;
+    } else {
+      btn.disabled = false;
+      if (apptSaveOriginalHtml != null) {
+        btn.innerHTML = apptSaveOriginalHtml;
+        apptSaveOriginalHtml = null;
+      }
+    }
+  }
+
   // Modal handling for personal appointments
   const btnNewAppointment = document.getElementById("btn-new-appointment");
   const apptBackdrop = document.getElementById("appointment-modal-backdrop");
@@ -991,7 +1023,9 @@
     
     // Reset appointment type to "booking" (default)
     const bookingRadio = document.querySelector('input[name="appointmentType"][value="booking"]');
+    const personalRadio = document.querySelector('input[name="appointmentType"][value="personal"]');
     if (bookingRadio) bookingRadio.checked = true;
+    if (personalRadio) personalRadio.checked = false;
     
     // Reset client mode to "existing" (default)
     const existingClientRadio = document.querySelector('input[name="clientMode"][value="existing"]');
@@ -1004,6 +1038,9 @@
     document.getElementById('bookingFields').style.display = 'block';
     document.getElementById('existingClientFields').style.display = 'block';
     document.getElementById('newClientFields').style.display = 'none';
+    
+    // Enable appointment type radios for new appointments
+    setAppointmentTypeRadiosDisabled(false);
     
     // Set end time field to readonly for bookings
     const endTimeInput = document.getElementById('appt-end');
@@ -1081,6 +1118,7 @@
     apptForm.reset();
     formHasChanges = false;
     resetPersonalEditState();
+    setAppointmentTypeRadiosDisabled(false);
   }
 
   // Open modal in edit mode for a personal appointment
@@ -1096,10 +1134,17 @@
     document.getElementById("appt-end").value = endHHMM || '';
     document.getElementById("appt-location").value = location || '';
     
-    // Force personal appointment mode
+    // Force personal appointment mode (keep personal enabled so it shows as selected)
+    const radioBooking = document.querySelector('input[name="appointmentType"][value="booking"]');
     const radioPersonal = document.querySelector('input[name="appointmentType"][value="personal"]');
+    
+    if (radioBooking) {
+      radioBooking.checked = false;
+      radioBooking.disabled = true; // Disable only booking to prevent switching
+    }
     if (radioPersonal) {
       radioPersonal.checked = true;
+      radioPersonal.disabled = false; // Keep personal enabled so selection is visible
       radioPersonal.dispatchEvent(new Event('change'));
     }
     
@@ -1579,6 +1624,9 @@
       const startTime12 = convert24To12Hour(startTime);
       const endTime12 = endTime ? convert24To12Hour(endTime) : null;
 
+      // Show loading state on save button
+      setAppointmentSaveLoading(true, editingPersonalAppt ? 'Updating...' : 'Creating...');
+
       if (editingPersonalAppt && editingPersonalGoogleEventId) {
         // UPDATE mode
         console.log("[appointment] Updating personal appointment via edge function");
@@ -1741,6 +1789,8 @@
       } else {
         alert("Could not save appointment. Please try again. Error: " + (err.message || err));
       }
+    } finally {
+      setAppointmentSaveLoading(false);
     }
   }
 
@@ -1919,6 +1969,20 @@
 
       console.log("[booking] ✅ Booking created successfully:", data);
       const googleEventId = data?.googleEvent?.id;
+      const bookingId = data?.bookingId;
+
+      if (bookingId) {
+        console.log("[booking] ✓ Booking record created immediately, refreshing calendar...");
+        closeAppointmentModal(true); // Force close without confirmation since we just saved
+
+        // Show success message
+        if (window.Modal && window.Modal.success) {
+          window.Modal.success("Booking created successfully!", "Success");
+        }
+
+        renderWeek(weekStart);
+        return; // Skip polling
+      }
 
       closeAppointmentModal(true); // Force close without confirmation since we just saved
 
@@ -2122,7 +2186,18 @@
     }
 
     const weekEnd = addDays(weekStart, 7);
-    console.log('📅 Fetching bookings for week:', weekStart.toISOString(), 'to', weekEnd.toISOString());
+    
+    // Create consistent local date boundaries for query (avoid timezone drift)
+    const weekStartLocal = new Date(weekStart);
+    weekStartLocal.setHours(0, 0, 0, 0);
+    
+    const weekEndLocal = addDays(weekStartLocal, 7);
+    weekEndLocal.setHours(0, 0, 0, 0);
+    
+    const weekStartIso = weekStartLocal.toISOString();
+    const weekEndIso = weekEndLocal.toISOString();
+    
+    console.log('📅 Fetching bookings for week:', weekStartIso, 'to', weekEndIso);
     
     // First, fetch all services to create a lookup map
     const { data: services, error: servicesError } = await window.supabaseClient
@@ -2162,8 +2237,8 @@
     const { data: bookings, error } = await window.supabaseClient
       .from('booking')
       .select('*')
-      .gte('start_time', weekStart.toISOString())
-      .lt('start_time', weekEnd.toISOString())
+      .gte('start_time', weekStartIso)
+      .lt('start_time', weekEndIso)
       .neq('status', 'cancelled')
       .order('start_time');
 
@@ -2839,6 +2914,7 @@
           cancelledBy: adminEmail,
           triggerElement: element,
           confirmMessage: confirmMessage, // Use custom message if provided
+          confirmTitle: 'Cancel appointment',
           showSuccessMessage: false, // Admin calendar refresh provides visual feedback
           onSuccess: async () => {
             // Refresh the calendar after successful cancellation

@@ -150,6 +150,7 @@ window.GoogleCalendar = (function() {
       googleEventId,
       cancelledBy,
       confirmMessage = 'Are you sure you want to cancel this booking? This action cannot be undone.',
+      confirmTitle,
       onSuccess = null,
       onError = null,
       onCancel = null,
@@ -164,7 +165,7 @@ window.GoogleCalendar = (function() {
           confirmMessage,
           () => resolve(true),
           () => resolve(false),
-          'Cancel Booking'
+          confirmTitle || 'Cancel appointment'
         );
       } else {
         resolve(confirm(confirmMessage));

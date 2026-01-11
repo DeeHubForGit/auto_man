@@ -469,10 +469,27 @@
     function refreshUpcomingValidationUI() {
       const renderable = getRenderableBookings(allBookings);
 
+      // Guard: hide banner when no UPCOMING bookings exist
+      const banner = document.getElementById('myBookingsStatusBanner');
+      const now = new Date(); // IMPORTANT: match renderBookings logic (real "upcoming")
+      
+      // Check if there are any upcoming confirmed bookings
+      const hasUpcomingBookings = renderable.some(b => {
+        const bookingDate = new Date(b.start_time);
+        return bookingDate >= now && b.status?.toLowerCase() === 'confirmed';
+      });
+      
+      if (!hasUpcomingBookings) {
+        if (banner) banner.style.display = 'none';
+        return;
+      }
+
+      // Bookings exist → ensure banner is visible
+      if (banner) banner.style.display = '';
+
       const invalidCount = getUpcomingInvalidCount(renderable);
 
       // Check if any upcoming confirmed bookings have pending validation
-      const now = new Date(); // IMPORTANT: match renderBookings logic (real "upcoming")
 
       const hasPending = renderable.some(b => {
         const bookingDate = new Date(b.start_time);
@@ -1267,23 +1284,13 @@
                     `}
                   </div>
                 </div>
-
-                ${booking.price_cents ? `
+                
+                ${false && booking.price_cents ? `
                   <div class="flex items-center gap-2">
                     <svg class="w-4 h-4 flex-shrink-0 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span class="text-gray-900">$${(booking.price_cents / 100).toFixed(2)}</span>
-                  </div>
-                ` : ''}
-                
-                ${isUpcoming && isConfirmed && booking.google_html_link ? `
-                  <div class="mt-2">
-                    <a href="${booking.google_html_link}" target="_blank" 
-                       class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 hover:underline">
-                      <i class="fa-solid fa-calendar"></i>
-                      <span>View in Calendar</span>
-                    </a>
                   </div>
                 ` : ''}
 

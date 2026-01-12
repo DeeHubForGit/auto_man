@@ -1,0 +1,663 @@
+<style>
+  /* Force white background for entire reporting section */
+  #section-reporting,
+  #section-reporting .bg-white {
+    background: #ffffff !important;
+  }
+
+  /* Ensure client search dropdown renders on top with white background */
+  #reportClientContainer {
+    position: relative;
+    z-index: 2000;
+  }
+
+  #reportClientDropdown {
+    position: absolute;
+    z-index: 2001;
+    background: #ffffff !important;
+    opacity: 1;
+  }
+
+  #reportClientDropdown > * {
+    background: #ffffff !important;
+  }
+
+  #reportClientDropdown button {
+    opacity: 1 !important;
+    filter: none !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  #reportClientDropdown button:hover,
+  #reportClientDropdown button:focus {
+    opacity: 1 !important;
+    filter: none !important;
+    background: #eff6ff !important;
+    color: #111827 !important;
+  }
+
+  /* Report heading - blue accent */
+  #section-reporting h2 {
+    color: #1d4ed8;
+  }
+
+  /* Filter labels - dark and readable */
+  #section-reporting label {
+    color: #111827 !important;
+  }
+
+  /* Report table styling - clean white background */
+  #reportTable {
+    width: 100%;
+    border-collapse: collapse;
+    background: #ffffff;
+  }
+
+  #reportTable thead {
+    background-color: #f9fafb;
+    border-bottom: 2px solid #e5e7eb;
+  }
+
+  #reportTable th {
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #1f2937;
+    font-size: 14px;
+  }
+
+  #reportTable tbody tr {
+    background: #ffffff;
+  }
+
+  #reportTable td {
+    padding: 12px;
+    border-bottom: 1px solid #e5e7eb;
+    color: #111827;
+    font-size: 14px;
+  }
+
+  #reportTable th {
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #1f2937;
+    font-size: 14px;
+  }
+
+  /* Client name + booking name styles */
+  .report-client-name {
+    color: #0f172a;
+    font-weight: 600;
+  }
+
+  .report-booking-name {
+    color: #334155;
+    font-size: 12px;
+    margin-top: 2px;
+  }
+
+  /* Muted text in table */
+  #reportTable .text-xs {
+    color: #6b7280;
+  }
+
+  /* Subtle hover for report-like feel */
+  #reportTable tbody tr:hover {
+    background-color: #f9fafb;
+  }
+
+  /* Ensure filters and inputs remain white with blue focus */
+  #section-reporting input {
+    background: #ffffff;
+    color: #111827;
+  }
+
+  #section-reporting input:focus {
+    ring-color: #3b82f6;
+  }
+
+  /* Allow Export CSV button to keep its blue styling */
+  #reportExportCsvBtn {
+    background: #2563eb !important;
+    color: #ffffff !important;
+  }
+
+  #reportExportCsvBtn:hover {
+    background: #1d4ed8 !important;
+  }
+</style>
+
+<!-- Admin Reporting Section -->
+<section id="section-reporting" class="section-content hidden">
+  <div class="bg-white rounded-none border shadow-sm p-6">
+    <h2 class="text-xl font-semibold mb-6">Reporting</h2>
+
+    <!-- Tabs -->
+    <div class="border-b border-gray-200 mb-6">
+      <nav class="flex space-x-8" aria-label="Tabs">
+        <button onclick="showReportTab('client-bookings')" id="tab-client-bookings"
+          class="report-tab border-b-2 border-blue-500 py-4 px-1 text-sm font-medium text-blue-600">
+          Client Bookings
+        </button>
+        <!-- Future tabs can be added here -->
+      </nav>
+    </div>
+
+    <!-- Client Bookings Tab -->
+    <div id="report-client-bookings" class="report-tab-content">
+      <!-- Filters -->
+      <div class="mb-6">
+        <div class="flex flex-wrap items-end gap-3">
+          <div class="flex flex-col gap-1">
+            <label class="text-sm font-medium text-gray-900">Date From</label>
+            <input type="date" id="reportDateFrom"
+              class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onchange="loadClientBookingsReport()">
+          </div>
+
+          <div class="flex flex-col gap-1">
+            <label class="text-sm font-medium text-gray-900">Date To</label>
+            <input type="date" id="reportDateTo"
+              class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onchange="loadClientBookingsReport()">
+          </div>
+
+          <div class="flex flex-col gap-1">
+            <label class="text-sm font-medium text-gray-900">Client</label>
+            <div class="relative min-w-[220px]" id="reportClientContainer">
+              <input type="text" id="reportClientSearch" placeholder="Type to search client..."
+                class="w-full bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                oninput="handleReportClientSearch(this.value)" autocomplete="off">
+              <button type="button" id="reportClientClear"
+                class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                onclick="clearReportClient()" title="Clear client filter">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <div id="reportClientDropdown"
+                class="hidden absolute left-0 top-full z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+              </div>
+            </div>
+          </div>
+
+          <button type="button" id="reportExportCsvBtn"
+            class="mt-5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center gap-2"
+            onclick="exportReportToCSV()">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Export CSV
+          </button>
+        </div>
+      </div>
+
+      <!-- Report Table -->
+      <div class="overflow-x-auto">
+        <div id="reportLoadingState" class="text-center py-12 text-gray-500">
+          <svg class="animate-spin h-8 w-8 text-blue-500 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none"
+            viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+            </path>
+          </svg>
+          Loading report...
+        </div>
+
+        <table id="reportTable" class="hidden">
+          <thead>
+            <tr>
+              <th>Client Name</th>
+              <th>Service</th>
+              <th>Date</th>
+              <th>Start Time</th>
+              <th>End Time</th>
+              <th>Price</th>
+              <th>Paid</th>
+            </tr>
+          </thead>
+          <tbody id="reportTableBody">
+          </tbody>
+        </table>
+
+        <div id="reportEmptyState" class="hidden text-center py-12">
+          <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <p class="mt-4 text-base font-medium text-gray-700">No bookings found for the selected filters.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  (function () {
+    let reportBookings = [];
+    let reportClientId = null;
+    let reportClientName = '';
+    let reportClientSearchDebounce = null;
+    let reportClientSearchResults = [];
+
+    // Set default date range (last 30 days)
+    function setDefaultDateRange() {
+      const today = new Date();
+      const thirtyDaysAgo = new Date(today);
+      thirtyDaysAgo.setDate(today.getDate() - 30);
+
+      const dateFrom = document.getElementById('reportDateFrom');
+      const dateTo = document.getElementById('reportDateTo');
+
+      if (dateFrom) dateFrom.value = thirtyDaysAgo.toISOString().split('T')[0];
+      if (dateTo) dateTo.value = today.toISOString().split('T')[0];
+    }
+
+    // Client search with debounce
+    window.handleReportClientSearch = function (searchTerm) {
+      if (reportClientSearchDebounce) {
+        clearTimeout(reportClientSearchDebounce);
+      }
+
+      const dropdown = document.getElementById('reportClientDropdown');
+
+      if (searchTerm.length < 2) {
+        dropdown.classList.add('hidden');
+        dropdown.innerHTML = '';
+        return;
+      }
+
+      dropdown.innerHTML = '<div class="px-3 py-2 text-sm bg-white text-gray-700">Searching...</div>';
+      dropdown.classList.remove('hidden');
+
+      reportClientSearchDebounce = setTimeout(async () => {
+        await searchReportClients(searchTerm);
+      }, 300);
+    };
+
+    // Search clients in database
+    async function searchReportClients(searchTerm) {
+      const dropdown = document.getElementById('reportClientDropdown');
+
+      if (!window.supabaseClient) {
+        dropdown.innerHTML = '<div class="px-3 py-2 text-sm bg-white text-red-600">Database not available</div>';
+        return;
+      }
+
+      try {
+        const { data: clients, error } = await window.supabaseClient
+          .from('client')
+          .select('id, first_name, last_name, email')
+          .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
+          .order('first_name')
+          .limit(20);
+
+        if (error) {
+          console.error('Error searching clients:', error);
+          dropdown.innerHTML = '<div class="px-3 py-2 text-sm bg-white text-red-600">Error searching clients</div>';
+          return;
+        }
+
+        if (!clients || clients.length === 0) {
+          dropdown.innerHTML = '<div class="px-3 py-2 text-sm bg-white text-gray-700">No clients found</div>';
+          reportClientSearchResults = [];
+          return;
+        }
+
+        reportClientSearchResults = clients;
+
+        dropdown.innerHTML = clients.map(client => {
+          const fullName = [client.first_name, client.last_name].filter(Boolean).join(' ');
+          const displayText = `${fullName} (${client.email || 'no email'})`;
+          return `
+            <button type="button" 
+              class="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 text-gray-900 border-b border-gray-100 last:border-b-0"
+              onclick="selectReportClient('${client.id}', '${fullName.replace(/'/g, "\\'")}')">
+              ${displayText}
+            </button>
+          `;
+        }).join('');
+
+      } catch (err) {
+        console.error('Exception searching clients:', err);
+        dropdown.innerHTML = '<div class="px-3 py-2 text-sm bg-white text-red-600">Error searching clients</div>';
+      }
+    }
+
+    // Select client from dropdown
+    window.selectReportClient = function (clientId, clientName) {
+      reportClientId = clientId;
+      reportClientName = clientName;
+
+      const searchInput = document.getElementById('reportClientSearch');
+      const dropdown = document.getElementById('reportClientDropdown');
+      const clearButton = document.getElementById('reportClientClear');
+
+      searchInput.value = clientName;
+      dropdown.classList.add('hidden');
+      dropdown.innerHTML = '';
+      reportClientSearchResults = [];
+      clearButton.classList.remove('hidden');
+
+      loadClientBookingsReport();
+    };
+
+    // Clear client filter
+    window.clearReportClient = function () {
+      reportClientId = null;
+      reportClientName = '';
+
+      const searchInput = document.getElementById('reportClientSearch');
+      const clearButton = document.getElementById('reportClientClear');
+      const dropdown = document.getElementById('reportClientDropdown');
+
+      searchInput.value = '';
+      clearButton.classList.add('hidden');
+      dropdown.classList.add('hidden');
+      dropdown.innerHTML = '';
+      reportClientSearchResults = [];
+
+      loadClientBookingsReport();
+    };
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function (event) {
+      const container = document.getElementById('reportClientContainer');
+      const dropdown = document.getElementById('reportClientDropdown');
+
+      if (container && dropdown && !container.contains(event.target)) {
+        dropdown.classList.add('hidden');
+      }
+    });
+
+    // Setup client filter input event listeners
+    function initReportClientListeners() {
+      const clientInput = document.getElementById('reportClientSearch');
+      const dropdown = document.getElementById('reportClientDropdown');
+
+      if (!clientInput || !dropdown) return;
+
+      clientInput.addEventListener('focus', async () => {
+        const term = (clientInput.value || '').trim();
+
+        if (term.length < 2) return;
+
+        if (reportClientSearchResults && reportClientSearchResults.length > 0) {
+          const displayResults = reportClientSearchResults.map(client => {
+            const fullName = [client.first_name, client.last_name].filter(Boolean).join(' ');
+            const displayText = `${fullName} (${client.email || 'no email'})`;
+            return `
+              <button type="button" 
+                class="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 text-gray-900 border-b border-gray-100 last:border-b-0"
+                onclick="selectReportClient('${client.id}', '${fullName.replace(/'/g, "\\'")}')">
+                ${displayText}
+              </button>
+            `;
+          }).join('');
+          dropdown.innerHTML = displayResults;
+          dropdown.classList.remove('hidden');
+          return;
+        }
+
+        await handleReportClientSearch(term);
+      });
+
+      clientInput.addEventListener('blur', () => {
+        setTimeout(() => {
+          dropdown.classList.add('hidden');
+        }, 150);
+      });
+
+      dropdown.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+      });
+    }
+
+    // Load client bookings report
+    window.loadClientBookingsReport = async function () {
+      if (!window.supabaseClient) return;
+
+      const loadingState = document.getElementById('reportLoadingState');
+      const table = document.getElementById('reportTable');
+      const emptyState = document.getElementById('reportEmptyState');
+      const tableBody = document.getElementById('reportTableBody');
+
+      // Show loading
+      loadingState.classList.remove('hidden');
+      table.classList.add('hidden');
+      emptyState.classList.add('hidden');
+
+      const dateFrom = document.getElementById('reportDateFrom')?.value;
+      const dateTo = document.getElementById('reportDateTo')?.value;
+
+      let query = window.supabaseClient
+        .from('booking')
+        .select('start_time,end_time,service_code,price_cents,is_payment_required,first_name,last_name,client:client_id(first_name,last_name)')
+        .eq('is_booking', true)
+        .order('start_time', { ascending: true })
+        .limit(1000);
+
+      // Apply date filters
+      if (dateFrom) {
+        query = query.gte('start_time', dateFrom + 'T00:00:00');
+      }
+      if (dateTo) {
+        query = query.lte('start_time', dateTo + 'T23:59:59');
+      }
+
+      // Apply client filter
+      if (reportClientId) {
+        query = query.eq('client_id', reportClientId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error loading report:', error);
+        loadingState.innerHTML = `<div class="p-4 bg-red-50 text-red-800 rounded border border-red-200">Error loading report: ${error.message}</div>`;
+        return;
+      }
+
+      reportBookings = data || [];
+
+      // Hide loading
+      loadingState.classList.add('hidden');
+
+      if (reportBookings.length === 0) {
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      // Render table
+      table.classList.remove('hidden');
+      tableBody.innerHTML = reportBookings.map(booking => {
+        const startTime = new Date(booking.start_time);
+        const endTime = new Date(booking.end_time);
+
+        const date = startTime.toLocaleDateString('en-AU', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+
+        const startTimeStr = startTime.toLocaleTimeString('en-AU', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+
+        const endTimeStr = endTime.toLocaleTimeString('en-AU', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+
+        // Client name - use client table as source of truth, fallback to booking table
+        const clientFirst = booking.client?.first_name || '';
+        const clientLast = booking.client?.last_name || '';
+        const clientNameFromClient = `${clientFirst} ${clientLast}`.trim();
+
+        const bookingNameFromBooking = `${booking.first_name || ''} ${booking.last_name || ''}`.trim();
+
+        const clientName = clientNameFromClient || bookingNameFromBooking || 'Unknown';
+
+        const normalise = (s) => (s || '').trim().toLowerCase();
+        const isNameMismatch =
+          clientNameFromClient &&
+          bookingNameFromBooking &&
+          normalise(clientNameFromClient) !== normalise(bookingNameFromBooking);
+
+        let serviceName = booking.service_code || 'Lesson';
+        if (serviceName.includes('auto')) serviceName = 'Auto';
+        else if (serviceName.includes('manual')) serviceName = 'Manual';
+
+        const price = typeof booking.price_cents === 'number' ? `$${(booking.price_cents / 100).toFixed(2)}` : '';
+        const paid = booking.is_payment_required === false ? 'Yes' : 'No';
+
+        return `
+          <tr>
+            <td>
+              <div class="report-client-name">${clientName}</div>
+              ${isNameMismatch ? `<div class="report-booking-name">Booking name: ${bookingNameFromBooking}</div>` : ''}
+            </td>
+            <td>${serviceName}</td>
+            <td>${date}</td>
+            <td>${startTimeStr}</td>
+            <td>${endTimeStr}</td>
+            <td>${price}</td>
+            <td>${paid}</td>
+          </tr>
+        `;
+      }).join('');
+    };
+
+    // Export report to CSV
+    window.exportReportToCSV = function () {
+      if (!reportBookings || reportBookings.length === 0) {
+        alert('No bookings to export');
+        return;
+      }
+
+      // CSV helper to escape values
+      function escapeCSV(value) {
+        if (value == null) return '';
+        const str = String(value);
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return '"' + str.replace(/"/g, '""') + '"';
+        }
+        return str;
+      }
+
+      // CSV Headers
+      const headers = ['Client Name', 'Service', 'Date', 'Start Time', 'End Time', 'Price', 'Paid'];
+
+      // Build CSV rows
+      const rows = reportBookings.map(booking => {
+        const startTime = new Date(booking.start_time);
+        const endTime = new Date(booking.end_time);
+
+        const date = startTime.toLocaleDateString('en-AU', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+
+        const startTimeStr = startTime.toLocaleTimeString('en-AU', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+
+        const endTimeStr = endTime.toLocaleTimeString('en-AU', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+
+        // Client name - use client table as source of truth, fallback to booking table
+        const clientFirst = booking.client?.first_name || '';
+        const clientLast = booking.client?.last_name || '';
+        const clientNameFromClient = `${clientFirst} ${clientLast}`.trim();
+        const bookingNameFromBooking = `${booking.first_name || ''} ${booking.last_name || ''}`.trim();
+        const clientName = clientNameFromClient || bookingNameFromBooking || 'Unknown';
+
+        let serviceName = booking.service_code || 'Lesson';
+        if (serviceName.includes('auto')) serviceName = 'Auto';
+        else if (serviceName.includes('manual')) serviceName = 'Manual';
+
+        const price = typeof booking.price_cents === 'number' ? `$${(booking.price_cents / 100).toFixed(2)}` : '';
+        const paid = booking.is_payment_required === false ? 'Yes' : 'No';
+
+        return [clientName, serviceName, date, startTimeStr, endTimeStr, price, paid].map(escapeCSV).join(',');
+      });
+
+      // Combine headers and rows
+      const csvContent = [headers.map(escapeCSV).join(','), ...rows].join('\n');
+
+      // Create filename with date and time
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+      const hours = now.getHours();
+      const hours12 = hours % 12 || 12;
+      const minutes = now.getMinutes().toString().padStart(2, '0');
+      const ampm = hours >= 12 ? 'pm' : 'am';
+      const timeStr = hours12.toString().padStart(2, '0') + minutes + ampm;
+
+      const filename = `client-bookings-${today}-${timeStr}.csv`;
+
+      // Download CSV
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    };
+
+    // Tab switching (for future tabs)
+    window.showReportTab = function (tabName) {
+      // In v1, only one tab exists, but structure is ready for more
+      document.querySelectorAll('.report-tab').forEach(tab => {
+        tab.classList.remove('border-blue-500', 'text-blue-600');
+        tab.classList.add('border-transparent', 'text-gray-500');
+      });
+
+      document.querySelectorAll('.report-tab-content').forEach(content => {
+        content.classList.add('hidden');
+      });
+
+      const activeTab = document.getElementById(`tab-${tabName}`);
+      const activeContent = document.getElementById(`report-${tabName}`);
+
+      if (activeTab) {
+        activeTab.classList.remove('border-transparent', 'text-gray-500');
+        activeTab.classList.add('border-blue-500', 'text-blue-600');
+      }
+
+      if (activeContent) {
+        activeContent.classList.remove('hidden');
+      }
+    };
+
+    // Initialize on DOM ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        setDefaultDateRange();
+        initReportClientListeners();
+        loadClientBookingsReport();
+      });
+    } else {
+      setDefaultDateRange();
+      initReportClientListeners();
+      loadClientBookingsReport();
+    }
+  })();
+</script>

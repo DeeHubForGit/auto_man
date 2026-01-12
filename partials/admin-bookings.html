@@ -1,4 +1,37 @@
 <style>
+  /* Ensure client search dropdown always renders on top */
+  #clientFilterContainer {
+    position: relative;
+    z-index: 2000;
+  }
+
+  #clientFilterDropdown {
+    position: absolute;
+    z-index: 2001;
+    background: #ffffff !important;
+    opacity: 1;
+  }
+
+  #clientFilterDropdown > * {
+    background: #ffffff !important;
+  }
+
+  /* Client filter dropdown: prevent global button hover styles from messing with it */
+  #clientFilterDropdown button {
+    opacity: 1 !important;
+    filter: none !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  #clientFilterDropdown button:hover,
+  #clientFilterDropdown button:focus {
+    opacity: 1 !important;
+    filter: none !important;
+    background: #eff6ff !important; /* light blue */
+    color: #111827 !important;
+  }
+
   #adminBookingsList .booking-card {
     background-color: #dbeafe !important;   /* bg-blue-100 */
     border: 2px solid #3b82f6 !important;   /* blue-500 edge */
@@ -58,23 +91,89 @@
       
       <!-- Filters -->
       <div class="flex flex-wrap items-center gap-3">
-        <select id="bookingFilterChecked" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px]" onchange="loadAdminBookings()">
-          <option value="unchecked" selected>Not Checked</option>
-          <option value="checked">Checked</option>
-          <option value="all">All</option>
-        </select>
+        <div class="flex flex-col gap-1">
+          <label class="text-sm font-medium text-gray-300">Date</label>
+          <select id="bookingViewFilter" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]" onchange="window.currentBookingsPage = 1; loadAdminBookings()">
+            <option value="upcoming" selected>Upcoming</option>
+            <option value="past">Past</option>
+            <option value="all">All</option>
+          </select>
+        </div>
 
-        <select id="bookingFilterValid" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[160px]" onchange="loadAdminBookings()">
-          <option value="all" selected>Valid and Invalid</option>
-          <option value="invalid">Invalid Only</option>
-          <option value="valid">Valid Only</option>
-        </select>
+        <div class="flex flex-col gap-1">
+          <label class="text-sm font-medium text-gray-300">Checked</label>
+          <select id="bookingFilterChecked" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px]" onchange="window.currentBookingsPage = 1; loadAdminBookings()">
+            <option value="unchecked" selected>Not Checked</option>
+            <option value="checked">Checked</option>
+            <option value="all">All</option>
+          </select>
+        </div>
 
-        <select id="bookingFilterPayment" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[160px]" onchange="loadAdminBookings()">
-          <option value="all" selected>All payments</option>
-          <option value="required">Payment required only</option>
-          <option value="paid">Paid only</option>
-        </select>
+        <div class="flex flex-col gap-1">
+          <label class="text-sm font-medium text-gray-300">Validation</label>
+          <select id="bookingFilterValid" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px]" onchange="window.currentBookingsPage = 1; loadAdminBookings()">
+            <option value="all" selected>All</option>
+            <option value="invalid">Invalid</option>
+            <option value="valid">Valid</option>
+          </select>
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <label class="text-sm font-medium text-gray-300">Payments</label>
+          <select id="bookingFilterPayment" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]" onchange="window.currentBookingsPage = 1; loadAdminBookings()">
+            <option value="all" selected>All</option>
+            <option value="required">Payment required</option>
+            <option value="paid">Paid</option>
+          </select>
+        </div>
+
+        <!-- Client Filter (Type-ahead Search) -->
+        <div class="flex flex-col gap-1">
+          <label class="text-sm font-medium text-gray-300">Client</label>
+          <div class="relative min-w-[220px]" id="clientFilterContainer">
+          <input type="text" 
+            id="clientFilterSearch" 
+            placeholder="Type to search client..." 
+            class="w-full bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            oninput="handleClientSearch(this.value)"
+            autocomplete="off"
+          >
+          <button type="button" 
+            id="clientFilterClear" 
+            class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            onclick="clearClientFilter()"
+            title="Clear client filter">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <!-- Dropdown suggestions -->
+          <div id="clientFilterDropdown" class="hidden absolute left-0 top-full z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+          </div>
+        </div>
+        </div>
+
+        <!-- Per Page Dropdown -->
+        <div class="flex flex-col gap-1">
+          <label class="text-sm font-medium text-gray-300">Per page</label>
+          <select id="bookingsPerPage" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[100px]" onchange="window.currentBookingsPage = 1; renderAdminBookings();">
+            <option value="10">10</option>
+            <option value="25" selected>25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </div>
+
+        <!-- Export CSV Button -->
+        <button type="button" 
+          id="exportCsvButton" 
+          class="mt-5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center gap-2"
+          onclick="exportBookingsToCSV()">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Export CSV
+        </button>
       </div>
     </div>
 
@@ -88,16 +187,228 @@
         Loading bookings...
       </div>
     </div>
+
+    <!-- Pagination Footer -->
+    <div id="bookingsPagination" class="hidden mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-200">
+      <div id="bookingsPaginationInfo" class="text-sm text-gray-400"></div>
+      <div class="flex items-center gap-2">
+        <button id="bookingsPrevPage" class="px-3 py-1 text-sm border border-gray-600 rounded hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white" onclick="changeBookingsPage(-1)">
+          Previous
+        </button>
+        <div id="bookingsPageNumbers" class="text-sm text-gray-400"></div>
+        <button id="bookingsNextPage" class="px-3 py-1 text-sm border border-gray-600 rounded hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white" onclick="changeBookingsPage(1)">
+          Next
+        </button>
+      </div>
+    </div>
   </div>
 </section>
 
 <script>
 (function() {
   let adminBookings = [];
+  let allAdminBookings = []; // Full dataset for pagination
+  let exportBookings = []; // Full filtered dataset for CSV export
+  window.currentBookingsPage = 1;
   let mobileDebounceTimers = {};
   let pickupDebounceTimers = {};
   let lastActiveField = null;   // 'pickup' | 'mobile'
   let lastActiveBookingId = null;
+  
+  // Client filter state
+  let selectedClientId = null;
+  let selectedClientName = '';
+  let clientSearchDebounce = null;
+  let clientSearchResults = [];
+  let selectedBookingView = 'upcoming';
+
+  // Client search function with debounce
+  window.handleClientSearch = function(searchTerm) {
+    // Clear existing debounce
+    if (clientSearchDebounce) {
+      clearTimeout(clientSearchDebounce);
+    }
+
+    const dropdown = document.getElementById('clientFilterDropdown');
+    const searchInput = document.getElementById('clientFilterSearch');
+    
+    // Hide dropdown if less than 2 characters
+    if (searchTerm.length < 2) {
+      dropdown.classList.add('hidden');
+      dropdown.innerHTML = '';
+      return;
+    }
+
+    // Show loading state
+    dropdown.innerHTML = '<div class="px-3 py-2 text-sm bg-white text-gray-700">Searching...</div>';
+    dropdown.classList.remove('hidden');
+
+    // Debounce search by 300ms
+    clientSearchDebounce = setTimeout(async () => {
+      await searchClients(searchTerm);
+    }, 300);
+  };
+
+  // Search clients in database
+  async function searchClients(searchTerm) {
+    const dropdown = document.getElementById('clientFilterDropdown');
+    
+    if (!window.supabaseClient) {
+      dropdown.innerHTML = '<div class="px-3 py-2 text-sm bg-white text-red-600">Database not available</div>';
+      return;
+    }
+
+    try {
+      // Search by first name, last name, or email (case-insensitive)
+      const { data: clients, error } = await window.supabaseClient
+        .from('client')
+        .select('id, first_name, last_name, email')
+        .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
+        .order('first_name')
+        .limit(20);
+
+      if (error) {
+        console.error('Error searching clients:', error);
+        dropdown.innerHTML = '<div class="px-3 py-2 text-sm bg-white text-red-600">Error searching clients</div>';
+        return;
+      }
+
+      if (!clients || clients.length === 0) {
+        dropdown.innerHTML = '<div class="px-3 py-2 text-sm bg-white text-gray-700">No clients found</div>';
+        clientSearchResults = [];
+        return;
+      }
+
+      // Store results for focus event
+      clientSearchResults = clients;
+
+      // Render suggestions
+      dropdown.innerHTML = clients.map(client => {
+        const fullName = [client.first_name, client.last_name].filter(Boolean).join(' ');
+        const displayText = `${fullName} (${client.email || 'no email'})`;
+        return `
+          <button type="button" 
+            class="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 text-gray-900 border-b border-gray-100 last:border-b-0"
+            onclick="selectClient('${client.id}', '${fullName.replace(/'/g, "\\'")}')">
+            ${displayText}
+          </button>
+        `;
+      }).join('');
+      
+    } catch (err) {
+      console.error('Exception searching clients:', err);
+      dropdown.innerHTML = '<div class="px-3 py-2 text-sm bg-white text-red-600">Error searching clients</div>';
+    }
+  }
+
+  // Select client from dropdown
+  window.selectClient = function(clientId, clientName) {
+    selectedClientId = clientId;
+    selectedClientName = clientName;
+    
+    const searchInput = document.getElementById('clientFilterSearch');
+    const dropdown = document.getElementById('clientFilterDropdown');
+    const clearButton = document.getElementById('clientFilterClear');
+    
+    // Update UI
+    searchInput.value = clientName;
+    dropdown.classList.add('hidden');
+    dropdown.innerHTML = '';
+    clientSearchResults = [];
+    clearButton.classList.remove('hidden');
+    
+    // Reset to page 1 and reload bookings with filter
+    window.currentBookingsPage = 1;
+    loadAdminBookings();
+  };
+
+  // Clear client filter
+  window.clearClientFilter = function() {
+    selectedClientId = null;
+    selectedClientName = '';
+    
+    const searchInput = document.getElementById('clientFilterSearch');
+    const clearButton = document.getElementById('clientFilterClear');
+    const dropdown = document.getElementById('clientFilterDropdown');
+    
+    searchInput.value = '';
+    clearButton.classList.add('hidden');
+    dropdown.classList.add('hidden');
+    dropdown.innerHTML = '';
+    clientSearchResults = [];
+    
+    // Reset to page 1 and reload bookings without client filter
+    window.currentBookingsPage = 1;
+    loadAdminBookings();
+  };
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', function(event) {
+    const container = document.getElementById('clientFilterContainer');
+    const dropdown = document.getElementById('clientFilterDropdown');
+    
+    if (container && dropdown && !container.contains(event.target)) {
+      dropdown.classList.add('hidden');
+    }
+  });
+
+  // Setup client filter input event listeners when DOM is ready
+  function initClientFilterListeners() {
+    const clientInput = document.getElementById('clientFilterSearch');
+    const dropdown = document.getElementById('clientFilterDropdown');
+    
+    if (!clientInput || !dropdown) return;
+
+    // Show dropdown on focus if we have cached results or valid search term
+    clientInput.addEventListener('focus', async () => {
+      const term = (clientInput.value || '').trim();
+
+      if (term.length < 2) {
+        return;
+      }
+
+      // If we already have cached results, just show them
+      if (clientSearchResults && clientSearchResults.length > 0) {
+        const displayResults = clientSearchResults.map(client => {
+          const fullName = [client.first_name, client.last_name].filter(Boolean).join(' ');
+          const displayText = `${fullName} (${client.email || 'no email'})`;
+          return `
+            <button type="button" 
+              class="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 text-gray-900 border-b border-gray-100 last:border-b-0"
+              onclick="selectClient('${client.id}', '${fullName.replace(/'/g, "\\'")}')">
+              ${displayText}
+            </button>
+          `;
+        }).join('');
+        dropdown.innerHTML = displayResults;
+        dropdown.classList.remove('hidden');
+        return;
+      }
+
+      // Otherwise re-run search and show
+      await handleClientSearch(term);
+    });
+
+    // Hide dropdown on blur with delay to allow click to register
+    clientInput.addEventListener('blur', () => {
+      setTimeout(() => {
+        dropdown.classList.add('hidden');
+      }, 150);
+    });
+
+    // Prevent dropdown mousedown from causing input blur
+    dropdown.addEventListener('mousedown', (e) => {
+      // Stops input losing focus before click registers
+      e.preventDefault();
+    });
+  }
+
+  // Initialize listeners when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initClientFilterListeners);
+  } else {
+    initClientFilterListeners();
+  }
 
   // Flush pending mobile changes before pickup address update to prevent race condition
   async function flushAdminMobileIfDirty() {
@@ -330,14 +641,29 @@
     const filterChecked = document.getElementById('bookingFilterChecked')?.value || 'unchecked';
     const filterValid = document.getElementById('bookingFilterValid')?.value || 'all';
     const filterPayment = document.getElementById('bookingFilterPayment')?.value || 'all';
+    const filterView = document.getElementById('bookingViewFilter')?.value || 'upcoming';
     
     // Base query
     let query = window.supabaseClient
       .from('booking')
       .select('*, pickup_location_issue') // Fetch issue code for better error messages
       .eq('is_booking', true)
-      .gte('start_time', new Date().toISOString().split('T')[0]) // Future/Today only
-      .order('start_time', { ascending: true });
+      .order('start_time', { ascending: true })
+      .limit(500); // Increased limit for client-side pagination
+
+    // Apply Date Filter (Upcoming | Past | All)
+    const now = new Date().toISOString();
+    if (filterView === 'upcoming') {
+      query = query.gte('start_time', now);
+    } else if (filterView === 'past') {
+      query = query.lt('start_time', now);
+    }
+    // filterView === 'all' means no date restriction
+
+    // Apply Client Filter (if selected)
+    if (selectedClientId) {
+      query = query.eq('client_id', selectedClientId);
+    }
 
     // Apply Checked Filter
     if (filterChecked === 'unchecked') {
@@ -370,19 +696,44 @@
       return;
     }
 
-    adminBookings = data || [];
+    allAdminBookings = data || [];
+    window.currentBookingsPage = 1;
     renderAdminBookings();
     
     // Trigger badge update on main menu
     if (window.updateNotificationBadges) window.updateNotificationBadges();
   };
 
-  // Render list
+  // Render list with pagination
   function renderAdminBookings() {
     const container = document.getElementById('adminBookingsList');
+    const paginationContainer = document.getElementById('bookingsPagination');
+    const paginationInfo = document.getElementById('bookingsPaginationInfo');
+    const prevButton = document.getElementById('bookingsPrevPage');
+    const nextButton = document.getElementById('bookingsNextPage');
+    const pageNumbers = document.getElementById('bookingsPageNumbers');
+    
     if (!container) return;
 
-    if (adminBookings.length === 0) {
+    // Use already-filtered bookings from loadAdminBookings()
+    // Store for CSV export (full filtered set, not paginated)
+    exportBookings = allAdminBookings;
+
+    // Pagination
+    const perPage = parseInt(document.getElementById('bookingsPerPage')?.value || '25');
+    const totalBookings = allAdminBookings.length;
+    const totalPages = Math.ceil(totalBookings / perPage) || 1;
+    
+    // Clamp current page
+    if (window.currentBookingsPage > totalPages) window.currentBookingsPage = totalPages;
+    if (window.currentBookingsPage < 1) window.currentBookingsPage = 1;
+
+    const startIdx = (window.currentBookingsPage - 1) * perPage;
+    const endIdx = Math.min(startIdx + perPage, totalBookings);
+    const pageBookings = allAdminBookings.slice(startIdx, endIdx);
+
+    // Render bookings
+    if (allAdminBookings.length === 0) {
       container.innerHTML = `
         <div class="text-center py-12">
           <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -393,12 +744,179 @@
             No bookings found matching these filters.
           </p>
         </div>`;
+      if (paginationContainer) paginationContainer.classList.add('hidden');
       return;
     }
 
-    container.innerHTML = adminBookings.map(booking => renderAdminBookingCard(booking)).join('');
+    container.innerHTML = pageBookings.map(booking => renderAdminBookingCard(booking)).join('');
     restoreAdminFocus();
+
+    // Update pagination controls
+    if (paginationContainer) {
+      paginationContainer.classList.remove('hidden');
+      
+      if (paginationInfo) {
+        if (totalPages === 1) {
+          paginationInfo.textContent = `Showing all ${totalBookings} booking${totalBookings !== 1 ? 's' : ''}`;
+        } else {
+          paginationInfo.textContent = `Showing ${startIdx + 1}–${endIdx} of ${totalBookings}`;
+        }
+      }
+
+      if (pageNumbers) {
+        pageNumbers.textContent = `Page ${window.currentBookingsPage} of ${totalPages}`;
+      }
+
+      if (prevButton) {
+        prevButton.disabled = window.currentBookingsPage === 1;
+      }
+
+      if (nextButton) {
+        nextButton.disabled = window.currentBookingsPage === totalPages;
+      }
+    }
   }
+
+  // Change page handler
+  window.changeBookingsPage = function(direction) {
+    window.currentBookingsPage += direction;
+    renderAdminBookings();
+    
+    // Scroll to top of bookings list
+    const container = document.getElementById('adminBookingsList');
+    if (container) {
+      container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  // Export bookings to CSV
+  window.exportBookingsToCSV = function() {
+    if (!exportBookings || exportBookings.length === 0) {
+      alert('No bookings to export');
+      return;
+    }
+
+    // CSV helper to escape values
+    function escapeCSV(value) {
+      if (value == null) return '';
+      const str = String(value);
+      // Escape quotes and wrap in quotes if contains comma, quote, or newline
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return '"' + str.replace(/"/g, '""') + '"';
+      }
+      return str;
+    }
+
+    // CSV Headers
+    const headers = [
+      'Date',
+      'Start Time',
+      'End Time',
+      'Service',
+      'Duration',
+      'Client Name',
+      'Client Email',
+      'Mobile',
+      'Pickup Location',
+      'Price',
+      'Paid',
+      'Mobile Valid',
+      'Pickup Valid',
+      'Admin Checked'
+    ];
+
+    // Build CSV rows
+    const rows = exportBookings.map(booking => {
+      const startTime = new Date(booking.start_time);
+      const endTime = new Date(booking.end_time);
+      
+      const date = startTime.toLocaleDateString('en-AU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+      
+      const startTimeStr = startTime.toLocaleTimeString('en-AU', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+      
+      const endTimeStr = endTime.toLocaleTimeString('en-AU', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+
+      // Service Name
+      let serviceName = booking.service_code || 'Lesson';
+      if (serviceName.includes('auto')) serviceName = 'Auto';
+      else if (serviceName.includes('manual')) serviceName = 'Manual';
+      
+      // Duration
+      const durationMinutes = Math.round((endTime - startTime) / 60000);
+      let durationStr = '';
+      if (durationMinutes === 60) durationStr = '1 hr';
+      else if (durationMinutes === 90) durationStr = '1.5 hrs';
+      else if (durationMinutes === 120) durationStr = '2 hrs';
+      else durationStr = `${durationMinutes} mins`;
+
+      const clientName = `${booking.first_name || ''} ${booking.last_name || ''}`.trim();
+      const price = typeof booking.price_cents === 'number' ? `$${(booking.price_cents / 100).toFixed(2)}` : '';
+      const paid = booking.is_payment_required === false ? 'Yes' : 'No';
+      const mobileValid = booking.is_mobile_valid === true ? 'Yes' : booking.is_mobile_valid === false ? 'No' : 'Unknown';
+      const pickupValid = booking.is_pickup_location_valid === true ? 'Yes' : booking.is_pickup_location_valid === false ? 'No' : 'Unknown';
+      const adminChecked = booking.is_admin_checked ? 'Yes' : 'No';
+
+      return [
+        date,
+        startTimeStr,
+        endTimeStr,
+        serviceName,
+        durationStr,
+        clientName,
+        booking.email || '',
+        booking.mobile || '',
+        booking.pickup_location || '',
+        price,
+        paid,
+        mobileValid,
+        pickupValid,
+        adminChecked
+      ].map(escapeCSV).join(',');
+    });
+
+    // Combine headers and rows
+    const csvContent = [headers.map(escapeCSV).join(','), ...rows].join('\n');
+
+    // Create filename with date, time, and optional client name
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const hours = now.getHours();
+    const hours12 = hours % 12 || 12;
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'pm' : 'am';
+    const timeStr = hours12.toString().padStart(2, '0') + minutes + ampm;
+    
+    let filename = 'bookings-export-' + today + '-' + timeStr;
+    if (selectedClientName) {
+      const sanitizedName = selectedClientName.replace(/[^a-zA-Z0-9]/g, '-');
+      filename = 'bookings-' + sanitizedName + '-' + today + '-' + timeStr;
+    }
+    filename += '.csv';
+
+    // Download CSV
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   // Render single card
   function renderAdminBookingCard(booking) {

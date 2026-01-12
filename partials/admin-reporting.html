@@ -436,7 +436,7 @@
 
       let query = window.supabaseClient
         .from('booking')
-        .select('start_time,end_time,service_code,price_cents,is_payment_required,first_name,last_name,client:client_id(first_name,last_name)')
+        .select('start_time,end_time,service_code,price_cents,is_payment_required,first_name,last_name,client:client_id(first_name,last_name),service:service_code(name)')
         .eq('is_booking', true)
         .order('start_time', { ascending: true })
         .limit(1000);
@@ -511,9 +511,8 @@
           bookingNameFromBooking &&
           normalise(clientNameFromClient) !== normalise(bookingNameFromBooking);
 
-        let serviceName = booking.service_code || 'Lesson';
-        if (serviceName.includes('auto')) serviceName = 'Auto';
-        else if (serviceName.includes('manual')) serviceName = 'Manual';
+        // Service name - use full name from service table, fallback to service_code
+        const serviceLabel = booking.service?.name || booking.service_code || '';
 
         const price = typeof booking.price_cents === 'number' ? `$${(booking.price_cents / 100).toFixed(2)}` : '';
         const paid = booking.is_payment_required === false ? 'Yes' : 'No';
@@ -524,7 +523,7 @@
               <div class="report-client-name">${clientName}</div>
               ${isNameMismatch ? `<div class="report-booking-name">Booking name: ${bookingNameFromBooking}</div>` : ''}
             </td>
-            <td>${serviceName}</td>
+            <td>${serviceLabel}</td>
             <td>${date}</td>
             <td>${startTimeStr}</td>
             <td>${endTimeStr}</td>
@@ -585,14 +584,15 @@
         const bookingNameFromBooking = `${booking.first_name || ''} ${booking.last_name || ''}`.trim();
         const clientName = clientNameFromClient || bookingNameFromBooking || 'Unknown';
 
-        let serviceName = booking.service_code || 'Lesson';
-        if (serviceName.includes('auto')) serviceName = 'Auto';
-        else if (serviceName.includes('manual')) serviceName = 'Manual';
+        // Service name - use full name from service table, fallback to service_code
+        let serviceLabel = booking.service?.name || booking.service_code || '';
+        // Sanitize Unicode dashes for Excel compatibility
+        serviceLabel = serviceLabel.replace(/—/g, ' - ').replace(/–/g, ' - ');
 
         const price = typeof booking.price_cents === 'number' ? `$${(booking.price_cents / 100).toFixed(2)}` : '';
         const paid = booking.is_payment_required === false ? 'Yes' : 'No';
 
-        return [clientName, serviceName, date, startTimeStr, endTimeStr, price, paid].map(escapeCSV).join(',');
+        return [clientName, serviceLabel, date, startTimeStr, endTimeStr, price, paid].map(escapeCSV).join(',');
       });
 
       // Combine headers and rows

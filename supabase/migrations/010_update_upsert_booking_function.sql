@@ -1,11 +1,8 @@
 -- Migration: Update upsert_booking_from_google function to include is_payment_required parameter
 -- This allows gcal-sync to store the payment flag when syncing events from Google Calendar
 
--- Drop the existing function
-DROP FUNCTION IF EXISTS public.upsert_booking_from_google(text, text, text, text, text, text, text, integer, timestamp without time zone, timestamp without time zone, text, jsonb, boolean, text);
-
 -- Recreate with the new parameter
-CREATE FUNCTION public.upsert_booking_from_google(
+CREATE OR REPLACE public.upsert_booking_from_google(
   p_google_event_id text, 
   p_calendar_id text, 
   p_client_email text, 
@@ -38,9 +35,9 @@ BEGIN
     INSERT INTO public.client (email, first_name, last_name, mobile)
     VALUES (p_client_email, p_first_name, p_last_name, p_mobile)
     ON CONFLICT (email) DO UPDATE
-      SET first_name = COALESCE(EXCLUDED.first_name, public.client.first_name),
-          last_name  = COALESCE(EXCLUDED.last_name,  public.client.last_name),
-          mobile     = COALESCE(EXCLUDED.mobile,     public.client.mobile),
+      SET first_name = COALESCE(public.client.first_name, EXCLUDED.first_name),
+          last_name  = COALESCE(public.client.last_name,  EXCLUDED.last_name),
+          mobile     = COALESCE(EXCLUDED.mobile,          public.client.mobile),
           updated_at = now()
     RETURNING id INTO v_client_id;
   end IF;

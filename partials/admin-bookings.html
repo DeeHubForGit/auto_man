@@ -156,7 +156,7 @@
         <!-- Per Page Dropdown -->
         <div class="flex flex-col gap-1">
           <label class="text-sm font-medium text-gray-300">Per page</label>
-          <select id="bookingsPerPage" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[100px]" onchange="window.currentBookingsPage = 1; renderAdminBookings();">
+          <select id="bookingsPerPage" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[100px]" onchange="window.currentBookingsPage = 1; window.renderAdminBookings();">
             <option value="10">10</option>
             <option value="25" selected>25</option>
             <option value="50">50</option>
@@ -646,7 +646,7 @@
     // Base query
     let query = window.supabaseClient
       .from('booking')
-      .select('*, pickup_location_issue') // Fetch issue code for better error messages
+      .select('*, pickup_location_issue, client:client_id(first_name,last_name)') // Fetch client name and issue code
       .eq('is_booking', true)
       .order('start_time', { ascending: true })
       .limit(500); // Increased limit for client-side pagination
@@ -777,6 +777,9 @@
     }
   }
 
+  // Expose for inline handlers
+  window.renderAdminBookings = renderAdminBookings;
+
   // Change page handler
   window.changeBookingsPage = function(direction) {
     window.currentBookingsPage += direction;
@@ -853,6 +856,9 @@
       if (serviceName.includes('auto')) serviceName = 'Auto';
       else if (serviceName.includes('manual')) serviceName = 'Manual';
       
+      // Sanitize Unicode dashes for Excel compatibility
+      serviceName = serviceName.replace(/—/g, ' - ').replace(/–/g, ' - ');
+      
       // Duration
       const durationMinutes = Math.round((endTime - startTime) / 60000);
       let durationStr = '';
@@ -861,7 +867,13 @@
       else if (durationMinutes === 120) durationStr = '2 hrs';
       else durationStr = `${durationMinutes} mins`;
 
-      const clientName = `${booking.first_name || ''} ${booking.last_name || ''}`.trim();
+      // Client name - use client table as source of truth, fallback to booking table
+      const clientFirst = booking.client?.first_name || '';
+      const clientLast = booking.client?.last_name || '';
+      const clientNameFromClient = `${clientFirst} ${clientLast}`.trim();
+      const bookingNameFromBooking = `${booking.first_name || ''} ${booking.last_name || ''}`.trim();
+      const clientName = clientNameFromClient || bookingNameFromBooking || 'Unknown';
+
       const price = typeof booking.price_cents === 'number' ? `$${(booking.price_cents / 100).toFixed(2)}` : '';
       const paid = booking.is_payment_required === false ? 'Yes' : 'No';
       const mobileValid = booking.is_mobile_valid === true ? 'Yes' : booking.is_mobile_valid === false ? 'No' : 'Unknown';
@@ -944,8 +956,20 @@
     else if (durationMinutes === 120) durationStr = '2 hrs';
     else durationStr = `${durationMinutes} mins`;
     
-    // Client name
-    const clientName = `${booking.first_name} ${booking.last_name}`;
+    // Client name - use client table as source of truth, fallback to booking table
+    const clientFirst = booking.client?.first_name || '';
+    const clientLast = booking.client?.last_name || '';
+    const clientNameFromClient = `${clientFirst} ${clientLast}`.trim();
+
+    const bookingNameFromBooking = `${booking.first_name || ''} ${booking.last_name || ''}`.trim();
+
+    const clientName = clientNameFromClient || bookingNameFromBooking || 'Unknown';
+
+    const normalise = (s) => (s || '').trim().toLowerCase();
+    const isNameMismatch =
+      clientNameFromClient &&
+      bookingNameFromBooking &&
+      normalise(clientNameFromClient) !== normalise(bookingNameFromBooking);
 
     // Validation states
     const isMobileInvalid = booking.is_mobile_valid === false;
@@ -977,6 +1001,7 @@
             <h3 class="text-sm sm:text-base font-semibold text-gray-900">
               ${serviceName} ${durationStr} (${clientName})${booking.is_payment_required ? '<span class="payment-icon">$</span>' : ''}
             </h3>
+            ${isNameMismatch ? `<div class="text-xs text-gray-600 mt-0.5">Booking name: ${bookingNameFromBooking}</div>` : ''}
           </div>
 
           <!-- Info Rows -->

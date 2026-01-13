@@ -34,6 +34,22 @@
     </span>
   </div>
   
+  <!-- Client selector -->
+  <div class="mb-4">
+    <label class="block text-sm font-medium mb-2 text-gray-900">Client</label>
+    <div class="flex gap-2">
+      <select id="msgClient" class="flex-1 bg-white border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        <option value="">Select a client…</option>
+      </select>
+      <button id="msgRefresh" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:brightness-110 transition-all focus:outline-none focus:ring-2 focus:ring-gray-500" title="Refresh client list">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+        </svg>
+      </button>
+    </div>
+    <div id="msgClientMsg" class="text-sm mt-2 text-gray-500"></div>
+  </div>
+  
   <div class="grid gap-4">
     <div>
       <label class="block text-sm font-medium mb-2 text-gray-900">Mobile (AU)</label>
@@ -50,7 +66,7 @@
         <span id="smsStatusMsg" class="text-sm ml-1 w-full sm:w-auto"></span>
       </div>
     </div>
-    <div class="border-t pt-4">
+    <div class="pt-4">
       <label class="block text-sm font-medium mb-2 text-gray-900">Email</label>
       <input id="emailTo" type="email" class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="you@example.com" />
       <div id="emailMsg" class="text-sm mt-2"></div>
@@ -74,6 +90,77 @@
 <script>
 (function() {
   // Send SMS & Email logic
+  let msgClientByEmail = {}; // Store client data by email for quick lookup
+
+  async function loadMsgClientOptions(){
+    const sel = document.getElementById('msgClient');
+    const msgEl = document.getElementById('msgClientMsg');
+    
+    if (!sel) return;
+    
+    if (!window.supabaseClient) {
+      sel.innerHTML = '<option value="">Supabase not connected</option>';
+      if (msgEl) msgEl.textContent = 'Supabase client not initialized';
+      return;
+    }
+    
+    sel.innerHTML = '<option value="">Loading…</option>';
+    if (msgEl) msgEl.textContent = 'Loading clients...';
+    
+    try {
+      const { data, error } = await window.supabaseClient
+        .from('client')
+        .select('*')
+        .order('first_name', { ascending: true });
+      
+      if (error) throw error;
+      
+      const rows = Array.isArray(data) ? data : [];
+      const opts = ['<option value="">Select a client…</option>'];
+      msgClientByEmail = {}; // Reset
+      
+      rows.forEach(c => {
+        const name = [c.first_name, c.last_name].filter(Boolean).join(' ');
+        const label = name ? `${name} <${c.email}>` : c.email;
+        opts.push(`<option value="${c.email}">${label}</option>`);
+        msgClientByEmail[c.email] = c; // Store for lookup
+      });
+      
+      sel.innerHTML = opts.join('');
+      if (msgEl) msgEl.textContent = '';
+    } catch (e) {
+      sel.innerHTML = '<option value="">Failed to load clients</option>';
+      if (msgEl) msgEl.textContent = 'Error: ' + (e?.message || String(e));
+    }
+  }
+
+  function onClientSelected(){
+    const sel = document.getElementById('msgClient');
+    const email = (sel && sel.value) ? sel.value : '';
+    
+    if (!email) return;
+    
+    const client = msgClientByEmail[email];
+    if (!client) return;
+    
+    // Auto-fill SMS and Email fields
+    const smsToEl = document.getElementById('smsTo');
+    const emailToEl = document.getElementById('emailTo');
+    
+    if (smsToEl && client.mobile) smsToEl.value = client.mobile;
+    if (emailToEl && client.email) emailToEl.value = client.email;
+    
+    // Clear any existing validation messages
+    const smsMsgEl = document.getElementById('smsMsg');
+    const emailMsgEl = document.getElementById('emailMsg');
+    if (smsMsgEl) smsMsgEl.textContent = '';
+    if (emailMsgEl) emailMsgEl.textContent = '';
+    
+    // Clear status messages
+    document.getElementById('smsStatusMsg').textContent = '';
+    document.getElementById('emailStatusMsg').textContent = '';
+  }
+
   async function sendSms(){
     const to = (document.getElementById('smsTo').value || '').trim();
     const message = (document.getElementById('smsBody').value || '').trim();
@@ -146,6 +233,9 @@
 
     statusEl.textContent = '✓ Sent';
     statusEl.className = 'text-sm text-blue-400';
+    setTimeout(() => {
+      statusEl.textContent = '';
+    }, 5000);
   }
 
   async function sendEmail(){
@@ -238,6 +328,9 @@
 
     statusEl.textContent = '✓ Email sent';
     statusEl.className = 'text-sm text-blue-400';
+    setTimeout(() => {
+      statusEl.textContent = '';
+    }, 5000);
   }
 
   function clearSms() {
@@ -276,6 +369,16 @@
       
       const clearEmailBtn = document.getElementById('clearEmail');
       if (clearEmailBtn) clearEmailBtn.onclick = clearEmail;
+      
+      // Wire up client selector
+      const msgClientSel = document.getElementById('msgClient');
+      if (msgClientSel) msgClientSel.onchange = onClientSelected;
+      
+      const msgRefreshBtn = document.getElementById('msgRefresh');
+      if (msgRefreshBtn) msgRefreshBtn.onclick = loadMsgClientOptions;
+      
+      // Load clients on init
+      loadMsgClientOptions();
     };
     
     if (document.readyState === 'loading') {

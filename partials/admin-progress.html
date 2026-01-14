@@ -1,4 +1,16 @@
 <!-- Admin Client Progress Section -->
+<style>
+  /* Force Instructor Notes textarea to be white (override dark theme rules) */
+  #section-progress #clientProgressNotes,
+  #section-progress .client-progress-notes {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  #section-progress #clientProgressNotes::placeholder {
+    color: #6b7280 !important;
+  }
+</style>
 <section id="section-progress" class="section-content bg-white border rounded-2xl shadow-sm p-5 hidden">
   <!-- Header with help text -->
   <div class="flex items-center justify-between mb-4">
@@ -28,19 +40,28 @@
     </div>
   </div>
   
-  <!-- Skills checklist (2-3 column responsive grid) -->
-  <div id="cpSkills" class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 mb-4"></div>
+  <div id="clientProgressDetails" style="display:none;">
+    <!-- Skills checklist (2-3 column responsive grid) -->
+    <div id="cpSkills" class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 mb-4"></div>
+
+    <!-- Skills count pill (must sit under tickboxes) -->
+    <div id="cpBadge" class="text-sm mb-4"></div>
+    
+    <!-- Instructor Notes -->
+    <div class="mb-4">
+      <label class="block text-sm font-medium mb-2 text-gray-900 mt-4">Instructor Notes</label>
+      <textarea id="clientProgressNotes" class="client-progress-notes w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="4" placeholder="Add notes about this client's progress..."></textarea>
+      <p id="cpAutoNote" class="mt-2 text-xs text-gray-400">Changes will be automatically saved.</p>
+      <div id="clientProgressNotesMsg" class="text-sm mt-2"></div>
+    </div>
+  </div>
   
   <!-- Actions / messages -->
   <div class="flex flex-col gap-1">
     <div class="flex items-center gap-3">
       <!-- Save status (transient): Saving… / Saved / Errors -->
       <div id="cpMsg" class="text-sm"></div>
-      <!-- Completion badge lives here (separate so it doesn’t fight the status line) -->
-      <div id="cpBadge" class="text-sm"></div>
     </div>
-    <!-- Static reassurance -->
-    <p id="cpAutoNote" class="mt-2 text-xs text-gray-400">Changes will be automatically saved.</p>
   </div>
 </section>
 
@@ -49,6 +70,7 @@
   // Client Progress logic
   let hasUnsavedChanges = false;
   let originalSkillsState = {};
+  let cpNotesDebounce = null; // debounce timer for notes
 
   // --- Auto-save additions (minimal & self-contained) ---
   let cpAutosaveTimer = null;     // debounce timer
@@ -59,6 +81,79 @@
     if (!msg) return;
     msg.textContent = text || '';
     msg.className = 'text-sm ' + (cls || '');
+  }
+
+  function cpSetNotesMsg(text, cls){
+    const msg = document.getElementById('clientProgressNotesMsg');
+    if (!msg) return;
+    msg.textContent = text || '';
+    msg.className = 'text-sm ' + (cls || '');
+  }
+
+  async function cpSaveNotes(expectedEmail, notesValue){
+    const sel = document.getElementById('cpClient');
+    const emailNow = (sel && sel.value) ? sel.value : '';
+
+    if (!expectedEmail) return false;
+    if (emailNow !== expectedEmail) return false;
+    if (!window.supabaseClient) return false;
+
+    try {
+      cpSetNotesMsg('Saving…', 'text-blue-500');
+
+      const row = { email: expectedEmail, notes: notesValue };
+      const { error } = await window.supabaseClient
+        .from('client_progress')
+        .upsert(row, { onConflict: 'email' });
+
+      if (error) throw error;
+
+      cpSetNotesMsg('Saved', 'text-gray-400');
+      setTimeout(() => {
+        const sel2 = document.getElementById('cpClient');
+        const email2 = (sel2 && sel2.value) ? sel2.value : '';
+        const msgEl = document.getElementById('clientProgressNotesMsg');
+        if (email2 === expectedEmail && msgEl && msgEl.textContent === 'Saved') msgEl.textContent = '';
+      }, 3000);
+
+      return true;
+    } catch (e) {
+      cpSetNotesMsg('Error saving notes', 'text-red-600');
+      return false;
+    }
+  }
+
+  function cpNotesMarkDirty(){
+    const sel = document.getElementById('cpClient');
+    const email = (sel && sel.value) ? sel.value : '';
+    const notesEl = document.getElementById('clientProgressNotes');
+    if (!email || !notesEl) return;
+
+    hasUnsavedChanges = true;
+    const notesMsgEl = document.getElementById('clientProgressNotesMsg');
+    if (notesMsgEl && notesMsgEl.textContent === 'Saved') notesMsgEl.textContent = '';
+
+    clearTimeout(cpNotesDebounce);
+    const notesValue = notesEl.value;
+    cpNotesDebounce = setTimeout(() => {
+      cpPendingSave = cpSaveNotes(email, notesValue)
+        .finally(() => {
+          cpPendingSave = null;
+        });
+    }, 700);
+  }
+
+  function cpNotesSaveOnBlur(){
+    const sel = document.getElementById('cpClient');
+    const email = (sel && sel.value) ? sel.value : '';
+    const notesEl = document.getElementById('clientProgressNotes');
+    if (!email || !notesEl) return;
+
+    clearTimeout(cpNotesDebounce);
+    cpPendingSave = cpSaveNotes(email, notesEl.value)
+      .finally(() => {
+        cpPendingSave = null;
+      });
   }
 
   // Debounced auto-save entry point
@@ -193,19 +288,35 @@
     const sel = document.getElementById('cpClient');
     const email = (sel && sel.value) ? sel.value : '';
 
+    const detailsEl = document.getElementById('clientProgressDetails');
+
     if (!email) { 
-      // No client selected - hide checkboxes and clear badge/status
+      // No client selected - hide checkboxes and clear badge/status/notes
+      if (detailsEl) detailsEl.style.display = 'none';
       document.getElementById('cpSkills').style.display = 'none';
       const badgeEl = document.getElementById('cpBadge');
       if (badgeEl) badgeEl.textContent = '';
+      const notesEl = document.getElementById('clientProgressNotes');
+      if (notesEl) notesEl.value = '';
       cpSetMsg('', '');
+      cpSetNotesMsg('', '');
       return; 
     }
     
     if (!window.supabaseClient) return;
     
+    // Clear notes immediately to prevent stale content
+    const notesEl = document.getElementById('clientProgressNotes');
+    if (notesEl) notesEl.value = '';
+    cpSetNotesMsg('', '');
+
+    if (detailsEl) detailsEl.style.display = '';
+    
     const { data } = await window.supabaseClient.from('client_progress').select('*').eq('email', email).maybeSingle();
     renderSkills(data?.skills || {});
+    
+    // Load notes
+    if (notesEl) notesEl.value = data?.notes || '';
     
     // Store original state for comparison
     originalSkillsState = JSON.parse(JSON.stringify(data?.skills || {}));
@@ -214,6 +325,7 @@
     // Do NOT clear the static note; leave #cpAutoNote alone
     // Clear transient status line
     cpSetMsg('', '');
+    cpSetNotesMsg('', '');
   }
 
   // NOTE: extended to support autoMode for subtle status handling
@@ -233,7 +345,11 @@
       skills[s] = !!(el && el.checked); 
     });
     
-    const row = { email, skills };
+    // Get notes
+    const notesEl = document.getElementById('clientProgressNotes');
+    const notes = notesEl ? notesEl.value : '';
+    
+    const row = { email, skills, notes };
 
     if (autoMode) cpSetMsg('Saving…', 'text-blue-500');
 
@@ -321,6 +437,9 @@
       // Hide skills initially until a client is selected
       const cpSkillsBox = document.getElementById('cpSkills');
       if (cpSkillsBox) cpSkillsBox.style.display = 'none';
+
+      const detailsEl = document.getElementById('clientProgressDetails');
+      if (detailsEl) detailsEl.style.display = 'none';
       
       // (Save button was removed/hidden; leave handler if you re-enable it)
       const cpSaveBtn = document.getElementById('cpSave');
@@ -336,9 +455,21 @@
       const cpClientSelect = document.getElementById('cpClient');
       if (cpClientSelect) {
         cpClientSelect.addEventListener('change', async function() {
+          clearTimeout(cpNotesDebounce);
+          const detailsEl = document.getElementById('clientProgressDetails');
+          if (detailsEl) detailsEl.style.display = 'none';
+          const notesEl = document.getElementById('clientProgressNotes');
+          if (notesEl) notesEl.value = '';
+          cpSetNotesMsg('', '');
           await cpFlushAutoSave(); // save previous client if needed
           await cpLoad();
         });
+      }
+
+      const notesEl = document.getElementById('clientProgressNotes');
+      if (notesEl) {
+        notesEl.addEventListener('input', cpNotesMarkDirty);
+        notesEl.addEventListener('blur', cpNotesSaveOnBlur);
       }
       
       // Warn before leaving page with unsaved changes

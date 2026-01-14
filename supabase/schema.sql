@@ -154,6 +154,7 @@ CREATE TABLE public.client_credit (
 CREATE TABLE public.client_progress (
     email text NOT NULL,
     skills jsonb DEFAULT '{}'::jsonb NOT NULL,
+    notes text,
     updated_at timestamp with time zone DEFAULT now()
 );
 

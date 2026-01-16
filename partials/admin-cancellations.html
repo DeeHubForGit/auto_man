@@ -136,45 +136,60 @@
   
   <!-- Filters -->
   <div class="flex flex-wrap items-center gap-3 mb-4">
-    <input 
-      id="cancellationSearch" 
-      type="text" 
-      placeholder="Search by name, email, or service..." 
-      class="flex-1 min-w-[150px] max-w-[300px] bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-    />
-    <select 
-      id="cancellationSort" 
-      class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[180px]"
-    >
-      <option value="newest">Newest first</option>
-      <option value="oldest">Oldest first</option>
-      <option value="booking-date">By booking date</option>
-    </select>
-    <select 
-      id="refundEligibilityFilter" 
-      class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[160px]"
-    >
-      <option value="all">All cancellations</option>
-      <option value="eligible">Refund eligible</option>
-      <option value="not-eligible">Refund not eligible</option>
-    </select>
-    <select 
-      id="refundStatusFilter" 
-      class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px]"
-    >
-      <option value="all">All refunds</option>
-      <option value="refunded">Refunded</option>
-      <option value="not-refunded">Not refunded</option>
-    </select>
-    <select 
-      id="cancellationsPerPage" 
-      class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px]"
-    >
-      <option value="10" selected>10 per page</option>
-      <option value="25">25 per page</option>
-      <option value="50">50 per page</option>
-      <option value="100">100 per page</option>
-    </select>
+    <div class="flex flex-col gap-1 min-w-[320px] max-w-[360px]">
+      <label class="text-sm font-medium text-gray-300">Search</label>
+      <input 
+        id="cancellationSearch" 
+        type="text" 
+        placeholder="Search by name, email, or service..." 
+        class="w-full min-w-[320px] max-w-[360px] bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      />
+    </div>
+    <div class="flex flex-col gap-1">
+      <label class="text-sm font-medium text-gray-300">Sort</label>
+      <select 
+        id="cancellationSort" 
+        class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[180px]"
+      >
+        <option value="newest">Newest first</option>
+        <option value="oldest">Oldest first</option>
+        <option value="booking-date">By booking date</option>
+      </select>
+    </div>
+    <div class="flex flex-col gap-1">
+      <label class="text-sm font-medium text-gray-300">Cancellations</label>
+      <select 
+        id="refundEligibilityFilter" 
+        class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[160px]"
+      >
+        <option value="all">All</option>
+        <option value="eligible">Refund eligible</option>
+        <option value="not-eligible">Refund not eligible</option>
+      </select>
+    </div>
+    <div class="flex flex-col gap-1">
+      <label class="text-sm font-medium text-gray-300">Refunds</label>
+      <select 
+        id="refundStatusFilter" 
+        class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px]"
+      >
+        <option value="all">All</option>
+        <option value="refunded">Refunded</option>
+        <option value="not-refunded">Not refunded</option>
+      </select>
+    </div>
+    <div class="flex flex-col gap-1">
+      <label class="text-sm font-medium text-gray-300">Per page</label>
+      <select 
+        id="cancellationsPerPage" 
+        class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px]"
+      >
+        <option value="10" selected>10 per page</option>
+        <option value="25">25 per page</option>
+        <option value="50">50 per page</option>
+        <option value="100">100 per page</option>
+      </select>
+    </div>
   </div>
   
   <!-- Scrollable Cancellations container -->

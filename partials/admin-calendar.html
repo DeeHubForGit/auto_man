@@ -927,6 +927,11 @@
   let editingPersonalAppt = false;
   let editingPersonalGoogleEventId = null;
 
+  // Edit state for bookings
+  let editingBooking = false;
+  let editingBookingId = null;
+  let editingBookingData = null;
+
   // Service duration configuration (in minutes) – populated from config
   const SERVICE_DURATIONS = {};
 
@@ -970,6 +975,20 @@
   function resetPersonalEditState() {
     editingPersonalAppt = false;
     editingPersonalGoogleEventId = null;
+  }
+
+  // Reset edit state for bookings
+  function resetBookingEditState() {
+    editingBooking = false;
+    editingBookingId = null;
+    editingBookingData = null;
+    editingBookingGoogleEventId = null;
+
+    // Re-enable client mode switching for non-edit flows
+    const newClientRadio = document.querySelector('input[name="clientMode"][value="new"]');
+    if (newClientRadio) newClientRadio.disabled = false;
+    const existingClientRadio = document.querySelector('input[name="clientMode"][value="existing"]');
+    if (existingClientRadio) existingClientRadio.disabled = false;
   }
 
   // Helper to enable/disable appointment type radio buttons
@@ -1030,6 +1049,11 @@
     // Reset client mode to "existing" (default)
     const existingClientRadio = document.querySelector('input[name="clientMode"][value="existing"]');
     if (existingClientRadio) existingClientRadio.checked = true;
+
+    // Enable client mode radios for new appointments
+    document.querySelectorAll('input[name="clientMode"]').forEach(r => {
+      r.disabled = false;
+    });
     
     // Show/hide fields based on default type (booking)
     document.getElementById('personal-title-field').style.display = 'none';
@@ -1118,6 +1142,7 @@
     apptForm.reset();
     formHasChanges = false;
     resetPersonalEditState();
+    resetBookingEditState();
     setAppointmentTypeRadiosDisabled(false);
   }
 
@@ -1158,6 +1183,130 @@
     const submitBtn = document.getElementById("appointment-save");
     if (submitBtn) {
       submitBtn.textContent = "Update Appointment";
+    }
+    
+    // Open modal
+    formHasChanges = false;
+    apptBackdrop.classList.remove("hidden");
+  }
+
+  // Open modal in edit mode for a booking
+  async function openEditBookingModal(booking) {
+    // Set edit state
+    editingBooking = true;
+    editingBookingId = booking.id;
+    editingBookingData = booking;
+    editingBookingGoogleEventId = booking.google_event_id || booking.googleEventId || null;
+
+    // Ensure dropdowns are populated before selecting values
+    loadServices();
+    await loadClients();
+    
+    // Extract date and time from ISO timestamp strings
+    let dateStr = '';
+    let startHHMM = '';
+    let endHHMM = '';
+    
+    if (booking.start_time) {
+      const startDate = new Date(booking.start_time);
+      dateStr = formatDateForInputLocal(startDate);
+      startHHMM = formatTimeForInput(startDate);
+    }
+    
+    if (booking.end_time) {
+      const endDate = new Date(booking.end_time);
+      endHHMM = formatTimeForInput(endDate);
+    }
+    
+    // Fill date/time fields
+    document.getElementById("appt-date").value = dateStr || '';
+    document.getElementById("appt-start").value = startHHMM || '';
+    document.getElementById("appt-end").value = endHHMM || '';
+    
+    // Fill service
+    const serviceSelect = document.getElementById("bookingService");
+    if (serviceSelect && booking.service_code) {
+      serviceSelect.value = booking.service_code;
+    }
+    
+    // Fill pickup location
+    document.getElementById("bookingPickupLocation").value = booking.pickup_location || '';
+    
+    // Fill payment required
+    document.getElementById("bookingPaymentRequired").checked = !!booking.is_payment_required;
+
+    // Client mode: keep Existing/New behavior (do not force or disable client mode radios)
+    const existingRadio = document.querySelector('input[name="clientMode"][value="existing"]');
+    const newRadio = document.querySelector('input[name="clientMode"][value="new"]');
+    if (existingRadio) existingRadio.disabled = false;
+    if (newRadio) newRadio.disabled = false;
+
+    const existingClientSelect = document.getElementById("existingClientSelect");
+
+    // Prefill existing client selection if possible
+    let matchedExistingClient = false;
+    if (existingClientSelect && booking.client_id) {
+      existingClientSelect.value = booking.client_id;
+      matchedExistingClient = !!existingClientSelect.value;
+    }
+
+    // Fallback to email match for older rows/inconsistencies
+    if (!matchedExistingClient && existingClientSelect && booking.email) {
+      const opts = Array.from(existingClientSelect.options);
+      const match = opts.find(o => (o.dataset.email || '').toLowerCase() === booking.email.toLowerCase());
+      if (match) {
+        existingClientSelect.value = match.value;
+        matchedExistingClient = true;
+      }
+    }
+
+    // Prefill new client fields from booking (useful if user switches modes)
+    const newFirstName = document.getElementById("newClientFirstName");
+    const newLastName = document.getElementById("newClientLastName");
+    const newEmail = document.getElementById("newClientEmail");
+    const newMobile = document.getElementById("newClientMobile");
+    if (newFirstName) newFirstName.value = booking.first_name || '';
+    if (newLastName) newLastName.value = booking.last_name || '';
+    if (newEmail) newEmail.value = booking.email || '';
+    if (newMobile) newMobile.value = booking.mobile || '';
+
+    // Choose a default client mode based on what we can prefill
+    if (matchedExistingClient) {
+      if (existingRadio) {
+        existingRadio.checked = true;
+        existingRadio.dispatchEvent(new Event('change'));
+      }
+    } else {
+      if (newRadio) {
+        newRadio.checked = true;
+        newRadio.dispatchEvent(new Event('change'));
+      }
+    }
+    
+    // Force booking mode (disable type switching)
+    const radioBooking = document.querySelector('input[name="appointmentType"][value="booking"]');
+    const radioPersonal = document.querySelector('input[name="appointmentType"][value="personal"]');
+    
+    if (radioBooking) {
+      radioBooking.checked = true;
+      radioBooking.disabled = false; // Keep enabled so selection is visible
+      radioBooking.dispatchEvent(new Event('change'));
+    }
+    if (radioPersonal) {
+      radioPersonal.checked = false;
+      radioPersonal.disabled = true; // Disable personal to prevent switching
+    }
+    
+    // Update modal title
+    const modalTitle = document.querySelector("#appointment-modal-backdrop h2");
+    if (modalTitle) {
+      modalTitle.textContent = "Edit Booking";
+    }
+    
+    // Update submit button text
+    const submitBtn = document.getElementById("appointment-save");
+    if (submitBtn) {
+      submitBtn.textContent = "Update Booking";
     }
     
     // Open modal
@@ -1575,6 +1724,13 @@
   apptForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
+    // Hard guard: if we're editing a booking, always run booking update
+    // (never route through the personal appointment submit handler)
+    if (editingBooking && editingBookingId) {
+      await handleBookingUpdate();
+      return;
+    }
+
     // Check appointment type
     const appointmentType = document.querySelector('input[name="appointmentType"]:checked')?.value;
 
@@ -1794,8 +1950,8 @@
     }
   }
 
-  // Handle booking submission
-  async function handleBookingSubmit() {
+  // Handle booking update (edit mode)
+  async function handleBookingUpdate() {
     const date = document.getElementById("appt-date").value;
     const startTime = document.getElementById("appt-start").value;
     const endTime = document.getElementById("appt-end").value;
@@ -1804,7 +1960,309 @@
     const serviceCode = serviceSelect.value;
     const serviceLabel = serviceSelect.options[serviceSelect.selectedIndex]?.text || "";
 
-    const clientMode = document.querySelector('input[name="clientMode"]:checked')?.value;
+    const clientMode = document.querySelector('input[name="clientMode"]:checked')?.value || "existing";
+    
+    const existingClientSelect = document.getElementById("existingClientSelect");
+    const clientId = clientMode === "existing" ? existingClientSelect.value : null;
+    
+    const firstName = clientMode === "new" 
+      ? document.getElementById("newClientFirstName").value.trim()
+      : existingClientSelect.selectedOptions[0]?.dataset.firstName || "";
+    const lastName = clientMode === "new"
+      ? document.getElementById("newClientLastName").value.trim()
+      : existingClientSelect.selectedOptions[0]?.dataset.lastName || "";
+    const email = clientMode === "existing"
+      ? existingClientSelect.selectedOptions[0]?.dataset.email || ""
+      : document.getElementById("newClientEmail").value.trim();
+    const mobile = clientMode === "existing"
+      ? existingClientSelect.selectedOptions[0]?.dataset.mobile || ""
+      : document.getElementById("newClientMobile").value.trim();
+    
+    const pickupLocation = document.getElementById("bookingPickupLocation").value.trim();
+    const isPaymentRequired = document.getElementById("bookingPaymentRequired").checked;
+
+    // Clear all errors first
+    clearApptError("appt-date");
+    clearApptError("appt-start");
+    clearApptError("bookingService");
+    clearApptError("existingClientSelect");
+    clearApptError("newClientFirstName");
+    clearApptError("newClientLastName");
+    clearApptError("newClientEmail");
+    clearApptError("newClientMobile");
+    clearApptError("bookingPickupLocation");
+
+    // Validate required fields
+    let hasError = false;
+    
+    if (!date) {
+      showApptError("appt-date", "Date is required");
+      hasError = true;
+    }
+    if (!startTime) {
+      showApptError("appt-start", "Start time is required");
+      hasError = true;
+    }
+    if (!serviceCode) {
+      showApptError("bookingService", "Please select a service");
+      hasError = true;
+    }
+    
+    if (clientMode === "existing") {
+      if (!clientId) {
+        showApptError("existingClientSelect", "Please select a client");
+        hasError = true;
+      }
+    } else {
+      if (!firstName) {
+        showApptError("newClientFirstName", "First name is required");
+        hasError = true;
+      }
+      if (!lastName) {
+        showApptError("newClientLastName", "Last name is required");
+        hasError = true;
+      }
+      if (!email) {
+        showApptError("newClientEmail", "Email is required");
+        hasError = true;
+      } else if (!window.Validation?.isValidEmail?.(email)) {
+        showApptError("newClientEmail", "Please enter a valid email address");
+        hasError = true;
+      }
+      if (!mobile) {
+        showApptError("newClientMobile", "Mobile is required");
+        hasError = true;
+      } else if (!window.Validation?.isValidAuMobile?.(mobile)) {
+        showApptError("newClientMobile", "Enter a valid AU mobile (e.g. 04XX XXX XXX or +61 4XX XXX XXX)");
+        hasError = true;
+      }
+    }
+    
+    // Enhanced pickup address validation
+    const pickupValidation = validatePickupAddressForBooking(pickupLocation);
+    if (!pickupValidation.valid) {
+      showApptError("bookingPickupLocation", pickupValidation.message);
+      hasError = true;
+    }
+
+    if (hasError) {
+      return;
+    }
+
+    // Show loading state on button only
+    const saveBtn = document.getElementById('appointment-save');
+    const originalBtnText = saveBtn ? saveBtn.textContent : '';
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Updating...';
+    }
+
+    try {
+      // Validate address with Google Maps before saving
+      console.log("[booking-update] Validating pickup address with Google Maps...");
+      const backendValidation = await validateAddressWithBackend(pickupLocation);
+      
+      if (!backendValidation.valid) {
+        // Re-enable save button
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = originalBtnText;
+        }
+        
+        // Show validation error
+        showApptError("bookingPickupLocation", backendValidation.message);
+        
+        // Show suggestion button if available
+        if (backendValidation.suggestion) {
+          showPickupSuggestion(backendValidation.suggestion);
+        } else {
+          hidePickupSuggestion();
+        }
+        
+        console.log("[booking-update] Address validation failed:", backendValidation.issue);
+        return; // STOP HERE - do not save
+      }
+      
+      console.log("[booking-update] Address validated successfully");
+      console.log("[booking-update] Updating booking via edge function");
+
+      // Convert 24-hour time to 12-hour format for the edge function
+      const startTime12 = convert24To12Hour(startTime);
+      const endTime12 = endTime ? convert24To12Hour(endTime) : null;
+
+      if (!editingBookingId) {
+        throw new Error("Missing booking id for update");
+      }
+
+      const googleEventId = editingBookingGoogleEventId || editingBookingData?.google_event_id;
+      if (!googleEventId) {
+        throw new Error("Missing Google Event ID for booking update");
+      }
+
+      const payload = {
+        type: "booking",
+        bookingId: editingBookingId,
+        googleEventId,
+        serviceCode,
+        serviceLabel,
+        date,
+        startTime: startTime12,
+        endTime: endTime12,
+        clientId: clientId || null,
+        firstName,
+        lastName: lastName || null,
+        email,
+        mobile,
+        pickupLocation,
+        isPaymentRequired,
+      };
+
+      console.log("[booking-update] Payload:", payload);
+
+      // Call edge function to update Google Calendar event and DB
+      const { data, error } = await window.supabaseClient.functions.invoke('update-admin-booking', {
+        body: payload
+      });
+
+      if (error) {
+        console.error('[booking-update] invoke error:', error);
+
+        let details = '';
+
+        if (error.context?.body) {
+          if (typeof error.context.body === 'string') {
+            details = error.context.body;
+          } else {
+            try {
+              details = JSON.stringify(error.context.body);
+            } catch (e) {
+              details = '';
+            }
+          }
+        }
+
+        // If body is useless, fall back to message
+        if (!details || details === '{}' || details === 'null' || details === '""') {
+          details = error.message || 'Unknown error';
+        }
+
+        if (window.Modal && window.Modal.error) {
+          window.Modal.error(details, 'Error');
+        } else {
+          alert(details);
+        }
+        return;
+      }
+
+      if (!data || !data.ok) {
+        console.error("[booking-update] Edge function returned error:", data);
+        const details = data?.error || JSON.stringify(data || { error: 'Failed to update booking' });
+        if (window.Modal && window.Modal.error) {
+          window.Modal.error(details, 'Error');
+        } else {
+          alert(details);
+        }
+        return;
+      }
+
+      console.log("[booking-update] ✅ Booking updated successfully:", data);
+
+      // Build ISO timestamps for DB (TIMESTAMPTZ)
+      const startIso = new Date(`${date}T${startTime}:00`).toISOString();
+      const endIso = endTime
+        ? new Date(`${date}T${endTime}:00`).toISOString()
+        : new Date(`${date}T${startTime}:00`).toISOString();
+
+      // Immediate DB update so calendar refresh shows the change right away
+      await updateBookingRowInDb(editingBookingId, {
+        serviceCode,
+        startIso,
+        endIso,
+        pickupLocation,
+        isPaymentRequired,
+        clientId,
+        firstName,
+        lastName,
+        email,
+        mobile,
+      });
+
+      closeAppointmentModal(true); // Force close without confirmation since we just saved
+
+      // Show success message
+      if (window.Modal && window.Modal.success) {
+        window.Modal.success("Booking updated successfully!", "Success");
+      }
+
+      // Refresh calendar to show updated booking
+      renderWeek(weekStart);
+
+    } catch (err) {
+      console.error("[booking-update] Error updating booking:", err);
+      if (window.Modal && window.Modal.error) {
+        window.Modal.error(
+          err.message || "Could not update booking. Please try again.",
+          "Error"
+        );
+      } else {
+        alert("Failed to update booking. Please try again. Error: " + (err.message || err));
+      }
+    } finally {
+      // Re-enable save button
+      const saveBtn = document.getElementById('appointment-save');
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = originalBtnText || 'Update Booking';
+      }
+    }
+  }
+
+  // Update the DB row for a booking immediately after a successful Google update
+  async function updateBookingRowInDb(bookingId, { serviceCode, startIso, endIso, pickupLocation, isPaymentRequired, clientId, firstName, lastName, email, mobile }) {
+    if (!bookingId) return;
+
+    const updateData = {
+      service_code: serviceCode || null,
+      start_time: startIso,
+      end_time: endIso,
+      pickup_location: pickupLocation || null,
+      is_payment_required: isPaymentRequired,
+      client_id: clientId || null,
+      first_name: firstName || null,
+      last_name: lastName || null,
+      email: email || null,
+      mobile: mobile || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await window.supabaseClient
+      .from('booking')
+      .update(updateData)
+      .eq('id', bookingId);
+
+    if (error) {
+      console.warn('[booking-update] DB update failed (webhook will eventually correct it):', error);
+    }
+  }
+
+  // Handle booking submission
+  async function handleBookingSubmit() {
+    // Check if we're in edit mode
+    if (editingBooking && editingBookingId) {
+      await handleBookingUpdate();
+      return;
+    }
+    
+    // Otherwise, proceed with create logic
+    const date = document.getElementById("appt-date").value;
+    const startTime = document.getElementById("appt-start").value;
+    const endTime = document.getElementById("appt-end").value;
+    
+    const serviceSelect = document.getElementById("bookingService");
+    const serviceCode = serviceSelect.value;
+    const serviceLabel = serviceSelect.options[serviceSelect.selectedIndex]?.text || "";
+
+    const clientMode = document.querySelector('input[name="clientMode"]:checked')?.value || "existing";
     
     const existingClientSelect = document.getElementById("existingClientSelect");
     const clientId = clientMode === "existing" ? existingClientSelect.value : null;
@@ -2511,6 +2969,21 @@
               </button>
             </div>
           `;
+          
+          // Add click handler to open edit modal for bookings
+          const bookingCardText = bookingDiv.querySelector('.booking-card-text');
+          if (bookingCardText) {
+            bookingCardText.style.cursor = 'pointer';
+            bookingCardText.addEventListener('click', (e) => {
+              // Don't open modal if clicking interactive elements
+              if (e.target.closest('.booking-cancel-btn')) return;
+              if (e.target.closest('.booking-status-select')) return;
+              if (e.target.closest('.payment-toggle-checkbox')) return;
+              
+              // Open edit booking modal with full booking data
+              openEditBookingModal(booking);
+            });
+          }
         } else {
           // This is a regular calendar appointment - show title and times
           bookingDiv.className = 'booking-card text-xs border-l-2 border-gray-400 p-1 rounded absolute left-0 right-0 z-10';

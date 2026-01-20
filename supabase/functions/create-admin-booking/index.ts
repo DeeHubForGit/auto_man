@@ -336,6 +336,7 @@ Deno.serve(async (req) => {
       source: "google",
       status: "confirmed",
       is_booking: true,
+      is_payment_required: !!isPaymentRequired,
 
       service_code: serviceCode,
       start_time: startUtc,

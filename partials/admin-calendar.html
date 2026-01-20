@@ -896,11 +896,26 @@
 
           <!-- Payment required -->
           <div class="form-group">
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" id="bookingPaymentRequired" checked class="cursor-pointer">
-              <span class="text-sm">Payment required?</span>
-            </label>
-            <p class="text-xs text-gray-400 mt-1">Uncheck when payment made by cash, direct transfer, etc</p>
+            <div class="flex items-center gap-2 flex-wrap">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="bookingPaymentRequired" class="cursor-pointer">
+                <span class="text-sm">Paid?</span>
+              </label>
+
+              <input id="bookingAmountPaid" type="number" min="0" step="0.01" inputmode="decimal" class="form-input" style="width: 120px;" placeholder="0.00">
+            </div>
+            <p class="text-xs text-gray-400 mt-1">Check when payment has been received (cash, transfer, etc)</p>
+          </div>
+
+          <!-- Status -->
+          <div class="form-group">
+            <label for="bookingStatus">Status</label>
+            <select id="bookingStatus" class="form-input">
+              <option value="confirmed">Confirmed</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="no_show">No Show</option>
+            </select>
           </div>
         </div>
 
@@ -934,6 +949,7 @@
 
   // Service duration configuration (in minutes) – populated from config
   const SERVICE_DURATIONS = {};
+  const SERVICE_PRICE_CENTS = {};
 
   // Helper: Round time to next 15 minutes
   function roundToNext15Minutes(date = new Date()) {
@@ -1025,10 +1041,12 @@
   const apptCloseBtn = document.getElementById("appointment-modal-close");
   const apptCancelBtn = document.getElementById("appointment-cancel");
   let formHasChanges = false;
+  let bookingAmountManuallyEdited = false;
 
   function openAppointmentModal(defaults = {}) {
     // Reset form to defaults
     apptForm.reset();
+    bookingAmountManuallyEdited = false;
     
     // Reset modal title and button text to defaults
     const modalTitle = document.querySelector("#appointment-modal-backdrop h2");
@@ -1232,8 +1250,23 @@
     // Fill pickup location
     document.getElementById("bookingPickupLocation").value = booking.pickup_location || '';
     
-    // Fill payment required
-    document.getElementById("bookingPaymentRequired").checked = !!booking.is_payment_required;
+    // Fill Paid? (checkbox means paid). DB is is_payment_required.
+    const paidCheckbox = document.getElementById("bookingPaymentRequired");
+    if (paidCheckbox) paidCheckbox.checked = !booking.is_payment_required;
+
+    // Fill amount paid (stored in booking.price_cents)
+    const amountInput = document.getElementById('bookingAmountPaid');
+    if (amountInput) {
+      amountInput.value = (typeof booking.price_cents === 'number')
+        ? (booking.price_cents / 100).toFixed(2)
+        : '';
+    }
+
+    // Fill status
+    const statusSelect = document.getElementById('bookingStatus');
+    if (statusSelect) {
+      statusSelect.value = booking.status || 'confirmed';
+    }
 
     // Client mode: keep Existing/New behavior (do not force or disable client mode radios)
     const existingRadio = document.querySelector('input[name="clientMode"][value="existing"]');
@@ -1492,6 +1525,20 @@
   // Listen for service selection change to update end time
   document.getElementById('bookingService')?.addEventListener('change', () => {
     updateBookingEndTime();
+
+    // New booking only: default amount from service price (do not overwrite manual edits)
+    if (editingBooking) return;
+    if (bookingAmountManuallyEdited) return;
+
+    const serviceCode = document.getElementById('bookingService')?.value || '';
+    const cents = SERVICE_PRICE_CENTS[serviceCode];
+
+    const amountInput = document.getElementById('bookingAmountPaid');
+    if (!amountInput) return;
+
+    if (typeof cents === 'number') {
+      amountInput.value = (cents / 100).toFixed(2);
+    }
   });
 
   // Listen for start time change to update end time
@@ -1520,6 +1567,13 @@
       } else {
         clearApptError('bookingPickupLocation');
       }
+    });
+  }
+
+  const bookingAmountInput = document.getElementById('bookingAmountPaid');
+  if (bookingAmountInput) {
+    bookingAmountInput.addEventListener('input', () => {
+      bookingAmountManuallyEdited = true;
     });
   }
 
@@ -1576,6 +1630,22 @@
 
         // Populate SERVICE_DURATIONS map with service id as key
         SERVICE_DURATIONS[svc.id] = svc.durationMinutes;
+
+        // Populate SERVICE_PRICE_CENTS map with service id as key
+        // Supports prices like 110, "110", "$110", "110.00", "$110.00"
+        let priceRaw = svc.price;
+
+        if (typeof priceRaw === 'string') {
+          priceRaw = priceRaw.trim().replace(/[$,\s]/g, '');
+        }
+
+        const priceNum = Number(priceRaw);
+
+        if (Number.isFinite(priceNum) && priceNum >= 0) {
+          SERVICE_PRICE_CENTS[svc.id] = Math.round(priceNum * 100);
+        } else {
+          // If price is missing or invalid, do NOT set a value (leave undefined)
+        }
 
         return {
           id: svc.id,              // used as <option> value
@@ -1979,7 +2049,16 @@
       : document.getElementById("newClientMobile").value.trim();
     
     const pickupLocation = document.getElementById("bookingPickupLocation").value.trim();
-    const isPaymentRequired = document.getElementById("bookingPaymentRequired").checked;
+
+    // Modal checkbox is Paid? (checked = paid). Persist as is_payment_required.
+    const isPaid = document.getElementById("bookingPaymentRequired").checked;
+    const isPaymentRequired = !isPaid;
+
+    const status = document.getElementById('bookingStatus')?.value || 'confirmed';
+    const amountPaidRaw = document.getElementById('bookingAmountPaid')?.value;
+    const amountPaidCents = (amountPaidRaw === undefined || String(amountPaidRaw).trim() === '')
+      ? undefined
+      : Math.round(Number(amountPaidRaw) * 100);
 
     // Clear all errors first
     clearApptError("appt-date");
@@ -2180,6 +2259,8 @@
         endIso,
         pickupLocation,
         isPaymentRequired,
+        status,
+        priceCents: Number.isFinite(amountPaidCents) ? amountPaidCents : undefined,
         clientId,
         firstName,
         lastName,
@@ -2235,6 +2316,17 @@
       updated_at: new Date().toISOString(),
     };
 
+    // Optional fields
+    if (arguments.length > 1) {
+      const opts = arguments[1] || {};
+      if (typeof opts.status === 'string') {
+        updateData.status = opts.status;
+      }
+      if (opts.priceCents !== undefined) {
+        updateData.price_cents = opts.priceCents;
+      }
+    }
+
     const { error } = await window.supabaseClient
       .from('booking')
       .update(updateData)
@@ -2281,7 +2373,16 @@
       : document.getElementById("newClientMobile").value.trim();
     
     const pickupLocation = document.getElementById("bookingPickupLocation").value.trim();
-    const isPaymentRequired = document.getElementById("bookingPaymentRequired").checked;
+
+    // Modal checkbox is Paid? (checked = paid). Persist as is_payment_required.
+    const isPaid = document.getElementById("bookingPaymentRequired").checked;
+    const isPaymentRequired = !isPaid;
+
+    const status = document.getElementById('bookingStatus')?.value || 'confirmed';
+    const amountPaidRaw = document.getElementById('bookingAmountPaid')?.value;
+    const amountPaidCents = (amountPaidRaw === undefined || String(amountPaidRaw).trim() === '')
+      ? undefined
+      : Math.round(Number(amountPaidRaw) * 100);
 
     // Clear all errors first
     clearApptError("appt-date");
@@ -2430,6 +2531,20 @@
       const bookingId = data?.bookingId;
 
       if (bookingId) {
+        // Save status/amount immediately (optional fields)
+        const extraUpdate = {};
+        if (typeof status === 'string') extraUpdate.status = status;
+        if (Number.isFinite(amountPaidCents)) extraUpdate.price_cents = amountPaidCents;
+        if (Object.keys(extraUpdate).length > 0) {
+          const { error: extraErr } = await window.supabaseClient
+            .from('booking')
+            .update(extraUpdate)
+            .eq('id', bookingId);
+          if (extraErr) {
+            console.warn('[booking] Optional status/amount update failed:', extraErr);
+          }
+        }
+
         console.log("[booking] ✓ Booking record created immediately, refreshing calendar...");
         closeAppointmentModal(true); // Force close without confirmation since we just saved
 
@@ -2856,7 +2971,7 @@
               ${typeof booking.price_cents === 'number' ? `<label class="payment-toggle ${booking.is_payment_required ? 'unpaid' : ''}">
                 <input type="checkbox" class="payment-toggle-checkbox" ${!booking.is_payment_required ? 'checked' : ''} data-booking-id="${booking.id}" />
                 <span class="payment-label">
-                  $${(booking.price_cents / 100).toFixed(0)} paid
+                  Paid? $${(booking.price_cents / 100).toFixed(0)}
                 </span>
               </label>` : ''}
               <div class="mt-1">
@@ -2890,7 +3005,7 @@
               ${typeof booking.price_cents === 'number' ? `<label class="payment-toggle ${booking.is_payment_required ? 'unpaid' : ''}">
                 <input type="checkbox" class="payment-toggle-checkbox" ${!booking.is_payment_required ? 'checked' : ''} data-booking-id="${booking.id}" />
                 <span class="payment-label">
-                  $${(booking.price_cents / 100).toFixed(0)} paid
+                  Paid? $${(booking.price_cents / 100).toFixed(0)}
                 </span>
               </label>` : ''}
               <div class="mt-1">
@@ -2935,7 +3050,7 @@
               ${typeof booking.price_cents === 'number' ? `<label class="payment-toggle ${booking.is_payment_required ? 'unpaid' : ''}">
                 <input type="checkbox" class="payment-toggle-checkbox" ${!booking.is_payment_required ? 'checked' : ''} data-booking-id="${booking.id}" />
                 <span class="payment-label">
-                  $${(booking.price_cents / 100).toFixed(0)} paid
+                  Paid? $${(booking.price_cents / 100).toFixed(0)}
                 </span>
               </label>` : ''}
               <div class="mt-1">

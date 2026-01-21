@@ -46,7 +46,7 @@ function getSuburbFromInput(address: string): string | null {
 // Remove trailing ", Australia" for cleaner suggestion display
 function stripTrailingCountry(address?: string | null): string | null {
   if (!address) return null;
-  return address.replace(/,?\s*Australia$/i, '');
+  return address.replace(/,?\s*Australia$/i, '').trim();
 }
 
 // Normalise place name for strict comparison (removes punctuation, collapses spaces)
@@ -126,9 +126,8 @@ async function validateAddressWithGoogle(address: string): Promise<PickupValidat
   const apiKey = Deno.env.get('GOOGLE_MAPS_API_KEY');
 
   if (!apiKey) {
-    console.warn('[validate-bookings] No Google Maps API key found. Skipping Google validation.');
-    // Fail open, no hint
-    return { isValid: true, issue: 'no_api_key' };
+    console.warn('[validate-bookings] No Google Maps API key found. Validation unavailable.');
+    return { isValid: false, issue: 'no_api_key' };
   }
 
   const url =
@@ -146,7 +145,7 @@ async function validateAddressWithGoogle(address: string): Promise<PickupValidat
         return { isValid: false, issue: 'google_no_result' };
       }
       console.warn('[validate-bookings] Google API Error:', data.status, data.error_message);
-      return { isValid: true, issue: 'google_error' };
+      return { isValid: false, issue: 'google_error' };
     }
 
     const result: any = data.results[0];
@@ -163,7 +162,7 @@ async function validateAddressWithGoogle(address: string): Promise<PickupValidat
       return {
         isValid: false,
         issue: 'partial_match',
-        suggestion: formattedAddress,
+        suggestion: formattedAddress || address,
       };
     }
 
@@ -337,10 +336,11 @@ async function validateAddressWithGoogle(address: string): Promise<PickupValidat
     }
     
     // Passed all checks → treat as valid
-    return { isValid: true, issue: 'none', suggestion: formattedAddress };
+    // Do not return a "suggestion" when valid (prevents UI showing a suggestion alongside VALID).
+    return { isValid: true, issue: 'none' };
   } catch (err) {
     console.error('[validate-bookings] Network error calling Google Maps:', err);
-    return { isValid: true, issue: 'network_error' }; // fail open on network issues
+    return { isValid: false, issue: 'network_error' }; // fail closed to avoid silent "Valid"
   }
 }
 
@@ -501,7 +501,9 @@ serve(async (req) => {
           is_mobile_valid: isMobileValid,
           is_pickup_location_valid: isLocationValid,
           pickup_location_issue: isLocationValid ? null : pickupResult.issue,
-          pickup_location_suggestion: stripTrailingCountry(pickupResult.suggestion),
+          pickup_location_suggestion: isLocationValid
+            ? null
+            : stripTrailingCountry(pickupResult.suggestion),
           validation_checked_at: new Date().toISOString(),
           // Any automatic validation means admin has not checked yet
           is_admin_checked: false,

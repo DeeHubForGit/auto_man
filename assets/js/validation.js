@@ -217,12 +217,28 @@
   const PICKUP_LOCATION_ISSUE_MESSAGES = {
     partial_match:
       'We found a similar address but it is not an exact match. Please check the street number and suburb.',
+    street_number_mismatch:
+      'The street number looks different to what Google Maps found. Please check the number.',
     street_mismatch:
       'We could not match this street or suffix (road, drive, etc). Please check the spelling of the street name or suffix.',
     suburb_mismatch:
       'We matched the street, but the suburb looks different. Please check the suburb.',
-    not_found:
+    google_no_result:
       'We could not find this address in Google Maps. Please check the number, street and suburb.',
+    google_error:
+      'Google address validation is currently unavailable. Please manually check the address before continuing.',
+    network_error:
+      'Google address validation is currently unavailable. Please manually check the address before continuing.',
+    no_api_key:
+      'Google address validation is currently unavailable. Please manually check the address before continuing.',
+    invoke_error:
+      'Google address validation is currently unavailable. Please manually check the address before continuing.',
+    empty:
+      'Pickup address is required.',
+    too_short:
+      'Please provide a valid address (minimum 5 characters).',
+    not_enough_letters:
+      'Please include a street name (letters) in the address.',
     test_data:
       'This looks like a test address. Please enter your real pickup address.',
     unknown:
@@ -260,14 +276,15 @@
   // Full address validation via Supabase Edge Function (async)
   async function validateAuAddressAsync(value) {
     if (isBlankOrNone(value)) {
-      return { valid: true, skipped: true };
+      return { valid: true, skipped: true, meta: { mode: 'skipped', issue: 'none' } };
     }
 
     if (!window.supabaseClient || !window.supabaseClient.functions) {
       return {
         valid: isProbablyValidAuAddress(value),
         fallback: true,
-        reason: 'Supabase client not available'
+        reason: 'Supabase client not available',
+        meta: { mode: 'fallback', issue: 'regex_only' }
       };
     }
 
@@ -281,34 +298,45 @@
 
       if (error) {
         return {
-          valid: isProbablyValidAuAddress(value),
+          valid: false,
           fallback: true,
-          reason: error.message || 'Address validation failed'
+          reason: error.message || 'Address validation failed',
+          meta: { mode: 'error', issue: 'invoke_error' }
         };
       }
 
       if (data && data.validation_result) {
         const result = data.validation_result;
-        const valid = result.isValid === true;
+        const issue = (result && result.issue) ? String(result.issue) : 'none';
+        const suggestion = result && result.suggestion ? String(result.suggestion) : undefined;
+
+        // IMPORTANT:
+        // VALID only when issue === 'none' (prevents fail-open regressions).
+        // Always return Google's suggested address (if present) so the UI can show it
+        // even when validation fails (partial_match, google_error, network_error, etc).
+        const valid = result.isValid === true && issue === 'none';
 
         return {
           valid: valid,
-          reason: result.issue && !valid ? result.issue : undefined,
-          formatted: result.suggestion ? result.suggestion : undefined,
-          raw: data
+          reason: issue !== 'none' ? issue : undefined,
+          formatted: suggestion,
+          raw: data,
+          meta: { mode: 'google', issue: issue }
         };
       }
 
       return {
-        valid: isProbablyValidAuAddress(value),
+        valid: false,
         fallback: true,
-        reason: 'No validation result from server'
+        reason: 'No validation result from server',
+        meta: { mode: 'error', issue: 'no_result' }
       };
     } catch (e) {
       return {
-        valid: isProbablyValidAuAddress(value),
+        valid: false,
         fallback: true,
-        reason: e && e.message ? e.message : 'Address validation error'
+        reason: e && e.message ? e.message : 'Address validation error',
+        meta: { mode: 'error', issue: 'exception' }
       };
     }
   }

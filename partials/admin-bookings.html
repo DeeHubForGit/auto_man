@@ -1224,9 +1224,28 @@
     if (field === 'pickup_location') {
       try {
         // Fire edge function
-        await window.supabaseClient.functions.invoke('validate-bookings', {
+        const { error: vbError } = await window.supabaseClient.functions.invoke('validate-bookings', {
           body: { id: id }
         });
+
+        // If Google validation is unavailable, keep the user-facing message visible.
+        // Avoid immediately reloading the list, because the DB will still be pending/null.
+        if (vbError) {
+          console.warn('[admin-bookings] validate-bookings error:', vbError);
+          const row = document.getElementById(`pickup-row-${id}`);
+          const icon = document.getElementById(`pickup-error-icon-${id}`);
+          const errorText = document.getElementById(`pickup-error-text-${id}`);
+          const checkbox = row?.querySelector('input[type="checkbox"]');
+          if (checkbox) checkbox.checked = false;
+          if (icon) icon.classList.remove('hidden');
+          if (errorText) {
+            errorText.textContent = window.Validation?.getPickupLocationIssueMessage?.('invoke_error') ||
+              'Google address validation is currently unavailable. Please manually check the address before continuing.';
+            errorText.classList.remove('hidden');
+          }
+          return;
+        }
+
         // Reload to show result (valid or suggestions)
         await loadAdminBookings();
         // Update notification badges
@@ -1235,6 +1254,17 @@
         }
       } catch (e) {
         console.warn('Validation trigger failed', e);
+        const row = document.getElementById(`pickup-row-${id}`);
+        const icon = document.getElementById(`pickup-error-icon-${id}`);
+        const errorText = document.getElementById(`pickup-error-text-${id}`);
+        const checkbox = row?.querySelector('input[type="checkbox"]');
+        if (checkbox) checkbox.checked = false;
+        if (icon) icon.classList.remove('hidden');
+        if (errorText) {
+          errorText.textContent = window.Validation?.getPickupLocationIssueMessage?.('invoke_error') ||
+            'Google address validation is currently unavailable. Please manually check the address before continuing.';
+          errorText.classList.remove('hidden');
+        }
       }
     }
     

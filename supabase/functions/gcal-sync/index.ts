@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck: Edge Functions run in Deno with dynamic env/request shapes; keep type checking off for this file.
 // supabase/functions/gcal-sync/index.ts
 // Google Calendar → Supabase Booking Sync (v5.0 - SMS with Email fallback)
 // =================================================================
@@ -379,12 +379,18 @@ Deno.serve(async () => {
       const startUTC = new Date(start).toISOString();
       const endUTC = new Date(end).toISOString();
 
-      // Extract is_payment_required from extended properties (defaults to false)
-      // Admin bookings without this flag should be treated as payment not required
-      const isPaymentRequiredRaw =
-        e.extendedProperties?.shared?.is_payment_required ?? "false";
-      
-      const isPaymentRequired = isPaymentRequiredRaw === "true";
+      // Payment flag (transition): prefer is_paid, fall back to legacy is_payment_required.
+      // is_paid: true => paid, false => unpaid
+      // is_payment_required (legacy): true => unpaid, false => paid
+      const isPaidRaw = String(e.extendedProperties?.shared?.is_paid ?? '').toLowerCase();
+      const legacyPaymentRequiredRaw = String(e.extendedProperties?.shared?.is_payment_required ?? '').toLowerCase();
+
+      let isPaid = false;
+
+      if (isPaidRaw === 'true') isPaid = true;
+      else if (isPaidRaw === 'false') isPaid = false;
+      else if (legacyPaymentRequiredRaw === 'true') isPaid = false;
+      else if (legacyPaymentRequiredRaw === 'false') isPaid = true;
       
       // Determine service code
       const serviceCode = parsed.service_code ?? inferServiceCode(e.summary, durationMinutes);
@@ -433,9 +439,9 @@ Deno.serve(async () => {
         p_extended: e,  // Store full event object for debugging/audit
         p_is_booking: isBooking,  // Simple booking detection
         p_title: e.summary ?? null,
-        p_is_payment_required: isPaymentRequired,  // Payment flag for admin bookings
+        p_is_paid: isPaid,  // Payment flag for admin bookings
       };
-
+      
       const up = await fetch(`${supa}/rest/v1/rpc/upsert_booking_from_google`, {
         method: "POST",
         headers: {
@@ -443,14 +449,15 @@ Deno.serve(async () => {
           Authorization: `Bearer ${key}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
-      });
+          body: JSON.stringify(payload),
+        });
+
+      const upBodyText = await up.text();
       
       if (!up.ok) {
         skipped++;
-        const errorText = await up.text();
         console.error(`[gcal-sync]   ✗ Failed to upsert: ${up.status}`);
-        console.error(`[gcal-sync]   Response: ${errorText}`);
+        console.error(`[gcal-sync]   Response: ${upBodyText}`);
         continue; // Skip to next event - don't break the whole sync
       }
 
@@ -460,7 +467,7 @@ Deno.serve(async () => {
       // ---------- SMS/EMAIL NOTIFICATION LOGIC (wrapped in try-catch to prevent breaking sync) ----------
       try {
         if (SMS_ENABLED && isBooking) {
-          const upData = await up.text();
+          const upData = upBodyText;
           let row: any = null;
           
           try {

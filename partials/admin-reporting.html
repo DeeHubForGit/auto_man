@@ -436,7 +436,7 @@
 
       let query = window.supabaseClient
         .from('booking')
-        .select('start_time,end_time,service_code,price_cents,is_payment_required,first_name,last_name,client:client_id(first_name,last_name),service:service_code(name)')
+        .select('start_time,end_time,service_code,price_cents,is_paid,first_name,last_name,client:client_id(first_name,last_name),service:service_code(name)')
         .eq('is_booking', true)
         .order('start_time', { ascending: true })
         .limit(1000);
@@ -515,7 +515,7 @@
         const serviceLabel = booking.service?.name || booking.service_code || '';
 
         const price = typeof booking.price_cents === 'number' ? `$${(booking.price_cents / 100).toFixed(2)}` : '';
-        const paid = booking.is_payment_required === false ? 'Yes' : 'No';
+        const paid = booking.is_paid === true ? 'Yes' : 'No';
 
         return `
           <tr>
@@ -590,7 +590,7 @@
         serviceLabel = serviceLabel.replace(/—/g, ' - ').replace(/–/g, ' - ');
 
         const price = typeof booking.price_cents === 'number' ? `$${(booking.price_cents / 100).toFixed(2)}` : '';
-        const paid = booking.is_payment_required === false ? 'Yes' : 'No';
+        const paid = booking.is_paid === true ? 'Yes' : 'No';
 
         return [clientName, serviceLabel, date, startTimeStr, endTimeStr, price, paid].map(escapeCSV).join(',');
       });

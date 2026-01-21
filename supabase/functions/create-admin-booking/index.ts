@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck: Edge Function runs in Deno with dynamic request/env shapes; keep type checking off for this file.
 // supabase/functions/create-admin-booking/index.ts
 // Create admin booking in Google Calendar
 // The gcal-sync function will automatically sync it to the database
@@ -114,6 +114,15 @@ const SERVICE_DURATION_MINUTES: Record<string, number> = {
   auto_60: 60,
   auto_90: 90,
   auto_120: 120,
+  manual_60: 60,
+  manual_90: 90,
+  manual_120: 120,
+  senior_auto_60: 60,
+  senior_auto_90: 90,
+  senior_auto_120: 120,
+  senior_manual_60: 60,
+  senior_manual_90: 90,
+  senior_manual_120: 120,
 };
 
 // ---------- CORS HEADERS ----------
@@ -158,8 +167,10 @@ Deno.serve(async (req) => {
       email,
       mobile,
       pickupLocation,
-      isPaymentRequired,
+      isPaid,
     } = payload;
+
+    const isPaidBool = !!(payload?.isPaid ?? payload?.is_paid);
 
     console.log("[create-admin-booking] Received payload:", JSON.stringify(payload, null, 2));
 
@@ -282,7 +293,7 @@ Deno.serve(async (req) => {
         shared: {
           service_code: serviceCode,
           created_by: "admin",
-          is_payment_required: isPaymentRequired ? "true" : "false",
+          is_paid: isPaidBool ? "true" : "false",
           is_booking: "true", // Mark as booking so gcal-sync colors it correctly
           mobile: safeMobile, // Stable source - immune to Google UI description corruption
           pickup_location: safePickup, // Stable source - immune to Google UI description corruption
@@ -336,7 +347,7 @@ Deno.serve(async (req) => {
       source: "google",
       status: "confirmed",
       is_booking: true,
-      is_payment_required: !!isPaymentRequired,
+      is_paid: isPaidBool,
 
       service_code: serviceCode,
       start_time: startUtc,

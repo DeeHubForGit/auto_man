@@ -683,9 +683,9 @@
 
     // Apply Payment Filter
     if (filterPayment === 'required') {
-      query = query.eq('is_payment_required', true);
+      query = query.eq('is_paid', false);
     } else if (filterPayment === 'paid') {
-      query = query.eq('is_payment_required', false);
+      query = query.eq('is_paid', true);
     }
 
     const { data, error } = await query;
@@ -875,7 +875,7 @@
       const clientName = clientNameFromClient || bookingNameFromBooking || 'Unknown';
 
       const price = typeof booking.price_cents === 'number' ? `$${(booking.price_cents / 100).toFixed(2)}` : '';
-      const paid = booking.is_payment_required === false ? 'Yes' : 'No';
+      const paid = booking.is_paid === true ? 'Yes' : 'No';
       const mobileValid = booking.is_mobile_valid === true ? 'Yes' : booking.is_mobile_valid === false ? 'No' : 'Unknown';
       const pickupValid = booking.is_pickup_location_valid === true ? 'Yes' : booking.is_pickup_location_valid === false ? 'No' : 'Unknown';
       const adminChecked = booking.is_admin_checked ? 'Yes' : 'No';
@@ -999,7 +999,7 @@
           <!-- Header: Service, Duration & Client Name -->
           <div class="mb-2">
             <h3 class="text-sm sm:text-base font-semibold text-gray-900">
-              ${serviceName} ${durationStr} (${clientName})${booking.is_payment_required ? '<span class="payment-icon">$</span>' : ''}
+              ${serviceName} ${durationStr} (${clientName})${!booking.is_paid ? '<span class="payment-icon">$</span>' : ''}
             </h3>
             ${isNameMismatch ? `<div class="text-xs text-gray-600 mt-0.5">Booking name: ${bookingNameFromBooking}</div>` : ''}
           </div>
@@ -1105,11 +1105,11 @@
               <label class="payment-toggle cursor-pointer">
                 <input type="checkbox" 
                   class="payment-toggle-checkbox w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
-                  ${!booking.is_payment_required ? 'checked' : ''}
+                  ${booking.is_paid ? 'checked' : ''}
                   onchange="togglePaymentStatus('${booking.id}', this.checked)"
                 >
-                <span class="payment-label text-sm ${booking.is_payment_required ? 'payment-owing' : 'payment-paid'}">
-                  $${(booking.price_cents / 100).toFixed(0)} paid
+                <span class="payment-label text-sm ${!booking.is_paid ? 'payment-owing' : 'payment-paid'}">
+                  Paid? $${(booking.price_cents / 100).toFixed(0)}
                 </span>
               </label>
             </div>
@@ -1301,28 +1301,26 @@
   };
 
   window.togglePaymentStatus = async function(id, isPaid) {
-    // Checkbox true = paid => is_payment_required = false
-    const isRequired = !isPaid;
-    console.log('[admin-bookings] Payment status toggled:', { isPaid, isRequired });
+    console.log('[admin-bookings] Payment status toggled:', { isPaid });
     
     // Find booking in memory
     const booking = adminBookings.find(b => String(b.id) === String(id));
     if (!booking) return;
     
-    const previous = booking.is_payment_required;
+    const previous = booking.is_paid;
     
     // Update UI optimistically
-    booking.is_payment_required = isRequired;
+    booking.is_paid = isPaid;
     
     const { error } = await window.supabaseClient
       .from('booking')
-      .update({ is_payment_required: isRequired })
+      .update({ is_paid: isPaid })
       .eq('id', id);
       
     if (error) {
       console.error('[admin-bookings] Payment status toggle failed:', error);
       // Revert on error
-      booking.is_payment_required = previous;
+      booking.is_paid = previous;
       await loadAdminBookings();
     } else {
       // Re-render to update UI

@@ -151,6 +151,7 @@ Deno.serve(async (req) => {
       );
     }
 
+    const payload = await req.json();
     const { 
       bookingId,
       googleEventId,
@@ -165,8 +166,10 @@ Deno.serve(async (req) => {
       email,
       mobile,
       pickupLocation,
-      isPaymentRequired
-    } = await req.json();
+      isPaid: _isPaid
+    } = payload;
+
+    const isPaidBool = !!(payload?.isPaid ?? payload?.is_paid);
 
     // Validate required fields
     if (!bookingId || !googleEventId || !serviceCode || !date || !startTime) {
@@ -215,8 +218,8 @@ ${mobile || 'N/A'}
 <b>Pickup Address</b>
 ${pickupLocation || 'N/A'}
 
-<b>Payment Required</b>
-${isPaymentRequired ? 'Yes' : 'No'}
+<b>Paid?</b>
+${isPaidBool ? 'Yes' : 'No'}
 `.trim();
 
     // Build event summary
@@ -260,7 +263,7 @@ ${isPaymentRequired ? 'Yes' : 'No'}
           ...existingShared,
           // gcal-sync uses these as source of truth
           is_booking: "true",
-          is_payment_required: isPaymentRequired ? "true" : "false",
+          is_paid: isPaidBool ? "true" : "false",
         },
         private: {
           ...existingPrivate,
@@ -268,7 +271,7 @@ ${isPaymentRequired ? 'Yes' : 'No'}
           serviceCode: serviceCode,
           clientEmail: email || '',
           pickup: pickupLocation || '',
-          isPaymentRequired: isPaymentRequired ? 'true' : 'false',
+          isPaid: isPaidBool ? 'true' : 'false',
           isBooking: 'true',
         }
       }
@@ -350,7 +353,7 @@ ${isPaymentRequired ? 'Yes' : 'No'}
       start_minute: startIso,
       timezone: "Australia/Melbourne",
       pickup_location: pickupLocation || null,
-      is_payment_required: isPaymentRequired,
+      is_paid: isPaidBool,
       client_id: finalClientId || null,
       first_name: firstName || null,
       last_name: lastName || null,

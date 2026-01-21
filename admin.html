@@ -402,7 +402,7 @@
           .from('booking')
           .select('id')
           .eq('is_booking', true)
-          .eq('is_payment_required', true)
+          .eq('is_paid', false)
           .gte('start_time', today);
         
         const paymentCount = paymentsRequired?.length || 0;

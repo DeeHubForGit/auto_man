@@ -898,7 +898,7 @@
           <div class="form-group">
             <div class="flex items-center gap-2 flex-wrap">
               <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="bookingPaymentRequired" class="cursor-pointer">
+                <input type="checkbox" id="bookingPaid" class="cursor-pointer">
                 <span class="text-sm">Paid?</span>
               </label>
 
@@ -1250,9 +1250,9 @@
     // Fill pickup location
     document.getElementById("bookingPickupLocation").value = booking.pickup_location || '';
     
-    // Fill Paid? (checkbox means paid). DB is is_payment_required.
-    const paidCheckbox = document.getElementById("bookingPaymentRequired");
-    if (paidCheckbox) paidCheckbox.checked = !booking.is_payment_required;
+    // Fill Paid? (checkbox means paid). DB is is_paid.
+    const paidCheckbox = document.getElementById("bookingPaid");
+    if (paidCheckbox) paidCheckbox.checked = !!booking.is_paid;
 
     // Fill amount paid (stored in booking.price_cents)
     const amountInput = document.getElementById('bookingAmountPaid');
@@ -2050,9 +2050,8 @@
     
     const pickupLocation = document.getElementById("bookingPickupLocation").value.trim();
 
-    // Modal checkbox is Paid? (checked = paid). Persist as is_payment_required.
-    const isPaid = document.getElementById("bookingPaymentRequired").checked;
-    const isPaymentRequired = !isPaid;
+    // Modal checkbox is Paid? (checked = paid). Persist as is_paid.
+    const isPaid = document.getElementById("bookingPaid").checked;
 
     const status = document.getElementById('bookingStatus')?.value || 'confirmed';
     const amountPaidRaw = document.getElementById('bookingAmountPaid')?.value;
@@ -2193,7 +2192,7 @@
         email,
         mobile,
         pickupLocation,
-        isPaymentRequired,
+        isPaid,
       };
 
       console.log("[booking-update] Payload:", payload);
@@ -2258,7 +2257,7 @@
         startIso,
         endIso,
         pickupLocation,
-        isPaymentRequired,
+        isPaid,
         status,
         priceCents: Number.isFinite(amountPaidCents) ? amountPaidCents : undefined,
         clientId,
@@ -2277,6 +2276,15 @@
 
       // Refresh calendar to show updated booking
       renderWeek(weekStart);
+
+      // If the bookings list is present on the page, refresh it so price/status changes show immediately
+      if (window.loadAdminBookings) {
+        try {
+          await window.loadAdminBookings();
+        } catch (e) {
+          console.warn('[booking-update] Failed to refresh bookings list:', e);
+        }
+      }
 
     } catch (err) {
       console.error("[booking-update] Error updating booking:", err);
@@ -2299,7 +2307,7 @@
   }
 
   // Update the DB row for a booking immediately after a successful Google update
-  async function updateBookingRowInDb(bookingId, { serviceCode, startIso, endIso, pickupLocation, isPaymentRequired, clientId, firstName, lastName, email, mobile }) {
+  async function updateBookingRowInDb(bookingId, { serviceCode, startIso, endIso, pickupLocation, isPaid, clientId, firstName, lastName, email, mobile }) {
     if (!bookingId) return;
 
     const updateData = {
@@ -2307,7 +2315,7 @@
       start_time: startIso,
       end_time: endIso,
       pickup_location: pickupLocation || null,
-      is_payment_required: isPaymentRequired,
+      is_paid: !!isPaid,
       client_id: clientId || null,
       first_name: firstName || null,
       last_name: lastName || null,
@@ -2374,9 +2382,8 @@
     
     const pickupLocation = document.getElementById("bookingPickupLocation").value.trim();
 
-    // Modal checkbox is Paid? (checked = paid). Persist as is_payment_required.
-    const isPaid = document.getElementById("bookingPaymentRequired").checked;
-    const isPaymentRequired = !isPaid;
+    // Modal checkbox is Paid? (checked = paid). Persist as is_paid.
+    const isPaid = document.getElementById("bookingPaid").checked;
 
     const status = document.getElementById('bookingStatus')?.value || 'confirmed';
     const amountPaidRaw = document.getElementById('bookingAmountPaid')?.value;
@@ -2506,7 +2513,7 @@
         email,
         mobile,
         pickupLocation,
-        isPaymentRequired,
+        isPaid,
       };
 
       console.log("[booking] Payload:", payload);
@@ -2554,6 +2561,15 @@
         }
 
         renderWeek(weekStart);
+
+        // If the bookings list is present on the page, refresh it so price/status changes show immediately
+        if (window.loadAdminBookings) {
+          try {
+            await window.loadAdminBookings();
+          } catch (e) {
+            console.warn('[booking] Failed to refresh bookings list:', e);
+          }
+        }
         return; // Skip polling
       }
 
@@ -2586,6 +2602,15 @@
             console.log(`[booking] ✅ Event found in database! Refreshing calendar.`, booking);
             hideNewBookingStatus();
             renderWeek(weekStart);
+
+            // If the bookings list is present on the page, refresh it so price/status changes show immediately
+            if (window.loadAdminBookings) {
+              try {
+                await window.loadAdminBookings();
+              } catch (e) {
+                console.warn('[booking] Failed to refresh bookings list:', e);
+              }
+            }
             return;
           }
           
@@ -2600,6 +2625,15 @@
             console.warn(`[booking] ⚠️ Event not found after ${maxPolls} attempts.`);
             hideNewBookingStatus();
             renderWeek(weekStart);
+
+            // If the bookings list is present on the page, refresh it so price/status changes show immediately
+            if (window.loadAdminBookings) {
+              try {
+                await window.loadAdminBookings();
+              } catch (e) {
+                console.warn('[booking] Failed to refresh bookings list:', e);
+              }
+            }
           }
         } catch (err) {
           console.error('[booking] Error polling for event:', err);
@@ -2801,9 +2835,9 @@
       }
     };
     
-    // Helper: Generate red $ marker if payment required
+    // Helper: Generate red $ marker if unpaid
     const getPaymentMarker = (booking) => {
-      return booking.is_payment_required ? '<span class="payment-marker">$</span>' : '';
+      return !booking.is_paid ? '<span class="payment-marker">$</span>' : '';
     };
     
     // Query bookings - exclude cancelled bookings
@@ -2930,7 +2964,7 @@
           const clientName = [booking.first_name, booking.last_name].filter(Boolean).join(' ') || 'Unknown Client';
           const statusValue = booking.status || 'confirmed';
           const statusLabel = statusValue === 'no_show' ? 'No Show' : (statusValue.charAt(0).toUpperCase() + statusValue.slice(1));
-          const paidYesNo = booking.is_payment_required ? 'No' : 'Yes';
+          const paidYesNo = booking.is_paid ? 'Yes' : 'No';
           
           // Get short service label
           const titleText = getServiceShortLabel(booking.service_code);
@@ -2972,7 +3006,7 @@
               <div class="text-sm font-semibold mb-1" style="color:#1e40af;">${clientName}</div>
               ${booking.mobile ? `<div class="text-xs mb-1" style="color:#1e40af;">📱 ${booking.mobile}</div>` : ''}
               <div class="text-xs mb-1 font-medium" style="color:#1e40af;">🕐 ${time} - ${endTime}</div>
-              ${typeof booking.price_cents === 'number' ? `<div class="payment-toggle ${booking.is_payment_required ? 'unpaid' : ''}">
+              ${typeof booking.price_cents === 'number' ? `<div class="payment-toggle ${!booking.is_paid ? 'unpaid' : ''}">
                 <span class="payment-label">Paid? ${paidYesNo} $${(booking.price_cents / 100).toFixed(0)}</span>
               </div>` : ''}
               <div class="mt-1">Status: ${statusLabel}</div>
@@ -2993,7 +3027,7 @@
               ${booking.pickup_location ? `<div class="text-xs mb-1" style="color:#374151;">📍 ${booking.pickup_location}</div>` : ''}
               <div class="text-sm font-semibold mb-1" style="color:#111827;">${clientName}</div>
               ${booking.mobile ? `<div class="text-xs mb-1" style="color:#374151;">📱 ${booking.mobile}</div>` : ''}
-              ${typeof booking.price_cents === 'number' ? `<div class="payment-toggle ${booking.is_payment_required ? 'unpaid' : ''}">
+              ${typeof booking.price_cents === 'number' ? `<div class="payment-toggle ${!booking.is_paid ? 'unpaid' : ''}">
                 <span class="payment-label">Paid? ${paidYesNo} $${(booking.price_cents / 100).toFixed(0)}</span>
               </div>` : ''}
               <div class="mt-1">Status: ${statusLabel}</div>
@@ -3015,7 +3049,7 @@
               ${booking.pickup_location ? `<div class="text-xs mb-1" style="color:#374151;">📍 ${booking.pickup_location}</div>` : ''}
               <div class="text-sm font-semibold mb-1" style="color:#111827;">${clientName}</div>
               ${booking.mobile ? `<div class="text-xs mb-1" style="color:#374151;">📱 ${booking.mobile}</div>` : ''}
-              ${typeof booking.price_cents === 'number' ? `<div class="payment-toggle ${booking.is_payment_required ? 'unpaid' : ''}">
+              ${typeof booking.price_cents === 'number' ? `<div class="payment-toggle ${!booking.is_paid ? 'unpaid' : ''}">
                 <span class="payment-label">Paid? ${paidYesNo} $${(booking.price_cents / 100).toFixed(0)}</span>
               </div>` : ''}
               <div class="mt-1">Status: ${statusLabel}</div>

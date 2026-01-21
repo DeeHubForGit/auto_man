@@ -22,7 +22,7 @@ extendedProperties: {
   shared: {
     service_code: serviceCode,
     created_by: "admin",
-    is_payment_required: isPaymentRequired ? "true" : "false",
+    is_paid: isPaid ? "true" : "false",
     is_booking: "true",
     mobile: safeMobile,              // ← STABLE SOURCE
     pickup_location: safePickup,     // ← STABLE SOURCE

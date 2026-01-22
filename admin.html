@@ -184,7 +184,18 @@
     }
 
     // Section navigation like portal.html
-    function showSection(section, source = 'sidebar') {
+    async function showSection(section, source = 'sidebar') {
+      // If leaving Bookings, cancel any pending debounced saves
+      try {
+        const current = document.querySelector('.section-content:not(.hidden)');
+        const leavingBookings = current && current.id === 'section-bookings' && section !== 'bookings';
+        if (leavingBookings) {
+          if (window.cancelAdminBookingsDebounces) window.cancelAdminBookingsDebounces();
+        }
+      } catch (e) {
+        // no-op
+      }
+
       // Hide all sections
       document.querySelectorAll('.section-content').forEach(el => el.classList.add('hidden'));
 
@@ -200,6 +211,17 @@
       const navItem = document.getElementById(`nav-${section}`);
       if (navItem) navItem.classList.add('is-active');
       
+      // Calendar: refresh bookings so it reflects any edits made in Bookings
+      if (section === 'calendar') {
+        if (window.refreshAdminCalendar) {
+          try {
+            await window.refreshAdminCalendar();
+          } catch (e) {
+            console.warn('[admin] Failed to refresh calendar:', e);
+          }
+        }
+      }
+
       // Reset filters to default when navigating to cancellations from sidebar
       if (section === 'cancellations' && source === 'sidebar') {
         setTimeout(() => {
@@ -234,19 +256,24 @@
       // Bookings – sidebar vs other sources
       if (section === 'bookings' && source === 'sidebar') {
         // Sidebar: force defaults → Not Checked + Valid and Invalid
-        setTimeout(() => {
+        setTimeout(async () => {
           const filterChecked = document.getElementById('bookingFilterChecked');
           const filterValid = document.getElementById('bookingFilterValid');
           
           if (filterChecked) filterChecked.value = 'unchecked';
           if (filterValid) filterValid.value = 'all';
           
-          if (window.loadAdminBookings) window.loadAdminBookings();
+          if (window.loadAdminBookings) await window.loadAdminBookings();
         }, 50);
       } else if (section === 'bookings' && source !== 'alert') {
         // Other callers (NOT the alert): just load with whatever filters are set
-        setTimeout(() => {
-          if (window.loadAdminBookings) window.loadAdminBookings();
+        setTimeout(async () => {
+          if (window.loadAdminBookings) await window.loadAdminBookings();
+        }, 50);
+      } else if (section === 'bookings' && source === 'alert') {
+        // Ensure Bookings always loads fresh data when opened
+        setTimeout(async () => {
+          if (window.loadAdminBookings) await window.loadAdminBookings();
         }, 50);
       }
       // Note: When source === 'alert', alert handler takes full control to avoid race

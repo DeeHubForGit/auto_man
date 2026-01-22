@@ -58,3 +58,6 @@ Thumbs.db
 # Temporary files
 ~$*
 *.tmp
+
+# Supabase CLI temp files
+supabase/.temp/

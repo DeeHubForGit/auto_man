@@ -212,8 +212,22 @@
   window.currentBookingsPage = 1;
   let mobileDebounceTimers = {};
   let pickupDebounceTimers = {};
+  let pickupDebouncePlannedValues = {};
   let lastActiveField = null;   // 'pickup' | 'mobile'
   let lastActiveBookingId = null;
+
+  // Cancel any pending debounced saves (prevents background writes after leaving Bookings)
+  window.cancelAdminBookingsDebounces = function() {
+    for (const [id, t] of Object.entries(mobileDebounceTimers)) {
+      if (t) clearTimeout(t);
+    }
+    for (const [id, t] of Object.entries(pickupDebounceTimers)) {
+      if (t) clearTimeout(t);
+    }
+    mobileDebounceTimers = {};
+    pickupDebounceTimers = {};
+    pickupDebouncePlannedValues = {};
+  };
   
   // Client filter state
   let selectedClientId = null;
@@ -550,24 +564,29 @@
     // Clear any existing debounce timer
     if (pickupDebounceTimers[bookingId]) {
       clearTimeout(pickupDebounceTimers[bookingId]);
+      delete pickupDebouncePlannedValues[bookingId];
     }
 
     // If empty, do not hit the backend
     if (!value) return;
 
     // Capture the value at the time we start the timer
-    const scheduledValue = value;
+    const plannedValue = value;
+
+    // Store the pickup value we intend to write (last-write-wins guard)
+    pickupDebouncePlannedValues[bookingId] = plannedValue;
 
     pickupDebounceTimers[bookingId] = setTimeout(async () => {
       // If the user kept typing, let the newer timer handle it
       const rowInput = document.querySelector(`#pickup-row-${bookingId} input[type="text"]`);
-      const latest = rowInput ? rowInput.value.trim() : scheduledValue;
-      if (latest !== scheduledValue) return;
+      const currentValue = rowInput ? rowInput.value.trim() : plannedValue;
+      if (currentValue !== plannedValue) return;
+      if (pickupDebouncePlannedValues[bookingId] !== plannedValue) return;
 
       // Skip if unchanged from original DB value
       const booking = adminBookings.find(b => String(b.id) === String(bookingId));
       const original = (booking?.pickup_location || '').trim();
-      if (latest === original) return;
+      if (currentValue === original) return;
 
       // Show processing state and hide suggestion panel
       const spinner = document.getElementById(`pickup-processing-${bookingId}`);
@@ -581,8 +600,9 @@
         await flushAdminMobileIfDirty();
 
         // Update pickup_location, trigger validation, reload bookings, and update badges
-        await window.updateAdminBookingField(bookingId, 'pickup_location', latest);
+        await window.updateAdminBookingField(bookingId, 'pickup_location', currentValue);
       } finally {
+        delete pickupDebouncePlannedValues[bookingId];
         // Hide processing state
         if (spinner) spinner.classList.add('hidden');
         if (rowInput) rowInput.disabled = false;
@@ -697,6 +717,7 @@
     }
 
     allAdminBookings = data || [];
+    adminBookings = allAdminBookings;
     window.currentBookingsPage = 1;
     renderAdminBookings();
     
@@ -731,6 +752,7 @@
     const startIdx = (window.currentBookingsPage - 1) * perPage;
     const endIdx = Math.min(startIdx + perPage, totalBookings);
     const pageBookings = allAdminBookings.slice(startIdx, endIdx);
+    adminBookings = pageBookings;
 
     // Render bookings
     if (allAdminBookings.length === 0) {
@@ -1190,7 +1212,33 @@
 
     // 2) Pickup: Reset validity and trigger backend validation
     if (field === 'pickup_location') {
-      updates.pickup_location = value || null;
+      const booking = allAdminBookings.find(b => String(b.id) === String(id)) ||
+        adminBookings.find(b => String(b.id) === String(id));
+      const newPickup = (value || '').trim() || null;
+      const oldPickup = ((booking?.pickup_location || '').trim() || null);
+
+      // Only write pickup_location if it actually changed
+      if (newPickup === oldPickup) {
+        return;
+      }
+
+      // Extra safety: re-check the current DB value to avoid overwriting Calendar changes
+      try {
+        const { data: currentRow } = await window.supabaseClient
+          .from('booking')
+          .select('pickup_location')
+          .eq('id', id)
+          .maybeSingle();
+
+        const dbPickup = ((currentRow?.pickup_location || '').trim() || null);
+        if (newPickup === dbPickup) {
+          return;
+        }
+      } catch (e) {
+        // If the check fails, continue with the update (best-effort safety)
+      }
+
+      updates.pickup_location = newPickup;
       updates.is_pickup_location_valid = null; // Reset to pending
       updates.pickup_location_suggestion = null;
       updates.pickup_location_issue = null;
@@ -1211,8 +1259,24 @@
     // Update Google Calendar event (mobile and/or pickup_location)
     if (field === 'mobile' || field === 'pickup_location') {
       try {
+        // Re-read values from inputs immediately before invoking (prevents stale/cached payloads)
+        const pickupInput = field === 'pickup_location'
+          ? document.querySelector(`#pickup-row-${id} input[type="text"]`)
+          : null;
+        const pickupFromInput = pickupInput ? pickupInput.value.trim() : null;
+
+        const mobileInput = field === 'mobile'
+          ? document.querySelector(`#mobile-row-${id} input[type="text"]`)
+          : null;
+        const mobileFromInput = mobileInput ? mobileInput.value.trim() : null;
+
         await window.supabaseClient.functions.invoke('update-booking-in-google', {
-          body: { booking_id: id, fields: [field] }
+          body: {
+            booking_id: id,
+            fields: [field],
+            pickup_location: pickupFromInput,
+            mobile: mobileFromInput
+          }
         });
         console.log(`[admin-bookings] Google Calendar updated for ${field}`);
       } catch (e) {

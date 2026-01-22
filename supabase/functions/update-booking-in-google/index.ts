@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck: Edge Functions run in Deno with dynamic env/request/event shapes; keep type checking off for this file.
 // supabase/functions/update-booking-in-google/index.ts
 // Update Google Calendar event when booking fields change in DB
 // =================================================================
@@ -216,7 +216,7 @@ serve(async (req) => {
 
   try {
     // Parse request body
-    const { booking_id, fields } = await req.json();
+    const { booking_id, fields, pickup_location, mobile } = await req.json();
     
     console.log(`[update-booking-in-google] Request to update booking: ${booking_id}, fields:`, fields);
     
@@ -293,41 +293,70 @@ serve(async (req) => {
 
     const currentEvent = await getRes.json();
     let description = currentEvent.description || '';
-    const patchBody: any = {};
+
+    type PatchExtendedProperties = {
+      shared: Record<string, unknown>;
+      private: Record<string, unknown>;
+    };
+
+    type GoogleEventPatch = {
+      location?: string;
+      structuredLocation?: null;
+      description?: string;
+      extendedProperties?: PatchExtendedProperties;
+    };
+
+    const patchBody: GoogleEventPatch = {};
     let descriptionChanged = false;
+
+    let computedPickupForDebug: string | null = null;
+    let computedMobileForDebug: string | null = null;
+
+    const pickupOverride = typeof pickup_location === 'string' ? pickup_location.trim() : undefined;
+    const mobileOverride = typeof mobile === 'string' ? mobile.trim() : undefined;
 
     // Update fields based on request
     if (fields.includes('pickup_location')) {
-      const newPickup = (booking.pickup_location || '').trim();
+      const newPickup = (pickupOverride !== undefined ? pickupOverride : (booking.pickup_location || '')).trim();
+      computedPickupForDebug = newPickup;
 
-      // Only patch location and description if pickup is non-empty
-      if (newPickup) {
-        patchBody.location = newPickup;
-        patchBody.structuredLocation = null;
-        
-        // Remove legacy pin lines before updating
-        const originalDescription = description;
-        description = removeLegacyPinnedAddressLines(description);
-        description = updatePickupInDescription(description, newPickup);
-        if (description !== originalDescription) {
-          descriptionChanged = true;
-        }
-        
-        // Initialize extendedProperties if needed (preserve both shared and private)
-        if (!patchBody.extendedProperties) {
-          const existingShared = currentEvent.extendedProperties?.shared || {};
-          const existingPrivate = currentEvent.extendedProperties?.private || {};
-          patchBody.extendedProperties = {
-            shared: { ...existingShared },
-            private: { ...existingPrivate }
-          };
-        }
-        patchBody.extendedProperties.shared.pickup_location = newPickup;
+      // Always patch location.  Empty string clears it in Google.
+      patchBody.location = newPickup;
+      patchBody.structuredLocation = null;
+
+      // Always update description (remove legacy pin lines, then set pickup line)
+      const originalDescription = description;
+      description = removeLegacyPinnedAddressLines(description);
+
+      const pickupForDescription = newPickup ? newPickup : 'N/A';
+      description = updatePickupInDescription(description, pickupForDescription);
+
+      if (description !== originalDescription) {
+        descriptionChanged = true;
       }
+
+      // Always update extendedProperties (preserve both shared and private)
+      if (!patchBody.extendedProperties) {
+        const existingShared = currentEvent.extendedProperties?.shared || {};
+        const existingPrivate = currentEvent.extendedProperties?.private || {};
+        patchBody.extendedProperties = {
+          shared: { ...existingShared },
+          private: { ...existingPrivate }
+        };
+      }
+
+      // Remove legacy payment-required keys (do not write these back)
+      delete patchBody.extendedProperties.shared.is_payment_required;
+      delete patchBody.extendedProperties.private.isPaymentRequired;
+
+      // Empty string is OK here, it keeps everything consistent
+      patchBody.extendedProperties.shared.pickup_location = newPickup;
+      patchBody.extendedProperties.private.pickup = newPickup;
     }
 
     if (fields.includes('mobile')) {
-      const newMobile = (booking.mobile || '').trim();
+      const newMobile = (mobileOverride !== undefined ? mobileOverride : (booking.mobile || '')).trim();
+      computedMobileForDebug = newMobile;
 
       if (newMobile) {
         const originalDescription = description;
@@ -345,7 +374,13 @@ serve(async (req) => {
             private: { ...existingPrivate }
           };
         }
+
+        // Remove legacy payment-required keys (do not write these back)
+        delete patchBody.extendedProperties.shared.is_payment_required;
+        delete patchBody.extendedProperties.private.isPaymentRequired;
+
         patchBody.extendedProperties.shared.mobile = newMobile;
+        patchBody.extendedProperties.private.mobile = newMobile;
       }
     }
 
@@ -367,8 +402,8 @@ serve(async (req) => {
     }
 
     // Debug: Log values before PATCH
-    const debugNewPickup = fields.includes('pickup_location') ? (booking.pickup_location || '').trim() : 'N/A';
-    const debugNewMobile = fields.includes('mobile') ? (booking.mobile || '').trim() : 'N/A';
+    const debugNewPickup = fields.includes('pickup_location') ? (computedPickupForDebug ?? '') : 'N/A';
+    const debugNewMobile = fields.includes('mobile') ? (computedMobileForDebug ?? '') : 'N/A';
     console.log('[update-booking-in-google] 🔍 Debug before PATCH:');
     console.log('  - newPickup:', debugNewPickup);
     console.log('  - newMobile:', debugNewMobile);

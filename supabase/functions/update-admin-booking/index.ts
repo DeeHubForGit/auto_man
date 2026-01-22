@@ -251,19 +251,27 @@ ${isPaidBool ? 'Yes' : 'No'}
     const existingPrivate = (existingEvent as { extendedProperties?: { private?: Record<string, unknown> } })
       ?.extendedProperties?.private || {};
 
+    // Remove legacy payment-required keys (do not write these back)
+    delete (existingShared as Record<string, unknown>)['is_payment_required'];
+    delete (existingPrivate as Record<string, unknown>)['isPaymentRequired'];
+
     // Update the Google Calendar event
     const eventPayload = {
       summary: summary,
       description: description,
       start: { dateTime: startDateTime, timeZone: "Australia/Melbourne" },
       end: { dateTime: endDateTime, timeZone: "Australia/Melbourne" },
-      location: pickupLocation || undefined,
+      location: (pickupLocation ?? '').toString(),
+      structuredLocation: null,
       extendedProperties: {
         shared: {
           ...existingShared,
           // gcal-sync uses these as source of truth
           is_booking: "true",
           is_paid: isPaidBool ? "true" : "false",
+          pickup_location: pickupLocation || '',
+          mobile: mobile || '',
+          service_code: serviceCode || '',
         },
         private: {
           ...existingPrivate,

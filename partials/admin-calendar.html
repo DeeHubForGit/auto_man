@@ -2865,6 +2865,24 @@
     document.getElementById('refreshBtn').onclick = () => renderWeek(weekStart); // Refresh current week
   }
 
+  async function refreshAdminCalendar() {
+    // Reuse the existing calendar render logic (which also triggers the bookings fetch)
+    try {
+      if (typeof renderWeek === 'function') {
+        renderWeek(weekStart || new Date());
+        return;
+      }
+
+      // Fallback: reuse the existing refresh button handler if present
+      const btn = document.getElementById('refreshBtn');
+      if (btn) btn.click();
+    } catch (e) {
+      console.warn('[calendar] refreshAdminCalendar failed:', e);
+    }
+  }
+
+  window.refreshAdminCalendar = refreshAdminCalendar;
+
   async function fetchBookings(weekStart, dayCells) {
     if (!window.supabaseClient) {
       console.error('❌ Supabase client not initialized');

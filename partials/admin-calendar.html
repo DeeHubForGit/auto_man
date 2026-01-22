@@ -1138,6 +1138,8 @@
             // User clicked No - close without saving
             apptBackdrop.classList.add("hidden");
             apptForm.reset();
+            clearApptError("bookingPickupLocation");
+            hidePickupSuggestion();
             formHasChanges = false;
           },
           "Unsaved Changes",
@@ -1151,6 +1153,8 @@
         }
         apptBackdrop.classList.add("hidden");
         apptForm.reset();
+        clearApptError("bookingPickupLocation");
+        hidePickupSuggestion();
         formHasChanges = false;
       }
       return;
@@ -1158,6 +1162,8 @@
     
     apptBackdrop.classList.add("hidden");
     apptForm.reset();
+    clearApptError("bookingPickupLocation");
+    hidePickupSuggestion();
     formHasChanges = false;
     resetPersonalEditState();
     resetBookingEditState();
@@ -1366,6 +1372,7 @@
     if (!field || !error) return;
     
     field.classList.remove('border-red-400');
+    error.textContent = '';
     error.classList.add('hidden');
   }
 
@@ -1715,16 +1722,16 @@
 
   // Enhanced pickup validation with helpful error messages (uses validation.js)
   function validatePickupAddressForBooking(addr) {
-    if (!addr || addr.trim() === '') {
+    const trimmed = (addr || '').trim();
+    if (!trimmed) {
       return { valid: false, message: 'Pickup address is required' };
     }
-    
-    const isValid = window.Validation?.isProbablyValidAuAddress?.(addr) ?? false;
-    
+
+    const isValid = window.Validation?.isProbablyValidAuAddress?.(trimmed) ?? false;
     if (!isValid) {
-      return { valid: false, message: 'Please provide a valid address (minimum 5 characters)' };
+      return { valid: false, message: 'Please provide a valid pickup address.' };
     }
-    
+
     return { valid: true, message: null };
   }
 
@@ -1734,6 +1741,7 @@
 
     const isValid = !!result?.valid;
     const suggestion = result?.formatted || null;
+    const issueCode = result?.meta?.issue || result?.reason || 'unknown';
 
     // If Google can resolve it but returns a different formatted address,
     // show a suggestion but do NOT block saving.
@@ -1746,7 +1754,8 @@
           valid: true,
           message: null,
           issue: 'suggestion_available',
-          suggestion
+          suggestion,
+          meta: result?.meta || null
         };
       }
     }
@@ -1754,9 +1763,12 @@
     // Convert validation.js format to our format
     return {
       valid: isValid,
-      message: isValid ? null : (window.Validation.getPickupLocationIssueMessage(result?.reason) || 'Please provide a valid address.'),
-      issue: result?.reason || 'unknown',
-      suggestion
+      message: isValid
+        ? null
+        : (window.Validation.getPickupLocationIssueMessage(issueCode) || 'Please provide a valid pickup address.'),
+      issue: issueCode,
+      suggestion,
+      meta: result?.meta || null
     };
   }
   
@@ -2048,7 +2060,7 @@
       ? existingClientSelect.selectedOptions[0]?.dataset.mobile || ""
       : document.getElementById("newClientMobile").value.trim();
     
-    const pickupLocation = document.getElementById("bookingPickupLocation").value.trim();
+    let pickupLocation = document.getElementById("bookingPickupLocation").value.trim();
 
     // Modal checkbox is Paid? (checked = paid). Persist as is_paid.
     const isPaid = document.getElementById("bookingPaid").checked;
@@ -2139,8 +2151,27 @@
       // Validate address with Google Maps before saving
       console.log("[booking-update] Validating pickup address with Google Maps...");
       const backendValidation = await validateAddressWithBackend(pickupLocation);
-      
-      if (!backendValidation.valid) {
+
+      if (backendValidation.valid) {
+        clearApptError("bookingPickupLocation");
+      }
+
+      // Show suggestion whenever available (even if address is valid)
+      if (backendValidation.suggestion) {
+        showPickupSuggestion(backendValidation.suggestion);
+      } else {
+        hidePickupSuggestion();
+      }
+
+      const isGoogleUnavailable =
+        window.Validation?.isGoogleValidationUnavailable?.(backendValidation.meta) === true;
+
+      const pickupValidToStore = isGoogleUnavailable ? null : true;
+      const pickupIssueToStore = null;
+      const pickupSuggestionToStore = null;
+      const checkedAtToStore = isGoogleUnavailable ? null : new Date().toISOString();
+
+      if (!backendValidation.valid && !isGoogleUnavailable) {
         // Re-enable save button
         if (saveBtn) {
           saveBtn.disabled = false;
@@ -2150,15 +2181,17 @@
         // Show validation error
         showApptError("bookingPickupLocation", backendValidation.message);
         
-        // Show suggestion button if available
-        if (backendValidation.suggestion) {
-          showPickupSuggestion(backendValidation.suggestion);
-        } else {
-          hidePickupSuggestion();
-        }
-        
         console.log("[booking-update] Address validation failed:", backendValidation.issue);
         return; // STOP HERE - do not save
+      }
+
+      if (!backendValidation.valid && isGoogleUnavailable) {
+        // Show warning, but DO NOT block saving
+        showApptError(
+          "bookingPickupLocation",
+          backendValidation.message ||
+            "Google address validation is currently unavailable. Please manually check the address before continuing."
+        );
       }
       
       console.log("[booking-update] Address validated successfully");
@@ -2176,6 +2209,8 @@
       if (!googleEventId) {
         throw new Error("Missing Google Event ID for booking update");
       }
+
+      pickupLocation = document.getElementById('bookingPickupLocation')?.value?.trim() || null;
 
       const payload = {
         type: "booking",
@@ -2251,6 +2286,8 @@
         ? new Date(`${date}T${endTime}:00`).toISOString()
         : new Date(`${date}T${startTime}:00`).toISOString();
 
+      pickupLocation = document.getElementById('bookingPickupLocation')?.value?.trim() || null;
+
       // Immediate DB update so calendar refresh shows the change right away
       await updateBookingRowInDb(editingBookingId, {
         serviceCode,
@@ -2265,6 +2302,12 @@
         lastName,
         email,
         mobile,
+
+        // NEW: clear stale invalid validation metadata on save
+        pickupValid: pickupValidToStore,
+        pickupIssue: pickupIssueToStore,
+        pickupSuggestion: pickupSuggestionToStore,
+        validationCheckedAt: checkedAtToStore,
       });
 
       closeAppointmentModal(true); // Force close without confirmation since we just saved
@@ -2333,6 +2376,19 @@
       if (opts.priceCents !== undefined) {
         updateData.price_cents = opts.priceCents;
       }
+
+      if (opts.pickupValid !== undefined) {
+        updateData.is_pickup_location_valid = opts.pickupValid;
+      }
+      if (opts.pickupIssue !== undefined) {
+        updateData.pickup_location_issue = opts.pickupIssue;
+      }
+      if (opts.pickupSuggestion !== undefined) {
+        updateData.pickup_location_suggestion = opts.pickupSuggestion;
+      }
+      if (opts.validationCheckedAt !== undefined) {
+        updateData.validation_checked_at = opts.validationCheckedAt;
+      }
     }
 
     const { error } = await window.supabaseClient
@@ -2380,7 +2436,7 @@
       ? existingClientSelect.selectedOptions[0]?.dataset.mobile || ""
       : document.getElementById("newClientMobile").value.trim();
     
-    const pickupLocation = document.getElementById("bookingPickupLocation").value.trim();
+    let pickupLocation = document.getElementById("bookingPickupLocation").value.trim();
 
     // Modal checkbox is Paid? (checked = paid). Persist as is_paid.
     const isPaid = document.getElementById("bookingPaid").checked;
@@ -2471,8 +2527,27 @@
       // Validate address with Google Maps before saving
       console.log("[booking] Validating pickup address with Google Maps...");
       const backendValidation = await validateAddressWithBackend(pickupLocation);
-      
-      if (!backendValidation.valid) {
+
+      if (backendValidation.valid) {
+        clearApptError("bookingPickupLocation");
+      }
+
+      // Show suggestion whenever available (even if address is valid)
+      if (backendValidation.suggestion) {
+        showPickupSuggestion(backendValidation.suggestion);
+      } else {
+        hidePickupSuggestion();
+      }
+
+      const isGoogleUnavailable =
+        window.Validation?.isGoogleValidationUnavailable?.(backendValidation.meta) === true;
+
+      const pickupValidToStore = isGoogleUnavailable ? null : true;
+      const pickupIssueToStore = null;
+      const pickupSuggestionToStore = null;
+      const checkedAtToStore = isGoogleUnavailable ? null : new Date().toISOString();
+
+      if (!backendValidation.valid && !isGoogleUnavailable) {
         // Re-enable save button
         if (saveBtn) {
           saveBtn.disabled = false;
@@ -2482,15 +2557,17 @@
         // Show validation error
         showApptError("bookingPickupLocation", backendValidation.message);
         
-        // Show suggestion button if available
-        if (backendValidation.suggestion) {
-          showPickupSuggestion(backendValidation.suggestion);
-        } else {
-          hidePickupSuggestion();
-        }
-        
         console.log("[booking] Address validation failed:", backendValidation.issue);
         return; // STOP HERE - do not save
+      }
+
+      if (!backendValidation.valid && isGoogleUnavailable) {
+        // Show warning, but DO NOT block saving
+        showApptError(
+          "bookingPickupLocation",
+          backendValidation.message ||
+            "Google address validation is currently unavailable. Please manually check the address before continuing."
+        );
       }
       
       console.log("[booking] Address validated successfully");
@@ -2499,6 +2576,8 @@
       // Convert 24-hour time to 12-hour format for the edge function
       const startTime12 = convert24To12Hour(startTime);
       const endTime12 = endTime ? convert24To12Hour(endTime) : null;
+
+      pickupLocation = document.getElementById('bookingPickupLocation')?.value?.trim() || null;
 
       const payload = {
         appointmentType: "booking",
@@ -2540,6 +2619,10 @@
       if (bookingId) {
         // Save status/amount immediately (optional fields)
         const extraUpdate = {};
+        extraUpdate.is_pickup_location_valid = pickupValidToStore;
+        extraUpdate.pickup_location_issue = pickupIssueToStore;
+        extraUpdate.pickup_location_suggestion = pickupSuggestionToStore;
+        extraUpdate.validation_checked_at = checkedAtToStore;
         if (typeof status === 'string') extraUpdate.status = status;
         if (Number.isFinite(amountPaidCents)) extraUpdate.price_cents = amountPaidCents;
         if (Object.keys(extraUpdate).length > 0) {

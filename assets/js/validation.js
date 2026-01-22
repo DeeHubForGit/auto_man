@@ -341,6 +341,14 @@
     }
   }
 
+  // Detect when Google address validation is unavailable (warning-only scenarios).
+  function isGoogleValidationUnavailable(meta) {
+    const mode = meta && meta.mode ? String(meta.mode) : '';
+    const issue = meta && meta.issue ? String(meta.issue) : '';
+    if (mode !== 'error') return false;
+    return ['invoke_error', 'google_error', 'no_api_key', 'network_error', 'exception', 'no_result'].includes(issue);
+  }
+
   // Export to window for global access
   window.Validation = {
     digitsOnly: digitsOnly,
@@ -359,6 +367,7 @@
     isBlankOrNone: isBlankOrNone,
     isProbablyValidAuAddress: isProbablyValidAuAddress,
     validateAuAddressAsync: validateAuAddressAsync,
+    isGoogleValidationUnavailable: isGoogleValidationUnavailable,
     getPickupLocationIssueMessage: getPickupLocationIssueMessage
   };
 })();

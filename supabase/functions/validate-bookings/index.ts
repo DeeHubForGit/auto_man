@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck: Supabase Edge Function uses dynamic JSON + Deno/ESM imports; keep validation logic runtime-focused.
 /**
  * Supabase Edge Function: validate-bookings
  *
@@ -47,6 +47,18 @@ function getSuburbFromInput(address: string): string | null {
 function stripTrailingCountry(address?: string | null): string | null {
   if (!address) return null;
   return address.replace(/,?\s*Australia$/i, '').trim();
+}
+
+function isGoogleUnavailableIssue(issue: string | null | undefined): boolean {
+  const code = (issue || '').trim().toLowerCase();
+  return (
+    code === 'invoke_error' ||
+    code === 'google_error' ||
+    code === 'no_api_key' ||
+    code === 'network_error' ||
+    code === 'exception' ||
+    code === 'no_result'
+  );
 }
 
 // Normalise place name for strict comparison (removes punctuation, collapses spaces)
@@ -424,10 +436,16 @@ serve(async (req) => {
     if (validateAddressOnly && addressToValidate) {
       console.log('[validate-bookings] Address-only validation mode for:', addressToValidate);
       const validationResult = await validatePickupLocation(addressToValidate);
+
+      // Strip "Australia" from suggestion for cleaner UI everywhere.
+      const cleanedResult = {
+        ...validationResult,
+        suggestion: stripTrailingCountry(validationResult.suggestion),
+      };
       return new Response(
         JSON.stringify({
           success: true,
-          validation_result: validationResult
+          validation_result: cleanedResult
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -494,17 +512,26 @@ serve(async (req) => {
       const pickupResult = await validatePickupLocation(booking.pickup_location);
       const isLocationValid = pickupResult.isValid;
 
+      const googleUnavailable = !isLocationValid && isGoogleUnavailableIssue(pickupResult.issue);
+
+      const pickupValidToStore = googleUnavailable ? null : isLocationValid;
+      const pickupIssueToStore = googleUnavailable
+        ? null
+        : (isLocationValid ? null : pickupResult.issue);
+      const pickupSuggestionToStore = googleUnavailable
+        ? null
+        : (isLocationValid ? null : stripTrailingCountry(pickupResult.suggestion));
+      const checkedAtToStore = googleUnavailable ? null : new Date().toISOString();
+
       // Update booking with validation results + hints
       const { error: updateError } = await supabase
         .from('booking')
         .update({
           is_mobile_valid: isMobileValid,
-          is_pickup_location_valid: isLocationValid,
-          pickup_location_issue: isLocationValid ? null : pickupResult.issue,
-          pickup_location_suggestion: isLocationValid
-            ? null
-            : stripTrailingCountry(pickupResult.suggestion),
-          validation_checked_at: new Date().toISOString(),
+          is_pickup_location_valid: pickupValidToStore,
+          pickup_location_issue: pickupIssueToStore,
+          pickup_location_suggestion: pickupSuggestionToStore,
+          validation_checked_at: checkedAtToStore,
           // Any automatic validation means admin has not checked yet
           is_admin_checked: false,
         })
@@ -523,14 +550,16 @@ serve(async (req) => {
         invalidMobiles.push(`${booking.id}: ${booking.mobile}`);
       }
       if (isLocationValid === false) {
-        locationInvalidCount++;
-        invalidLocations.push(`${booking.id}: ${booking.pickup_location}`);
+        if (!googleUnavailable) {
+          locationInvalidCount++;
+          invalidLocations.push(`${booking.id}: ${booking.pickup_location}`);
+        }
       }
 
       console.log(
         `[validate-bookings] ${booking.id}: ` +
           `Mobile ${isMobileValid ? 'VALID' : 'INVALID'}, ` +
-          `Location ${isLocationValid ? 'VALID' : 'INVALID'} (issue=${pickupResult.issue})`,
+          `Location ${isLocationValid ? 'VALID' : (googleUnavailable ? 'PENDING' : 'INVALID')} (issue=${pickupResult.issue})`,
       );
     }
 

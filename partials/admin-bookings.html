@@ -1259,28 +1259,42 @@
     // Update Google Calendar event (mobile and/or pickup_location)
     if (field === 'mobile' || field === 'pickup_location') {
       try {
-        // Re-read values from inputs immediately before invoking (prevents stale/cached payloads)
+        // For pickup, re-read immediately before invoking (prevents stale/cached payloads)
         const pickupInput = field === 'pickup_location'
           ? document.querySelector(`#pickup-row-${id} input[type="text"]`)
           : null;
         const pickupFromInput = pickupInput ? pickupInput.value.trim() : null;
 
-        const mobileInput = field === 'mobile'
-          ? document.querySelector(`#mobile-row-${id} input[type="text"]`)
-          : null;
-        const mobileFromInput = mobileInput ? mobileInput.value.trim() : null;
+        // For mobile, send the normalized value (same value stored in DB)
+        const mobileToSend = field === 'mobile' ? (valueToStore || '').trim() : null;
 
-        await window.supabaseClient.functions.invoke('update-booking-in-google', {
+        const { data: gData, error: gError } = await window.supabaseClient.functions.invoke('update-booking-in-google', {
           body: {
             booking_id: id,
             fields: [field],
             pickup_location: pickupFromInput,
-            mobile: mobileFromInput
+            mobile: mobileToSend
           }
         });
+
+        if (gError) {
+          console.warn(`[admin-bookings] Failed to update Google Calendar for ${field}:`, gError);
+          alert(`Google update failed: ${gError.message || gError}`);
+          if (field !== 'pickup_location') return;
+        }
+
+        if (!gData || gData.ok !== true) {
+          const msg = gData?.error || gData?.message || 'Unknown error';
+          console.warn(`[admin-bookings] Google update returned not ok for ${field}:`, gData);
+          alert(`Google update failed: ${msg}`);
+          if (field !== 'pickup_location') return;
+        }
+
         console.log(`[admin-bookings] Google Calendar updated for ${field}`);
       } catch (e) {
         console.warn(`[admin-bookings] Failed to update Google Calendar for ${field}:`, e);
+        alert(`Google update failed: ${e?.message || e}`);
+        if (field !== 'pickup_location') return;
       }
     }
 

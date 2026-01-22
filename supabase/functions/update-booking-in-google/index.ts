@@ -309,6 +309,11 @@ serve(async (req) => {
     const patchBody: GoogleEventPatch = {};
     let descriptionChanged = false;
 
+    let patchedSharedPickupLocation = false;
+    let patchedPrivatePickup = false;
+    let patchedSharedMobile = false;
+    let patchedPrivateMobile = false;
+
     let computedPickupForDebug: string | null = null;
     let computedMobileForDebug: string | null = null;
 
@@ -352,36 +357,39 @@ serve(async (req) => {
       // Empty string is OK here, it keeps everything consistent
       patchBody.extendedProperties.shared.pickup_location = newPickup;
       patchBody.extendedProperties.private.pickup = newPickup;
+      patchedSharedPickupLocation = true;
+      patchedPrivatePickup = true;
     }
 
     if (fields.includes('mobile')) {
       const newMobile = (mobileOverride !== undefined ? mobileOverride : (booking.mobile || '')).trim();
       computedMobileForDebug = newMobile;
 
-      if (newMobile) {
-        const originalDescription = description;
-        description = updateMobileInDescription(description, newMobile);
-        if (description !== originalDescription) {
-          descriptionChanged = true;
-        }
-        
-        // Initialize extendedProperties if needed (preserve both shared and private)
-        if (!patchBody.extendedProperties) {
-          const existingShared = currentEvent.extendedProperties?.shared || {};
-          const existingPrivate = currentEvent.extendedProperties?.private || {};
-          patchBody.extendedProperties = {
-            shared: { ...existingShared },
-            private: { ...existingPrivate }
-          };
-        }
-
-        // Remove legacy payment-required keys (do not write these back)
-        delete patchBody.extendedProperties.shared.is_payment_required;
-        delete patchBody.extendedProperties.private.isPaymentRequired;
-
-        patchBody.extendedProperties.shared.mobile = newMobile;
-        patchBody.extendedProperties.private.mobile = newMobile;
+      const originalDescription = description;
+      const mobileForDescription = newMobile ? newMobile : 'N/A';
+      description = updateMobileInDescription(description, mobileForDescription);
+      if (description !== originalDescription) {
+        descriptionChanged = true;
       }
+      
+      // Initialize extendedProperties if needed (preserve both shared and private)
+      if (!patchBody.extendedProperties) {
+        const existingShared = currentEvent.extendedProperties?.shared || {};
+        const existingPrivate = currentEvent.extendedProperties?.private || {};
+        patchBody.extendedProperties = {
+          shared: { ...existingShared },
+          private: { ...existingPrivate }
+        };
+      }
+
+      // Remove legacy payment-required keys (do not write these back)
+      delete patchBody.extendedProperties.shared.is_payment_required;
+      delete patchBody.extendedProperties.private.isPaymentRequired;
+
+      patchBody.extendedProperties.shared.mobile = newMobile;
+      patchBody.extendedProperties.private.mobile = newMobile;
+      patchedSharedMobile = true;
+      patchedPrivateMobile = true;
     }
 
     // Set description only if we actually changed it
@@ -435,12 +443,33 @@ serve(async (req) => {
     }
 
     console.log(`[update-booking-in-google] ✅ Event updated successfully`);
+
+    const patched_description = !!patchBody.description;
+    const patched_location = Object.prototype.hasOwnProperty.call(patchBody, 'location');
+
+    const patched_fields: string[] = [];
+    if (patched_location) patched_fields.push('location');
+    if (Object.prototype.hasOwnProperty.call(patchBody, 'structuredLocation')) patched_fields.push('structuredLocation');
+    if (patched_description) patched_fields.push('description');
+    if (patchedSharedPickupLocation) patched_fields.push('extendedProperties.shared.pickup_location');
+    if (patchedPrivatePickup) patched_fields.push('extendedProperties.private.pickup');
+    if (patchedSharedMobile) patched_fields.push('extendedProperties.shared.mobile');
+    if (patchedPrivateMobile) patched_fields.push('extendedProperties.private.mobile');
     
     return new Response(
       JSON.stringify({ 
         ok: true, 
         message: 'Event updated successfully',
         fields_updated: fields,
+        patched_fields,
+        patched_description,
+        patched_location,
+        patched_shared_keys: Object.keys(patchBody.extendedProperties?.shared || {}),
+        patched_private_keys: Object.keys(patchBody.extendedProperties?.private || {}),
+        new_pickup_location: fields.includes('pickup_location') ? (computedPickupForDebug ?? '') : null,
+        new_mobile: fields.includes('mobile') ? (computedMobileForDebug ?? '') : null,
+        google_event_id: booking.google_event_id,
+        google_calendar_id: booking.google_calendar_id,
         booking_id
       }),
       { 

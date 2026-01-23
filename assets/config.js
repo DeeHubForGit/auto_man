@@ -10,6 +10,7 @@ const SITE_CONFIG = {
   ],
   
   OWNER_NAME: 'Darren',
+  APPOINTMENT_BUFFER_MINUTES: 15,
   PHONE_NUMBER: '0403 632 313',
   PHONE_NUMBER_LINK: '0403632313', // For tel: links (no spaces)
   PHONE_NUMBER_DISPLAY: '0403 632 313', // For display (with spaces)

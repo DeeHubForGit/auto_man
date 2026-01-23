@@ -1787,6 +1787,11 @@
     });
   }
 
+  function getAppointmentBufferMinutes() {
+    const n = Number(window.SITE_CONFIG?.APPOINTMENT_BUFFER_MINUTES);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  }
+
   // WARNING ONLY: Check local DB for overlapping bookings, then continue.
   // - Does not block saving.
   // - Local booking table only (no Google).
@@ -1796,13 +1801,23 @@
 
       if (!startIso || !endIso) return;
 
+      const bufferMins = getAppointmentBufferMinutes();
+      const bufferMs = bufferMins * 60 * 1000;
+
+      const startMs = new Date(startIso).getTime();
+      const endMs = new Date(endIso).getTime();
+      if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return;
+
+      const windowStartIso = new Date(startMs - bufferMs).toISOString();
+      const windowEndIso = new Date(endMs + bufferMs).toISOString();
+
       let q = window.supabaseClient
         .from('booking')
         .select('id, start_time, end_time, first_name, last_name, event_title, is_booking, status')
         .eq('is_deleted', false)
         .neq('status', 'cancelled')
-        .lt('start_time', endIso)
-        .gt('end_time', startIso)
+        .lt('start_time', windowEndIso)
+        .gt('end_time', windowStartIso)
         .order('start_time', { ascending: true })
         .limit(5);
 
@@ -1819,7 +1834,40 @@
 
       if (!data || data.length === 0) return;
 
-      const lines = data.map(b => {
+      const overlaps = [];
+      const tooClose = [];
+
+      for (const b of data) {
+        const existingStartMs = new Date(b.start_time).getTime();
+        const existingEndMs = new Date(b.end_time).getTime();
+        if (!Number.isFinite(existingStartMs) || !Number.isFinite(existingEndMs)) continue;
+
+        const isOverlap = startMs < existingEndMs && endMs > existingStartMs;
+        if (isOverlap) {
+          overlaps.push(b);
+          continue;
+        }
+
+        if (bufferMs > 0) {
+          const gapBefore =
+            existingEndMs <= startMs &&
+            (startMs - existingEndMs) >= 0 &&
+            (startMs - existingEndMs) <= bufferMs;
+
+          const gapAfter =
+            endMs <= existingStartMs &&
+            (existingStartMs - endMs) >= 0 &&
+            (existingStartMs - endMs) <= bufferMs;
+
+          if (gapBefore || gapAfter) {
+            tooClose.push(b);
+          }
+        }
+      }
+
+      if (overlaps.length === 0 && tooClose.length === 0) return;
+
+      const overlapLines = overlaps.map(b => {
         const label = b.is_booking
           ? ([b.first_name, b.last_name].filter(Boolean).join(' ') || 'Booking')
           : (b.event_title || 'Appointment');
@@ -1828,10 +1876,31 @@
         return `• ${label} (${start} - ${end})`;
       });
 
-      const msg =
-        `Warning: This overlaps ${data.length} existing appointment(s).\n\n` +
-        lines.join('\n') +
-        `\n\nClick OK to continue.`;
+      const tooCloseLines = tooClose.map(b => {
+        const label = b.is_booking
+          ? ([b.first_name, b.last_name].filter(Boolean).join(' ') || 'Booking')
+          : (b.event_title || 'Appointment');
+        const start = formatAuDateTime(b.start_time);
+        const end = formatAuDateTime(b.end_time);
+        return `• ${label} (${start} - ${end})`;
+      });
+
+      let msg = '';
+
+      if (overlaps.length > 0) {
+        msg +=
+          `Warning: This overlaps ${overlaps.length} existing appointment(s).\n\n` +
+          overlapLines.join('\n');
+      }
+
+      if (bufferMins > 0 && tooClose.length > 0) {
+        if (msg) msg += '\n\n';
+        msg +=
+          `Travel time warning: Less than ${bufferMins} minutes between appointments (${tooClose.length} found).\n\n` +
+          tooCloseLines.join('\n');
+      }
+
+      msg += `\n\nClick OK to continue.`;
 
       if (window.Modal && window.Modal.requireOk) {
         await window.Modal.requireOk(msg, 'Overlap Warning', { confirmText: 'OK' });

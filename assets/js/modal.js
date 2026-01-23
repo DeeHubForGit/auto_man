@@ -149,6 +149,74 @@
     warning: function(message, title = 'Warning') {
       showModal({ type: 'warning', title, message });
     },
+
+    requireOk: function(message, title = 'Warning', options = {}) {
+      return new Promise((resolve) => {
+        const confirmText = options.confirmText || 'OK';
+
+        createModal();
+
+        const modal = document.getElementById('customModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalMessage = document.getElementById('modalMessage');
+        const modalIcon = document.getElementById('modalIcon');
+        const okBtn = document.getElementById('modalOkBtn');
+        const cancelBtn = document.getElementById('modalCancelBtn');
+
+        // Set content
+        modalTitle.textContent = title;
+        modalMessage.textContent = message;
+        okBtn.textContent = confirmText;
+
+        // Warning styling
+        modalIcon.innerHTML = '⚠';
+        modalIcon.className = 'flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-2xl bg-yellow-100 text-yellow-600';
+
+        // Force OK-only
+        cancelBtn.classList.add('hidden');
+
+        // Show modal
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(() => {
+          modal.querySelector('.bg-white').classList.add('scale-100', 'opacity-100');
+        }, 10);
+
+        function cleanup() {
+          okBtn.removeEventListener('click', handleOk);
+          document.removeEventListener('keydown', handleKeydown);
+          modal.removeEventListener('click', handleBackdropClick);
+
+          modal.classList.remove('flex');
+          modal.classList.add('hidden');
+        }
+
+        function handleOk() {
+          cleanup();
+          resolve(true);
+        }
+
+        // DO NOT allow Escape to close
+        function handleKeydown(e) {
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+        }
+
+        // DO NOT allow clicking backdrop to close
+        function handleBackdropClick(e) {
+          if (e.target === modal) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+        }
+
+        okBtn.addEventListener('click', handleOk);
+        document.addEventListener('keydown', handleKeydown);
+        modal.addEventListener('click', handleBackdropClick);
+      });
+    },
     
     info: function(message, title = 'Information') {
       showModal({ type: 'info', title, message });

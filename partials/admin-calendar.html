@@ -1771,6 +1771,78 @@
       meta: result?.meta || null
     };
   }
+
+  function formatAuDateTime(dateInput) {
+    if (!dateInput) return '';
+
+    const d = new Date(dateInput);
+
+    return d.toLocaleString('en-AU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  }
+
+  // WARNING ONLY: Check local DB for overlapping bookings, then continue.
+  // - Does not block saving.
+  // - Local booking table only (no Google).
+  async function warnIfBookingClash(startIso, endIso, excludeBookingId) {
+    try {
+      if (!window.supabaseClient) return;
+
+      if (!startIso || !endIso) return;
+
+      let q = window.supabaseClient
+        .from('booking')
+        .select('id, start_time, end_time, first_name, last_name, event_title, is_booking, status')
+        .eq('is_deleted', false)
+        .neq('status', 'cancelled')
+        .lt('start_time', endIso)
+        .gt('end_time', startIso)
+        .order('start_time', { ascending: true })
+        .limit(5);
+
+      if (excludeBookingId) {
+        q = q.neq('id', excludeBookingId);
+      }
+
+      const { data, error } = await q;
+
+      if (error) {
+        console.warn('[clash-warning] Clash check query error (continuing anyway):', error);
+        return;
+      }
+
+      if (!data || data.length === 0) return;
+
+      const lines = data.map(b => {
+        const label = b.is_booking
+          ? ([b.first_name, b.last_name].filter(Boolean).join(' ') || 'Booking')
+          : (b.event_title || 'Appointment');
+        const start = formatAuDateTime(b.start_time);
+        const end = formatAuDateTime(b.end_time);
+        return `• ${label} (${start} - ${end})`;
+      });
+
+      const msg =
+        `Warning: This overlaps ${data.length} existing appointment(s).\n\n` +
+        lines.join('\n') +
+        `\n\nClick OK to continue.`;
+
+      if (window.Modal && window.Modal.requireOk) {
+        await window.Modal.requireOk(msg, 'Overlap Warning', { confirmText: 'OK' });
+      } else {
+        alert(msg);
+      }
+    } catch (e) {
+      console.warn('[clash-warning] Clash check failed (continuing anyway):', e);
+      return;
+    }
+  }
   
   // Helper function to convert 24-hour time to 12-hour format with AM/PM
   function convert24To12Hour(time24) {
@@ -1862,12 +1934,36 @@
       const startTime12 = convert24To12Hour(startTime);
       const endTime12 = endTime ? convert24To12Hour(endTime) : null;
 
+      // Build ISO timestamps for local overlap warning (TIMESTAMPTZ)
+      const startIso = new Date(`${date}T${startTime}:00`).toISOString();
+      const endIso = endTime
+        ? new Date(`${date}T${endTime}:00`).toISOString()
+        : new Date(`${date}T${startTime}:00`).toISOString();
+
       // Show loading state on save button
       setAppointmentSaveLoading(true, editingPersonalAppt ? 'Updating...' : 'Creating...');
 
       if (editingPersonalAppt && editingPersonalGoogleEventId) {
         // UPDATE mode
         console.log("[appointment] Updating personal appointment via edge function");
+
+        let excludeId = null;
+        if (editingPersonalAppt && editingPersonalGoogleEventId && window.supabaseClient) {
+          try {
+            const { data: existingRow, error: excludeErr } = await window.supabaseClient
+              .from('booking')
+              .select('id')
+              .eq('google_event_id', editingPersonalGoogleEventId)
+              .maybeSingle();
+            if (excludeErr) {
+              console.warn('[clash-warning] Exclude lookup error (continuing anyway):', excludeErr);
+            }
+            excludeId = existingRow?.id || null;
+          } catch (e) {
+            console.warn('[clash-warning] Exclude lookup failed (continuing anyway):', e);
+          }
+        }
+        await warnIfBookingClash(startIso, endIso, excludeId);
         
         const { data, error } = await window.supabaseClient.functions.invoke('update-admin-appointment', {
           body: { 
@@ -1892,12 +1988,6 @@
 
         console.log("[appointment] ✅ Appointment updated successfully:", data);
 
-        // Build ISO timestamps for DB (TIMESTAMPTZ)
-        const startIso = new Date(`${date}T${startTime}:00`).toISOString();
-        const endIso = endTime
-          ? new Date(`${date}T${endTime}:00`).toISOString()
-          : new Date(`${date}T${startTime}:00`).toISOString(); // fallback if end omitted
-
         // Immediate DB update so calendar refresh shows the change right away
         await updatePersonalAppointmentRowInDb(editingPersonalGoogleEventId, {
           title,
@@ -1919,6 +2009,8 @@
       } else {
         // CREATE mode
         console.log("[appointment] Creating personal appointment via edge function");
+
+        await warnIfBookingClash(startIso, endIso, null);
 
         // Call edge function to create Google Calendar event and insert into DB
         const { data, error } = await window.supabaseClient.functions.invoke('create-admin-appointment', {
@@ -2232,6 +2324,13 @@
 
       console.log("[booking-update] Payload:", payload);
 
+      // Local overlap warning only (does not block saving)
+      const startIso = new Date(`${date}T${startTime}:00`).toISOString();
+      const endIso = endTime
+        ? new Date(`${date}T${endTime}:00`).toISOString()
+        : new Date(`${date}T${startTime}:00`).toISOString();
+      await warnIfBookingClash(startIso, endIso, editingBookingId);
+
       // Call edge function to update Google Calendar event and DB
       const { data, error } = await window.supabaseClient.functions.invoke('update-admin-booking', {
         body: payload
@@ -2279,12 +2378,6 @@
       }
 
       console.log("[booking-update] ✅ Booking updated successfully:", data);
-
-      // Build ISO timestamps for DB (TIMESTAMPTZ)
-      const startIso = new Date(`${date}T${startTime}:00`).toISOString();
-      const endIso = endTime
-        ? new Date(`${date}T${endTime}:00`).toISOString()
-        : new Date(`${date}T${startTime}:00`).toISOString();
 
       pickupLocation = document.getElementById('bookingPickupLocation')?.value?.trim() || null;
 
@@ -2578,6 +2671,13 @@
       const endTime12 = endTime ? convert24To12Hour(endTime) : null;
 
       pickupLocation = document.getElementById('bookingPickupLocation')?.value?.trim() || null;
+
+      // Local overlap warning only (does not block saving)
+      const startIso = new Date(`${date}T${startTime}:00`).toISOString();
+      const endIso = endTime
+        ? new Date(`${date}T${endTime}:00`).toISOString()
+        : new Date(`${date}T${startTime}:00`).toISOString();
+      await warnIfBookingClash(startIso, endIso, null);
 
       const payload = {
         appointmentType: "booking",

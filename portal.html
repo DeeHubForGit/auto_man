@@ -861,6 +861,50 @@
       }
     }
 
+    function showPortalPickupInvokeError(bookingId) {
+      try {
+        const cardEl = document.getElementById(`booking-card-${bookingId}`);
+        if (!cardEl) return;
+
+        const pickupInput = cardEl.querySelector('.pickup-address-input');
+        const issueEl = cardEl.querySelector('.pickup-issue-message');
+        const iconEl = pickupInput?.parentElement ? pickupInput.parentElement.querySelector('svg') : null;
+
+        const spinner = document.getElementById(`pickup-processing-${bookingId}`);
+        if (spinner) spinner.classList.add('hidden');
+
+        const msg = window.Validation?.getPickupLocationIssueMessage
+          ? window.Validation.getPickupLocationIssueMessage('invoke_error')
+          : 'Google address validation is currently unavailable. Please manually check the address before continuing.';
+
+        if (issueEl) {
+          issueEl.textContent = msg;
+        }
+
+        if (pickupInput) {
+          pickupInput.classList.add('border-red-400', 'text-red-600');
+          pickupInput.classList.remove('border-gray-300', 'text-gray-900', 'border-blue-400', 'text-blue-600');
+        }
+
+        if (iconEl) {
+          iconEl.classList.remove('hidden');
+        }
+
+        const idx = allBookings.findIndex(b => b.id === bookingId);
+        if (idx !== -1) {
+          allBookings[idx] = {
+            ...allBookings[idx],
+            is_pickup_location_valid: false,
+            pickup_location_issue: 'invoke_error',
+          };
+        }
+
+        refreshUpcomingValidationUI();
+      } catch (e) {
+        console.warn('[portal] showPortalPickupInvokeError failed (continuing anyway):', e);
+      }
+    }
+
     async function flushMobileIfDirty(bookingId) {
       const mobileEl = document.getElementById(`mobile-input-${bookingId}`);
       if (!mobileEl) return;
@@ -900,14 +944,26 @@
         // Update Google Calendar with new pickup location
         await patchGoogleAfterClientEdit(bookingId, ['pickup_location']);
 
+        let invokeResult = null;
         try {
-          await window.supabaseClient.functions.invoke('validate-bookings', {
+          invokeResult = await window.supabaseClient.functions.invoke('validate-bookings', {
             body: { id: bookingId, booking_id: bookingId }
           });
-          console.log('[portal] validate-bookings invoked for booking_id:', bookingId);
-          
-          await loadBookings();
-        } catch (e) { console.warn('Validation trigger failed', e); }
+        } catch (e) {
+          console.warn('[portal] validate-bookings invoke failed (continuing anyway):', e);
+          showPortalPickupInvokeError(bookingId);
+          return; // Do NOT reload bookings - keep inline error visible
+        }
+
+        if (invokeResult && invokeResult.error) {
+          console.warn('[portal] validate-bookings returned error (continuing anyway):', invokeResult.error);
+          showPortalPickupInvokeError(bookingId);
+          return; // Do NOT reload bookings - keep inline error visible
+        }
+
+        console.log('[portal] validate-bookings invoked for booking_id:', bookingId);
+
+        await loadBookings();
       }
     }
 
@@ -1551,6 +1607,8 @@
       
       // Save to database
       try {
+        let pickupInvokeFailed = false;
+
         // For mobile: normalize if valid, otherwise save raw trimmed value
         const raw = inputElement.value ?? '';
         const trimmed = raw.trim();
@@ -1612,13 +1670,22 @@
 
         // Trigger server-side validation immediately if we just reset the flags
         if (fieldName === 'pickup_location' && newValue) {
+          let invokeResult = null;
           try {
             console.log('Triggering server-side validation...');
-            await window.supabaseClient.functions.invoke('validate-bookings', {
+            invokeResult = await window.supabaseClient.functions.invoke('validate-bookings', {
               body: { id: bookingId, booking_id: bookingId }
             });
           } catch (valErr) {
             console.warn('Validation trigger failed (will be picked up by background job):', valErr);
+            showPortalPickupInvokeError(bookingId);
+            pickupInvokeFailed = true;
+          }
+
+          if (invokeResult && invokeResult.error) {
+            console.warn('Validation trigger returned error (will be picked up by background job):', invokeResult.error);
+            showPortalPickupInvokeError(bookingId);
+            pickupInvokeFailed = true;
           }
         }
 
@@ -1632,10 +1699,18 @@
         if (fetchError) {
           console.error('[saveBookingField] Error fetching updated booking:', fetchError);
         } else {
+          const bookingForMemory = (pickupInvokeFailed && fieldName === 'pickup_location' && updatedBooking)
+            ? {
+                ...updatedBooking,
+                is_pickup_location_valid: false,
+                pickup_location_issue: 'invoke_error',
+              }
+            : updatedBooking;
+
           // Update in-memory list with fresh database data
           const idx = allBookings.findIndex(b => b.id === bookingId);
           if (idx !== -1) {
-            allBookings[idx] = updatedBooking;
+            allBookings[idx] = bookingForMemory;
             // Update original value
             inputElement.dataset.original = newValue;
           }

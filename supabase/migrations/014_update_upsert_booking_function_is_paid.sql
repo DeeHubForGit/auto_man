@@ -90,7 +90,7 @@ BEGIN
         google_calendar_id = EXCLUDED.google_calendar_id,
         is_booking         = COALESCE(EXCLUDED.is_booking, public.booking.is_booking),
         service_code       = EXCLUDED.service_code,
-        price_cents        = EXCLUDED.price_cents,
+        price_cents        = COALESCE(public.booking.price_cents, EXCLUDED.price_cents),
         start_time         = EXCLUDED.start_time,
         end_time           = EXCLUDED.end_time,
         pickup_location    = COALESCE(EXCLUDED.pickup_location, public.booking.pickup_location),

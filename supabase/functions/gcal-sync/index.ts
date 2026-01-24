@@ -470,7 +470,7 @@ Deno.serve(async () => {
 
       // ---------- SMS/EMAIL NOTIFICATION LOGIC (wrapped in try-catch to prevent breaking sync) ----------
       try {
-        if (SMS_ENABLED && isBooking) {
+        if (isBooking) {
           const upData = upBodyText;
           let row: any = null;
           
@@ -488,6 +488,8 @@ Deno.serve(async () => {
             // Fail-safe: log and continue if anything fails.
             let b: any = null;
             let sentSmsThisSync = false;
+            let sentEmailThisSync = false;
+
             try {
               const { data: bData, error: bErr } = await supabase
                 .from('booking')
@@ -498,15 +500,13 @@ Deno.serve(async () => {
               b = bData;
 
               if (bErr) {
-                console.warn('[gcal-sync] Failed to load booking for SMS check (continuing anyway):', bookingId, bErr);
+                console.warn('[gcal-sync] Failed to load booking for notification check (continuing anyway):', bookingId, bErr);
               } else if (!b) {
-                console.warn('[gcal-sync] Booking not found for SMS check (continuing anyway):', bookingId);
+                console.warn('[gcal-sync] Booking not found for notification check (continuing anyway):', bookingId);
               } else if (b.is_booking !== true) {
                 // Not a booking row
               } else if ((b.status || '').toLowerCase() === 'cancelled') {
-                // Cancelled bookings should not get confirmation SMS
-              } else if (b.sms_confirm_sent_at) {
-                console.log(`[gcal-sync] SMS already sent, skipping: ${bookingId}`);
+                // Cancelled bookings should not get confirmations
               } else {
                 const rawMobile = (b.mobile || '').toString();
                 const compact = rawMobile.replace(/\s+/g, '').trim();
@@ -525,6 +525,7 @@ Deno.serve(async () => {
                   normalisedMobile = `+61${compact.slice(1)}`;
                 }
 
+                // Always persist validation result (independent of SMS_ENABLED)
                 const updatePayload: Record<string, unknown> = {
                   is_mobile_valid: isValidMobile,
                 };
@@ -536,19 +537,25 @@ Deno.serve(async () => {
                   .from('booking')
                   .update(updatePayload)
                   .eq('id', bookingId);
+
                 if (updErr) {
                   console.warn('[gcal-sync] Failed to update mobile validity (continuing anyway):', bookingId, updErr);
                 }
 
-                if (!isValidMobile || !normalisedMobile) {
-                  console.log(`[gcal-sync] SMS skipped, invalid mobile: ${bookingId} ${rawMobile}`);
-                } else {
-                  const startTs = new Date(start).getTime();
-                  const isFuture = startTs > Date.now();
-                  const status = String(b.status || 'confirmed').toLowerCase();
-                  const isConfirmed = status === 'confirmed';
+                const startTs = new Date(start).getTime();
+                const isFuture = startTs > Date.now();
+                const status = String(b.status || 'confirmed').toLowerCase();
+                const isConfirmed = status === 'confirmed';
 
-                  if (!isFuture || !isConfirmed) {
+                let isEmailRequired = false;
+
+                if (SMS_ENABLED) {
+                  if (b.sms_confirm_sent_at) {
+                    console.log(`[gcal-sync] SMS already sent, skipping: ${bookingId}`);
+                  } else if (!isValidMobile || !normalisedMobile) {
+                    console.log(`[gcal-sync] SMS not sent (invalid mobile), will require email: ${bookingId} ${rawMobile}`);
+                    isEmailRequired = true;
+                  } else if (!isFuture || !isConfirmed) {
                     // Only send confirmation SMS for future, confirmed bookings
                   } else {
                     console.log(`[gcal-sync] Invoking booking-sms: ${bookingId} ${normalisedMobile}`);
@@ -564,20 +571,8 @@ Deno.serve(async () => {
 
                     if (smsErr) {
                       console.warn('[gcal-sync] booking-sms invoke failed (continuing anyway):', bookingId, smsErr);
-                      if (isInvalidMobileErr && !(b.email_confirm_sent_at != null)) {
-                        console.log(`[gcal-sync]   → Invalid mobile detected, falling back to email...`);
-                        const { data: emailData, error: emailErr } = await supabase.functions.invoke('booking-email', {
-                          body: { booking_id: bookingId },
-                        });
-                        if (emailErr) {
-                          console.error('[gcal-sync]   ✗ Email fallback failed (non-fatal):', bookingId, emailErr);
-                        } else if (emailData?.ok === true) {
-                          console.log(`[gcal-sync]   ✓ Email sent (fallback) for booking ${bookingId}`);
-                        } else if (emailData?.skipped) {
-                          console.warn(`[gcal-sync]   ⚠ Email skipped for booking ${bookingId}: ${emailData.skipped}`);
-                        } else {
-                          console.warn('[gcal-sync]   ⚠ Email response not ok (non-fatal):', bookingId, emailData);
-                        }
+                      if (isInvalidMobileErr) {
+                        isEmailRequired = true;
                       }
                     } else if (smsData?.ok === true) {
                       console.log(`[gcal-sync] booking-sms ok for booking ${bookingId}`);
@@ -586,6 +581,7 @@ Deno.serve(async () => {
                         .from('booking')
                         .update({ sms_confirm_sent_at: new Date().toISOString() })
                         .eq('id', bookingId);
+
                       if (smsFlagErr) {
                         console.warn('[gcal-sync] Failed to set sms_confirm_sent_at (continuing anyway):', bookingId, smsFlagErr);
                       } else {
@@ -593,28 +589,46 @@ Deno.serve(async () => {
                       }
                     } else {
                       console.warn('[gcal-sync] booking-sms returned non-ok (continuing anyway):', bookingId, smsData);
-
-                      if (isInvalidMobileErr && !(b.email_confirm_sent_at != null)) {
-                        console.log(`[gcal-sync]   → Invalid mobile detected, falling back to email...`);
-                        const { data: emailData, error: emailErr } = await supabase.functions.invoke('booking-email', {
-                          body: { booking_id: bookingId },
-                        });
-                        if (emailErr) {
-                          console.error('[gcal-sync]   ✗ Email fallback failed (non-fatal):', bookingId, emailErr);
-                        } else if (emailData?.ok === true) {
-                          console.log(`[gcal-sync]   ✓ Email sent (fallback) for booking ${bookingId}`);
-                        } else if (emailData?.skipped) {
-                          console.warn(`[gcal-sync]   ⚠ Email skipped for booking ${bookingId}: ${emailData.skipped}`);
-                        } else {
-                          console.warn('[gcal-sync]   ⚠ Email response not ok (non-fatal):', bookingId, emailData);
-                        }
+                      if (isInvalidMobileErr) {
+                        isEmailRequired = true;
                       }
+                    }
+                  }
+                } else {
+                  // SMS disabled: send email only if no SMS has been sent
+                  if (b.sms_confirm_sent_at) {
+                    console.log(`[gcal-sync] SMS_ENABLED=false, SMS already sent, skipping email: ${bookingId}`);
+                  } else {
+                    isEmailRequired = true;
+                    console.log(`[gcal-sync] SMS_ENABLED=false, email required for booking ${bookingId}`);
+                  }
+                }
+                
+                if (isEmailRequired) {
+                  const hasEmailAlready = b.email_confirm_sent_at != null;
+                  if (hasEmailAlready) {
+                    console.log(`[gcal-sync] Email already sent, skipping: ${bookingId}`);
+                  } else {
+                    console.log(`[gcal-sync] Invoking booking-email: ${bookingId}`);
+                    const { data: emailData, error: emailErr } = await supabase.functions.invoke('booking-email', {
+                      body: { booking_id: bookingId },
+                    });
+
+                    if (emailErr) {
+                      console.error('[gcal-sync] Email failed (non-fatal):', bookingId, emailErr);
+                    } else if (emailData?.ok === true) {
+                      console.log(`[gcal-sync] Email ok for booking ${bookingId}`);
+                      sentEmailThisSync = true;
+                    } else if (emailData?.skipped) {
+                      console.warn(`[gcal-sync] Email skipped for booking ${bookingId}: ${emailData.skipped}`);
+                    } else {
+                      console.warn('[gcal-sync] Email returned non-ok (non-fatal):', bookingId, emailData);
                     }
                   }
                 }
               }
             } catch (smsCheckErr) {
-              console.warn('[gcal-sync] SMS confirm check failed (continuing anyway):', bookingId, smsCheckErr);
+              console.warn('[gcal-sync] Notification check failed (continuing anyway):', bookingId, smsCheckErr);
             }
 
             const startTs = new Date(start).getTime();
@@ -622,7 +636,7 @@ Deno.serve(async () => {
             const status = String((b && b.status) || 'confirmed').toLowerCase();
             const isConfirmed = status === 'confirmed';
             const hasSMS = (b && b.sms_confirm_sent_at != null) || sentSmsThisSync;
-            const hasEmail = (b && b.email_confirm_sent_at != null) ? true : false;
+            const hasEmail = (b && b.email_confirm_sent_at != null) || sentEmailThisSync;
 
             console.log(`[gcal-sync]   → Notification check for booking ${bookingId}: has_sms=${hasSMS}, has_email=${hasEmail}, future=${isFuture}, confirmed=${isConfirmed}`);
           } else {

@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck: Edge Function runs in Deno with dynamic request/env shapes; keep type checking off for this file.
 // supabase/functions/create-admin-appointment/index.ts
 // Create personal appointment in Google Calendar
 // The gcal-sync function will automatically sync it to the database
@@ -114,8 +114,9 @@ async function getAccessToken(): Promise<string> {
 // ---------- CORS HEADERS ----------
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
 };
 
 // ---------- MAIN FUNCTION ----------
@@ -281,8 +282,8 @@ Deno.serve(async (req) => {
       google_event_id: event.id,
       google_calendar_id: calendarId,
       // Store as UTC ISO for timestamptz
-      start_time: event?.start?.dateTime ? new Date(event.start.dateTime).toISOString() : startISO,
-      end_time: event?.end?.dateTime ? new Date(event.end.dateTime).toISOString() : endISO,
+      start_time: event?.start?.dateTime ? new Date(event.start.dateTime).toISOString() : new Date(startISO).toISOString(),
+      end_time: event?.end?.dateTime ? new Date(event.end.dateTime).toISOString() : new Date(endISO).toISOString(),
       status: 'confirmed',
       source: 'google',
       is_booking: false,
@@ -293,12 +294,12 @@ Deno.serve(async (req) => {
     };
 
     console.log("[create-admin-appointment] Inserting booking record:", bookingData);
-
+    
     const { data: bookingRecord, error: bookingError } = await supabase
       .from('booking')
       .upsert(bookingData, { onConflict: 'google_event_id' })
       .select('id')
-      .single();
+      .maybeSingle();
 
     if (bookingError) {
       console.error("[create-admin-appointment] Failed to insert booking:", bookingError);

@@ -27,6 +27,15 @@ function convertTo24Hour(timeStr: string) {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
+function addDaysToDate(dateStr: string, days: number) {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 async function requireAdmin(req: Request) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
@@ -104,8 +113,9 @@ async function getAccessToken(): Promise<string> {
 // ---------- CORS HEADERS ----------
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
 };
 
 function getPrimaryCalendarId(): string {
@@ -129,7 +139,7 @@ function getPrimaryCalendarId(): string {
   }
 
   // Plain string (single calendar id)
-  return raw;
+  return raw.split(",")[0].trim();
 }
 
 // ---------- MAIN FUNCTION ----------
@@ -188,9 +198,22 @@ Deno.serve(async (req) => {
     const start24 = convertTo24Hour(startTime);
     const end24 = endTime ? convertTo24Hour(endTime) : start24;
 
+    // Midnight rollover: if end time is earlier than (or same as) start time, assume it crosses midnight
+    const [sh, sm] = start24.split(":").map(Number);
+    const startMins = sh * 60 + sm;
+    let endDate = date;
+
+    if (endTime) {
+      const [eh, em] = end24.split(":").map(Number);
+      const endMins = eh * 60 + em;
+      if (endMins <= startMins) {
+        endDate = addDaysToDate(date, 1);
+      }
+    }
+
     // Build ISO timestamps
     const startDateTime = `${date}T${start24}:00`;
-    const endDateTime = `${date}T${end24}:00`;
+    const endDateTime = `${endDate}T${end24}:00`;
 
     // Get calendar ID from env (supports JSON array/object or plain string)
     const calendarId = getPrimaryCalendarId();
@@ -358,7 +381,6 @@ ${isPaidBool ? 'Yes' : 'No'}
       start_time: startIso,
       end_time: endIso,
       start_date: date,
-      start_minute: startIso,
       timezone: "Australia/Melbourne",
       pickup_location: pickupLocation || null,
       is_paid: isPaidBool,
@@ -367,7 +389,6 @@ ${isPaidBool ? 'Yes' : 'No'}
       last_name: lastName || null,
       email: email || null,
       mobile: mobile || null,
-      updated_at: new Date().toISOString(),
     };
 
     const { error: dbError } = await supabase

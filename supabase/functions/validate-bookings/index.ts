@@ -14,9 +14,12 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
 import { parseAuMobile } from "../_shared/mobile.ts";
 
+// ---------- CORS HEADERS ----------
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
 };
 
 type PickupValidationResult = {
@@ -52,12 +55,9 @@ function stripTrailingCountry(address?: string | null): string | null {
 function isGoogleUnavailableIssue(issue: string | null | undefined): boolean {
   const code = (issue || '').trim().toLowerCase();
   return (
-    code === 'invoke_error' ||
     code === 'google_error' ||
     code === 'no_api_key' ||
-    code === 'network_error' ||
-    code === 'exception' ||
-    code === 'no_result'
+    code === 'network_error'
   );
 }
 

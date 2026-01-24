@@ -128,7 +128,9 @@ const SERVICE_DURATION_MINUTES: Record<string, number> = {
 // ---------- CORS HEADERS ----------
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
 };
 
 // ---------- CANCELLATION POLICY TEXT ----------
@@ -263,6 +265,8 @@ Deno.serve(async (req) => {
       `${safeEmail}\n` +
       `<br><b>Mobile</b>\n` +
       `${safeMobile}\n` +
+      `<br><b>Pickup Address</b>\n` +
+      `${safePickup}\n` +
       CANCELLATION_POLICY_HTML + `\n` +
       SERVICE_DESCRIPTION;
 
@@ -338,8 +342,13 @@ Deno.serve(async (req) => {
     const adminSupa = createClient(supabaseUrl, serviceRoleKey);
 
     // Store times as UTC ISO for timestamptz columns
-    const startUtc = googleEvent?.start?.dateTime ? new Date(googleEvent.start.dateTime).toISOString() : null;
-    const endUtc = googleEvent?.end?.dateTime ? new Date(googleEvent.end.dateTime).toISOString() : null;
+    const startUtc = googleEvent?.start?.dateTime
+      ? new Date(googleEvent.start.dateTime).toISOString()
+      : new Date(startISO).toISOString();
+
+    const endUtc = googleEvent?.end?.dateTime
+      ? new Date(googleEvent.end.dateTime).toISOString()
+      : new Date(endISO).toISOString();
 
     const bookingRow: any = {
       google_event_id: googleEvent.id,

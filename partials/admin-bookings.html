@@ -1189,18 +1189,12 @@
     let valueToStore = value;
     const updates = {};
     
-    // 1) Mobile: Normalize and validate using validation.js
+    // 1) Mobile: Store as entered (trim only) and validate using validation.js
     if (field === 'mobile') {
       const trimmed = (value || '').trim();
-      let valid = false;
-      
-      if (trimmed && window.Validation?.normaliseAuMobileForStorage) {
-        const normalized = window.Validation.normaliseAuMobileForStorage(trimmed);
-        if (normalized?.ok) {
-          valueToStore = normalized.value;
-          valid = true;
-        }
-      }
+
+      valueToStore = trimmed;
+      const valid = window.Validation?.isValidAuMobile?.(trimmed) ?? false;
       
       updates.mobile = valueToStore || null;
       updates.is_mobile_valid = valid;

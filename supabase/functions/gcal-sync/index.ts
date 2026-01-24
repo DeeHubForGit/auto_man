@@ -526,12 +526,10 @@ Deno.serve(async () => {
                 }
 
                 // Always persist validation result (independent of SMS_ENABLED)
+                // Do NOT normalise or rewrite the stored mobile number.
                 const updatePayload: Record<string, unknown> = {
                   is_mobile_valid: isValidMobile,
                 };
-                if (isValidMobile && normalisedMobile) {
-                  updatePayload.mobile = normalisedMobile;
-                }
 
                 const { error: updErr } = await supabase
                   .from('booking')

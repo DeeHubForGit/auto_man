@@ -1609,17 +1609,10 @@
       try {
         let pickupInvokeFailed = false;
 
-        // For mobile: normalize if valid, otherwise save raw trimmed value
+        // For mobile: store exactly as entered (trim only)
         const raw = inputElement.value ?? '';
         const trimmed = raw.trim();
-        let valueToStore = trimmed;
-        
-        if (fieldName === 'mobile' && window.Validation?.normaliseAuMobileForStorage) {
-          const norm = window.Validation.normaliseAuMobileForStorage(trimmed);
-          if (norm?.ok) {
-            valueToStore = norm.value; // "0404096768" or "+61404096768" (no spaces)
-          }
-        }
+        const valueToStore = trimmed;
         
         const updateData = { [fieldName]: valueToStore || null };
         

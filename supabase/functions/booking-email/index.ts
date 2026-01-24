@@ -16,7 +16,7 @@ function json(body: Json, init: number | ResponseInit = 200) {
       "content-type": "application/json; charset=utf-8",
       "access-control-allow-origin": "*",
       "access-control-allow-methods": "POST,OPTIONS",
-      "access-control-allow-headers": "authorization, x-client-info, apikey, content-type",
+      "access-control-allow-headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform",
       ...(initObj as ResponseInit).headers || {},
     },
   });

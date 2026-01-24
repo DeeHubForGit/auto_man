@@ -18,7 +18,7 @@ function json(body: Json, init: number | ResponseInit = 200) {
       "access-control-allow-origin": "*",
       "access-control-allow-methods": "POST,OPTIONS",
       "access-control-allow-headers":
-        "authorization, x-client-info, apikey, content-type",
+        "authorization, x-client-info, apikey, content-type, x-supabase-client-platform",
       ...(initObj as ResponseInit).headers || {},
     },
   });
@@ -360,7 +360,7 @@ serve(async (req) => {
     );
 
     if (!logRes.res.ok) {
-      const logError = await logRes.res.text();
+      const logError = logRes.raw;
       console.warn(`[booking-sms] Failed to log to sms_log: ${logRes.res.status}`);
       console.warn(`[booking-sms] Log error details: ${logError}`);
     } else {

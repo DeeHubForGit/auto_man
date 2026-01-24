@@ -1,4 +1,3 @@
-// deno-lint-ignore-file no-explicit-any
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 // Input validation helpers
@@ -66,7 +65,7 @@ function json(body: unknown, init: number | ResponseInit = 200, req?: Request) {
   ];
   
   const origin = req?.headers.get('origin') || '';
-  const corsOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+  const corsOrigin = allowedOrigins.includes(origin) ? origin : "null";
   
   return new Response(JSON.stringify(body), {
     ...initObj,
@@ -74,7 +73,7 @@ function json(body: unknown, init: number | ResponseInit = 200, req?: Request) {
       'content-type': 'application/json; charset=utf-8',
       'access-control-allow-origin': corsOrigin,
       'access-control-allow-methods': 'POST,OPTIONS',
-      'access-control-allow-headers': 'authorization, x-client-info, apikey, content-type',
+      'access-control-allow-headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform',
       'access-control-allow-credentials': 'false',
       ...(initObj.headers || {}),
     }

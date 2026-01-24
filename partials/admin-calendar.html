@@ -946,6 +946,7 @@
   let editingBooking = false;
   let editingBookingId = null;
   let editingBookingData = null;
+  let editingBookingGoogleEventId = null;
 
   // Service duration configuration (in minutes) – populated from config
   const SERVICE_DURATIONS = {};
@@ -1034,6 +1035,12 @@
     }
   }
 
+  function setAppointmentSaveSavedLabel() {
+    const btn = document.getElementById('appointment-save');
+    if (!btn) return;
+    btn.textContent = 'Saved';
+  }
+
   // Modal handling for personal appointments
   const btnNewAppointment = document.getElementById("btn-new-appointment");
   const apptBackdrop = document.getElementById("appointment-modal-backdrop");
@@ -1047,15 +1054,24 @@
     // Reset form to defaults
     apptForm.reset();
     bookingAmountManuallyEdited = false;
+
+    // Ensure save button is usable when reopening the modal
+    const submitBtn = document.getElementById("appointment-save");
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      if (apptSaveOriginalHtml != null) {
+        submitBtn.innerHTML = apptSaveOriginalHtml;
+        apptSaveOriginalHtml = null;
+      }
+    }
     
     // Reset modal title and button text to defaults
     const modalTitle = document.querySelector("#appointment-modal-backdrop h2");
     if (modalTitle) {
-      modalTitle.textContent = "New Appointment";
+      modalTitle.textContent = "New appointment";
     }
-    const submitBtn = document.getElementById("appointment-save");
     if (submitBtn) {
-      submitBtn.textContent = "Create Appointment";
+      submitBtn.textContent = "Save";
     }
     
     // Reset appointment type to "booking" (default)
@@ -1206,6 +1222,7 @@
     // Update submit button text
     const submitBtn = document.getElementById("appointment-save");
     if (submitBtn) {
+      submitBtn.disabled = false;
       submitBtn.textContent = "Update Appointment";
     }
     
@@ -1345,6 +1362,7 @@
     // Update submit button text
     const submitBtn = document.getElementById("appointment-save");
     if (submitBtn) {
+      submitBtn.disabled = false;
       submitBtn.textContent = "Update Booking";
     }
     
@@ -1998,6 +2016,8 @@
       return;
     }
 
+    let shouldAutoClose = false;
+
     try {
       // Convert 24-hour time to 12-hour format for the edge function
       const startTime12 = convert24To12Hour(startTime);
@@ -2065,12 +2085,13 @@
           location
         });
 
-        closeAppointmentModal(true); // Force close without confirmation since we just saved
+        setAppointmentSaveLoading(false);
+        setAppointmentSaveSavedLabel();
+        shouldAutoClose = true;
 
-        // Show success message
-        if (window.Modal && window.Modal.success) {
-          window.Modal.success("Appointment updated successfully!", "Success");
-        }
+        setTimeout(() => {
+          closeAppointmentModal(true);
+        }, 900);
 
         // Refresh calendar to show updated appointment
         renderWeek(weekStart);
@@ -2106,12 +2127,13 @@
         const googleEventId = data?.googleEvent?.id;
         const bookingId = data?.bookingId;
 
-        closeAppointmentModal(true); // Force close without confirmation since we just saved
+        setAppointmentSaveLoading(false);
+        setAppointmentSaveSavedLabel();
+        shouldAutoClose = true;
 
-        // Show success message
-        if (window.Modal && window.Modal.success) {
-          window.Modal.success("Appointment created successfully!", "Success");
-        }
+        setTimeout(() => {
+          closeAppointmentModal(true);
+        }, 900);
 
         // If bookingId is returned, the DB row already exists - just refresh immediately
         if (bookingId) {
@@ -2189,7 +2211,9 @@
         alert("Could not save appointment. Please try again. Error: " + (err.message || err));
       }
     } finally {
-      setAppointmentSaveLoading(false);
+      if (!shouldAutoClose) {
+        setAppointmentSaveLoading(false);
+      }
     }
   }
 
@@ -2307,6 +2331,8 @@
       saveBtn.disabled = true;
       saveBtn.textContent = 'Updating...';
     }
+
+    let shouldAutoClose = false;
 
     try {
       // Validate address with Google Maps before saving
@@ -2472,12 +2498,14 @@
         validationCheckedAt: checkedAtToStore,
       });
 
-      closeAppointmentModal(true); // Force close without confirmation since we just saved
-
-      // Show success message
-      if (window.Modal && window.Modal.success) {
-        window.Modal.success("Booking updated successfully!", "Success");
+      if (saveBtn) {
+        saveBtn.textContent = 'Saved';
       }
+      shouldAutoClose = true;
+
+      setTimeout(() => {
+        closeAppointmentModal(true);
+      }, 900);
 
       // Refresh calendar to show updated booking
       renderWeek(weekStart);
@@ -2504,7 +2532,7 @@
     } finally {
       // Re-enable save button
       const saveBtn = document.getElementById('appointment-save');
-      if (saveBtn) {
+      if (!shouldAutoClose && saveBtn) {
         saveBtn.disabled = false;
         saveBtn.textContent = originalBtnText || 'Update Booking';
       }
@@ -2512,45 +2540,44 @@
   }
 
   // Update the DB row for a booking immediately after a successful Google update
-  async function updateBookingRowInDb(bookingId, { serviceCode, startIso, endIso, pickupLocation, isPaid, clientId, firstName, lastName, email, mobile }) {
+  async function updateBookingRowInDb(bookingId, opts) {
     if (!bookingId) return;
 
+    opts = opts || {};
+
     const updateData = {
-      service_code: serviceCode || null,
-      start_time: startIso,
-      end_time: endIso,
-      pickup_location: pickupLocation || null,
-      is_paid: !!isPaid,
-      client_id: clientId || null,
-      first_name: firstName || null,
-      last_name: lastName || null,
-      email: email || null,
-      mobile: mobile || null,
+      service_code: opts.serviceCode || null,
+      start_time: opts.startIso,
+      end_time: opts.endIso,
+      pickup_location: opts.pickupLocation || null,
+      is_paid: !!opts.isPaid,
+      client_id: opts.clientId || null,
+      first_name: opts.firstName || null,
+      last_name: opts.lastName || null,
+      email: opts.email || null,
+      mobile: opts.mobile || null,
       updated_at: new Date().toISOString(),
     };
 
     // Optional fields
-    if (arguments.length > 1) {
-      const opts = arguments[1] || {};
-      if (typeof opts.status === 'string') {
-        updateData.status = opts.status;
-      }
-      if (opts.priceCents !== undefined) {
-        updateData.price_cents = opts.priceCents;
-      }
+    if (typeof opts.status === 'string') {
+      updateData.status = opts.status;
+    }
+    if (opts.priceCents !== undefined) {
+      updateData.price_cents = opts.priceCents;
+    }
 
-      if (opts.pickupValid !== undefined) {
-        updateData.is_pickup_location_valid = opts.pickupValid;
-      }
-      if (opts.pickupIssue !== undefined) {
-        updateData.pickup_location_issue = opts.pickupIssue;
-      }
-      if (opts.pickupSuggestion !== undefined) {
-        updateData.pickup_location_suggestion = opts.pickupSuggestion;
-      }
-      if (opts.validationCheckedAt !== undefined) {
-        updateData.validation_checked_at = opts.validationCheckedAt;
-      }
+    if (opts.pickupValid !== undefined) {
+      updateData.is_pickup_location_valid = opts.pickupValid;
+    }
+    if (opts.pickupIssue !== undefined) {
+      updateData.pickup_location_issue = opts.pickupIssue;
+    }
+    if (opts.pickupSuggestion !== undefined) {
+      updateData.pickup_location_suggestion = opts.pickupSuggestion;
+    }
+    if (opts.validationCheckedAt !== undefined) {
+      updateData.validation_checked_at = opts.validationCheckedAt;
     }
 
     const { error } = await window.supabaseClient
@@ -2685,6 +2712,8 @@
       saveBtn.textContent = 'Saving...';
     }
 
+    let shouldAutoClose = false;
+
     try {
       // Validate address with Google Maps before saving
       console.log("[booking] Validating pickup address with Google Maps...");
@@ -2805,12 +2834,15 @@
         }
 
         console.log("[booking] ✓ Booking record created immediately, refreshing calendar...");
-        closeAppointmentModal(true); // Force close without confirmation since we just saved
 
-        // Show success message
-        if (window.Modal && window.Modal.success) {
-          window.Modal.success("Booking created successfully!", "Success");
+        if (saveBtn) {
+          saveBtn.textContent = 'Saved';
         }
+        shouldAutoClose = true;
+
+        setTimeout(() => {
+          closeAppointmentModal(true);
+        }, 900);
 
         renderWeek(weekStart);
 
@@ -2825,12 +2857,14 @@
         return; // Skip polling
       }
 
-      closeAppointmentModal(true); // Force close without confirmation since we just saved
-
-      // Show success message
-      if (window.Modal && window.Modal.success) {
-        window.Modal.success("Booking created successfully!", "Success");
+      if (saveBtn) {
+        saveBtn.textContent = 'Saved';
       }
+      shouldAutoClose = true;
+
+      setTimeout(() => {
+        closeAppointmentModal(true);
+      }, 900);
 
       // Poll database directly for the new event by Google event ID
       console.log("[booking] Waiting for gcal-sync to process the new event...", googleEventId);
@@ -2908,9 +2942,7 @@
         alert("Failed to create booking. Please try again.");
       }
     } finally {
-      // Re-enable save button
-      const saveBtn = document.getElementById('appointment-save');
-      if (saveBtn) {
+      if (!shouldAutoClose && saveBtn) {
         saveBtn.disabled = false;
         saveBtn.textContent = originalBtnText || 'Save';
       }

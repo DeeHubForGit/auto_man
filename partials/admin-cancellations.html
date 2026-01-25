@@ -292,6 +292,7 @@
     const cancellationsCount = document.getElementById('cancellationsCount');
     const paginationInfo = document.getElementById('cancellationPaginationInfo');
     const pageNumbers = document.getElementById('cancellationPageNumbers');
+    const paginationContainer = document.getElementById('cancellationsPagination');
     const prevBtn = document.getElementById('cancellationPrevPage');
     const nextBtn = document.getElementById('cancellationNextPage');
     
@@ -396,12 +397,30 @@
     
     // Render
     box.innerHTML = '';
+
+    // Ensure pagination controls are visible when results exist
+    if (filtered.length > 0) {
+      paginationContainer?.classList.remove('hidden');
+      prevBtn?.classList.remove('hidden');
+      nextBtn?.classList.remove('hidden');
+    }
     
     if (filtered.length === 0) {
-      const emptyMsg = searchTerm 
-        ? `<div class="p-8 text-center text-gray-500">No cancelled bookings match "${searchTerm}"</div>`
-        : '<div class="p-8 text-center text-gray-500">✅ No cancelled bookings</div>';
-      box.innerHTML = emptyMsg;
+      const message = searchTerm
+        ? `No cancelled bookings found matching "${searchTerm}".`
+        : 'No cancelled bookings found.';
+
+      // Hide pagination/footer strip when there are no results
+      paginationContainer?.classList.add('hidden');
+      prevBtn?.classList.add('hidden');
+      nextBtn?.classList.add('hidden');
+
+      box.innerHTML = `
+        <div class="p-8 text-center">
+          <div class="mb-2 text-gray-300 text-2xl">📅</div>
+          <div class="text-gray-300 font-medium">${message}</div>
+        </div>
+      `;
       return;
     }
     

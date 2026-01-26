@@ -1,4 +1,5 @@
 <!-- Admin Calendar Section -->
+<script src="/assets/js/config.js"></script>
 <script src="assets/js/googleCalendar.js?v=3"></script>
 <style>
   /* Scoped styles for calendar bookings */
@@ -6,6 +7,11 @@
     cursor: pointer;
     transition: all 0.2s ease;
     overflow: visible;
+  }
+  
+  /* Booking time warnings */
+  #section-calendar .booking-time-warning {
+    color: #fb923c !important; /* Tailwind orange-400 */
   }
   
   #section-calendar .booking-card .booking-time {
@@ -325,6 +331,11 @@
   /* Error messages must stay red */
   #section-calendar .admin-modal-body p.text-red-500 {
     color: #ef4444 !important;
+  }
+
+  /* Warning messages must stay orange */
+  #section-calendar .admin-modal-body p.booking-time-warning {
+    color: #fb923c !important;
   }
 
   .admin-modal-body .form-input {
@@ -726,8 +737,44 @@
         Week: 09/11/25 - 15/11/25
       </span>
       <div class="flex flex-wrap items-center gap-2 min-w-0">
-        <button id="prevWeek" class="btn btn-primary-light calendar-nav-btn !px-2 !py-1" aria-label="Previous week">←</button>
-        <button id="nextWeek" class="btn btn-primary calendar-nav-btn !px-2 !py-1" aria-label="Next week">→</button>
+        <button
+          id="prevWeek"
+          class="btn btn-primary-light calendar-nav-btn !px-2 !py-1"
+          aria-label="Previous week"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <button
+          id="nextWeek"
+          class="btn btn-primary-light calendar-nav-btn !px-2 !py-1"
+          aria-label="Next week"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
         <button id="todayBtn" class="btn btn-outline-blue calendar-nav-btn !px-2 !py-1" title="Today" aria-label="Jump to today">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -827,12 +874,14 @@
             <label for="appt-start">Start<span class="text-red-500">*</span></label>
             <input id="appt-start" name="startTime" type="time" class="form-input" />
             <p id="appt-start-error" class="text-xs text-red-500 mt-1 hidden"></p>
+            <p id="appt-start-warning" class="text-xs mt-1 hidden booking-time-warning"></p>
           </div>
 
           <!-- End -->
           <div class="form-group">
             <label for="appt-end" id="appt-end-label">End</label>
             <input id="appt-end" name="endTime" type="time" class="form-input" />
+            <p id="appt-end-warning" class="text-xs mt-1 hidden booking-time-warning"></p>
           </div>
         </div>
 
@@ -1041,6 +1090,90 @@
       el.style.removeProperty('color');
       el.style.removeProperty('cursor');
     });
+
+    // Clear business hours warnings
+    const sw = document.getElementById('appt-start-warning');
+    if (sw) { sw.textContent = ''; sw.classList.add('hidden'); }
+
+    const ew = document.getElementById('appt-end-warning');
+    if (ew) { ew.textContent = ''; ew.classList.add('hidden'); }
+  }
+
+  // Helper to convert HH:MM to minutes
+  function timeToMinutes(hhmm) {
+    if (!hhmm || typeof hhmm !== 'string') return null;
+    const parts = hhmm.split(':');
+    if (parts.length < 2) return null;
+
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+
+    if (Number.isNaN(h) || Number.isNaN(m)) return null;
+    return (h * 60) + m;
+  }
+
+  function formatMinutes(mins) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+  
+  // Update business hours warnings for start/end times
+  function updateBusinessHoursWarnings() {
+    const startWarn = document.getElementById('appt-start-warning');
+    const endWarn   = document.getElementById('appt-end-warning');
+
+    // If the warning elements are missing, do nothing (safe)
+    if (!startWarn || !endWarn) return;
+
+    const appointmentType = document.querySelector('input[name="appointmentType"]:checked')?.value;
+
+    if (appointmentType !== 'booking') {
+      // Hide warnings for personal appointments
+      startWarn.textContent = '';
+      startWarn.classList.add('hidden');
+      endWarn.textContent = '';
+      endWarn.classList.add('hidden');
+      return;
+    }
+
+    const startEl = document.getElementById('appt-start');
+    const endEl   = document.getElementById('appt-end');
+
+    if (!startEl || !endEl) return;
+
+    const startMins = timeToMinutes(startEl.value);
+    const endMins   = timeToMinutes(endEl.value);
+
+    // Safe fallback if config is not available
+    const bh = window.SITE_CONFIG && window.SITE_CONFIG.BUSINESS_HOURS
+      ? window.SITE_CONFIG.BUSINESS_HOURS
+      : { EARLIEST_START_MINS: 8 * 60, LATEST_END_MINS: 21 * 60 };
+
+    const EARLIEST_START_MINS = bh.EARLIEST_START_MINS;
+    const LATEST_END_MINS = bh.LATEST_END_MINS;
+
+    // Start warning
+    if (startMins !== null && startMins < EARLIEST_START_MINS) {
+      startWarn.textContent =
+        `Warning: outside normal hours (before ${formatMinutes(EARLIEST_START_MINS)}).`;
+      startWarn.classList.remove('hidden');
+    } else {
+      startWarn.textContent = '';
+      startWarn.classList.add('hidden');
+    }
+
+    // End warning
+    if (endMins !== null && endMins > LATEST_END_MINS) {
+      endWarn.textContent =
+        `Warning: outside normal hours (after ${formatMinutes(LATEST_END_MINS)}).`;
+      endWarn.classList.remove('hidden');
+    } else {
+      endWarn.textContent = '';
+      endWarn.classList.add('hidden');
+    }
   }
 
   // Helper to enable/disable appointment type radio buttons
@@ -1171,6 +1304,9 @@
     // Calculate initial end time for booking if service is selected
     updateBookingEndTime();
 
+    // Update business hours warnings after setting default times
+    updateBusinessHoursWarnings();
+
     formHasChanges = false; // Reset change tracking
     apptBackdrop.classList.remove("hidden");
   }
@@ -1298,6 +1434,9 @@
     document.getElementById("appt-date").value = dateStr || '';
     document.getElementById("appt-start").value = startHHMM || '';
     document.getElementById("appt-end").value = endHHMM || '';
+    
+    // Update business hours warnings
+    updateBusinessHoursWarnings();
     
     // Fill service
     const serviceSelect = document.getElementById("bookingService");
@@ -1590,6 +1729,9 @@
     
     const endTime = addMinutesToTime(startTime, date, duration);
     document.getElementById('appt-end').value = endTime;
+    
+    // Update warnings after setting end time
+    updateBusinessHoursWarnings();
   }
 
   // Toggle between personal appointment and booking
@@ -1612,6 +1754,7 @@
         endTimeInput.readOnly = true;
         endTimeLabel.innerHTML = 'End time';
         updateBookingEndTime();
+        updateBusinessHoursWarnings();
       } else {
         personalFields.style.display = 'block';
         personalLocation.style.display = 'block';
@@ -1663,6 +1806,12 @@
   // Listen for start time change to update end time
   document.getElementById('appt-start')?.addEventListener('change', () => {
     updateBookingEndTime();
+    updateBusinessHoursWarnings();
+  });
+
+  // Listen for end time change to update warnings
+  document.getElementById('appt-end')?.addEventListener('change', () => {
+    updateBusinessHoursWarnings();
   });
 
   // Listen for date change to update end time

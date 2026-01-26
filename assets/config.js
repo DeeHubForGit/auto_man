@@ -19,6 +19,12 @@ const SITE_CONFIG = {
   // Business hours
   WORKING_HOURS: '10 am to 5 pm on weekends',
   
+  // Business hours used for admin warnings (soft only, not enforced)
+  BUSINESS_HOURS: {
+    EARLIEST_START_MINS: 8 * 60,   // 08:00
+    LATEST_END_MINS: 21 * 60,      // 21:00 (9 PM)
+  },
+  
   // Social media
   FACEBOOK_URL: 'https://www.facebook.com/auto.man.driving',
   FACEBOOK_HANDLE: '@auto.man.driving',

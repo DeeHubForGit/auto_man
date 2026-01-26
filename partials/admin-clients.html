@@ -1,0 +1,773 @@
+<!-- Admin Clients Section -->
+<style>
+  /* Match Bookings list look & spacing */
+  #adminClientsList .client-card {
+    width: 100%;
+    background-color: #dbeafe !important;   /* bg-blue-100 like bookings */
+    border: 2px solid #3b82f6 !important;   /* blue-500 edge */
+    border-radius: 0.5rem;
+    color: #111827 !important;
+  }
+
+  #adminClientsList .client-card:hover {
+    border-color: #2563eb !important;       /* blue-600 */
+  }
+
+  /* Inputs in cards must stay white (theme override safety) */
+  #adminClientsList .client-card input,
+  #adminClientsList .client-card textarea,
+  #adminClientsList .client-card select {
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  #adminClientsList .client-card input:disabled,
+  #adminClientsList .client-card textarea:disabled {
+    background: #e5e7eb !important;
+    color: #6b7280 !important;
+  }
+
+  /* Labels/headings must be readable (override global theme) */
+  #adminClientsList .client-card label,
+  #adminClientsList .client-card .client-section-title {
+    color: #111827 !important;
+  }
+
+  /* Learning Information box should match card background */
+  #adminClientsList .client-card .learning-box {
+    background: transparent !important;
+  }
+
+  #section-clients .client-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 10px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
+    color: #111827;
+  }
+
+  #section-clients .client-pill.bad {
+    border-color: #fecaca;
+    background: #fef2f2;
+    color: #991b1b !important;
+  }
+
+  #section-clients .client-pill.good {
+    border-color: #bbf7d0;
+    background: #f0fdf4;
+    color: #166534 !important;
+  }
+
+  #section-clients .client-header {
+    cursor: pointer;
+  }
+
+  #section-clients .client-chevron {
+    transition: transform 0.15s ease;
+  }
+
+  #section-clients .client-chevron.is-open {
+    transform: rotate(180deg);
+  }
+
+  /* Ensure summary text stays readable under global theme overrides */
+  #adminClientsList .client-summary,
+  #adminClientsList .client-summary * {
+    color: #111827 !important;
+  }
+
+  /* Exception: allow red text for invalid/missing items */
+  #adminClientsList .client-summary .text-red-600 {
+    color: #dc2626 !important;
+  }
+
+  #adminClientsList .client-summary svg {
+    color: #374151 !important;
+  }
+
+  /* Force black color for Created/Updated timestamps */
+  #adminClientsList .client-card [data-role="client-details"] .text-xs {
+    color: #111827 !important;
+  }
+
+  /* Search box must stay white (theme override safety) */
+  #clientSearch {
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  /* Backward-compat if older id remains in cache */
+  #clientSearchInput {
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+</style>
+
+<section id="section-clients" class="section-content bg-white border rounded-2xl shadow-sm p-5 hidden">
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <h2 class="text-xl font-semibold">Clients</h2>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button id="clientsRefreshBtn" class="btn btn-primary-light" type="button">
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <div class="flex flex-wrap items-end gap-3 mb-4">
+    <div class="flex flex-col gap-1">
+      <label class="text-sm font-medium text-gray-300">Validation</label>
+      <select id="clientValidationFilter" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[160px]">
+        <option value="all" selected>All</option>
+        <option value="valid">Valid mobile</option>
+        <option value="invalid">Invalid mobile</option>
+      </select>
+    </div>
+
+    <div class="flex flex-col gap-1 flex-1 min-w-[260px]">
+      <label class="text-sm font-medium text-gray-300">Search</label>
+      <input id="clientSearch" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Search name, email, or mobile…" />
+    </div>
+
+    <div class="text-sm text-gray-500 ml-auto">
+      <span id="clientsCount">0</span>
+      <span class="text-gray-400">results</span>
+    </div>
+  </div>
+
+  <div id="clientsMsg" class="text-sm mb-3"></div>
+  <div id="adminClientsList" class="flex flex-col gap-4"></div>
+</section>
+
+<script>
+(function() {
+  let allAdminClients = [];
+  let clientsSearchDebounce = null;
+  let expandedClientId = null;
+
+  function setClientsMsg(text, cls) {
+    const el = document.getElementById('clientsMsg');
+    if (!el) return;
+    el.textContent = text || '';
+    el.className = 'text-sm mb-3 ' + (cls || '');
+  }
+
+  function normalizePhone(value) {
+    const raw = (value || '').toString();
+    // Spec says trimming spaces; removing all whitespace is safer for user-entered values.
+    return raw.replace(/\s+/g, '').trim();
+  }
+
+  function isValidMobile(value) {
+    const v = normalizePhone(value);
+    if (!v) return false;
+    return /^(04\d{8}|\+614\d{8}|614\d{8})$/.test(v);
+  }
+
+  function getMobileStatus(value) {
+    const normalized = normalizePhone(value);
+    if (!normalized) return { status: 'missing', normalized: '' };
+    if (isValidMobile(normalized)) return { status: 'valid', normalized };
+    return { status: 'invalid', normalized };
+  }
+
+  function safeText(value) {
+    return (value === null || value === undefined) ? '' : String(value);
+  }
+
+  function escapeHtml(str) {
+    return safeText(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function formatDateTime(value) {
+    if (!value) return '';
+    try {
+      const d = new Date(value);
+      if (isNaN(d.getTime())) return '';
+      const pad2 = (n) => String(n).padStart(2, '0');
+      const dd = pad2(d.getDate());
+      const mm = pad2(d.getMonth() + 1);
+      const yy = pad2(d.getFullYear() % 100);
+      const minutes = pad2(d.getMinutes());
+      const h24 = d.getHours();
+      const ampm = h24 >= 12 ? 'PM' : 'AM';
+      const h12 = (h24 % 12) || 12;
+      return `${dd}/${mm}/${yy} ${h12}:${minutes} ${ampm}`;
+    } catch {
+      return '';
+    }
+  }
+
+  function applyClientFilters() {
+    const validation = (document.getElementById('clientValidationFilter')?.value || 'all');
+    const qRaw = (document.getElementById('clientSearch')?.value || document.getElementById('clientSearchInput')?.value || '');
+    const q = qRaw.trim().toLowerCase();
+
+    let filtered = Array.isArray(allAdminClients) ? allAdminClients.slice() : [];
+
+    // Search first, then validation filter (per spec)
+    if (q) {
+      filtered = filtered.filter(c => {
+        const first = safeText(c.first_name).toLowerCase();
+        const last = safeText(c.last_name).toLowerCase();
+        const email = safeText(c.email).toLowerCase();
+        const mobile = normalizePhone(c.mobile).toLowerCase();
+        const full = (first + ' ' + last).trim();
+
+        return (
+          first.includes(q) ||
+          last.includes(q) ||
+          full.includes(q) ||
+          email.includes(q) ||
+          mobile.includes(q)
+        );
+      });
+    }
+
+    if (validation === 'valid') {
+      filtered = filtered.filter(c => isValidMobile(c.mobile));
+    } else if (validation === 'invalid') {
+      filtered = filtered.filter(c => !isValidMobile(c.mobile));
+    }
+
+    return filtered;
+  }
+
+  function updateMobileUIForCard(cardEl) {
+    if (!cardEl) return;
+    const mobileInput = cardEl.querySelector('[data-field="mobile"]');
+    const pillEl = cardEl.querySelector('[data-role="mobile-pill"]');
+    const helpEl = cardEl.querySelector('[data-role="mobile-help"]');
+
+    const { status, normalized } = getMobileStatus(mobileInput ? mobileInput.value : '');
+
+    if (pillEl) {
+      pillEl.classList.remove('good', 'bad');
+      if (status === 'valid') {
+        pillEl.classList.add('good');
+        pillEl.textContent = `Mobile: ${normalized}`;
+      } else if (status === 'missing') {
+        pillEl.classList.add('bad');
+        pillEl.textContent = 'Mobile: Missing';
+      } else {
+        pillEl.classList.add('bad');
+        pillEl.textContent = `Mobile: ${normalized || 'Invalid'}`;
+      }
+    }
+
+    if (mobileInput) {
+      if (status === 'invalid') {
+        mobileInput.style.setProperty('border-color', '#ef4444', 'important');
+      } else {
+        mobileInput.style.removeProperty('border-color');
+      }
+    }
+
+    if (helpEl) {
+      if (status === 'invalid') {
+        helpEl.classList.remove('hidden');
+      } else {
+        helpEl.classList.add('hidden');
+      }
+    }
+  }
+
+  function updateOtherUIForCard(cardEl) {
+    if (!cardEl) return;
+    const otherCheckbox = cardEl.querySelector('[data-field="learning_other_enabled"]');
+    const otherInput = cardEl.querySelector('[data-field="learning_needs_other"]');
+    if (!otherCheckbox || !otherInput) return;
+
+    const enabled = otherCheckbox.checked === true;
+    otherInput.disabled = !enabled;
+
+    if (!enabled) {
+      otherInput.value = '';
+      otherInput.style.removeProperty('color');
+      otherInput.style.removeProperty('background-color');
+    }
+  }
+
+  function collapseAllClientCards(exceptId = null) {
+    document.querySelectorAll('#adminClientsList .client-card').forEach(card => {
+      const cardId = card.getAttribute('data-client-id');
+      if (exceptId && cardId === exceptId) return;
+      const details = card.querySelector('[data-role="client-details"]');
+      const chevron = card.querySelector('[data-role="client-chevron"]');
+      if (details) details.classList.add('hidden');
+      if (chevron) chevron.classList.remove('is-open');
+    });
+  }
+
+  function restoreExpandedCard() {
+    if (!expandedClientId) return;
+    const card = document.querySelector(`#adminClientsList .client-card[data-client-id="${expandedClientId}"]`);
+    if (!card) {
+      expandedClientId = null;
+      return;
+    }
+    collapseAllClientCards(expandedClientId);
+    const details = card.querySelector('[data-role="client-details"]');
+    const chevron = card.querySelector('[data-role="client-chevron"]');
+    if (details) details.classList.remove('hidden');
+    if (chevron) chevron.classList.add('is-open');
+    updateOtherUIForCard(card);
+    updateMobileUIForCard(card);
+  }
+
+  function renderAdminClients() {
+    const list = document.getElementById('adminClientsList');
+    const countEl = document.getElementById('clientsCount');
+    if (!list) return;
+
+    const filtered = applyClientFilters();
+    if (countEl) countEl.textContent = String(filtered.length);
+
+    if (filtered.length === 0) {
+      list.innerHTML = '<div class="text-gray-500">No clients found.</div>';
+      return;
+    }
+
+    const html = filtered.map(c => {
+      const first = safeText(c.first_name);
+      const last = safeText(c.last_name);
+      const name = (first + ' ' + last).trim() || '(No name)';
+      const email = safeText(c.email);
+      const mobileStatus = getMobileStatus(c.mobile);
+
+      const licence = safeText(c.learner_permit_number).trim();
+      const hasLicence = licence.length > 0;
+
+      const medicalText = safeText(c.medical_conditions).trim();
+
+      const otherText = safeText(c.learning_needs_other).trim();
+      const learningParts = [];
+      if (c.is_beginner === true) learningParts.push('Beginner');
+      if (c.is_anxious_nervous === true) learningParts.push('Nervous');
+      if (c.is_senior === true) learningParts.push('Senior');
+      if (otherText.length > 0) learningParts.push(`Other: ${otherText}`);
+      const learningSummary = learningParts.join(', ');
+
+      const created = formatDateTime(c.created_at);
+      const updated = formatDateTime(c.updated_at);
+
+      const intakePillHtml = (c.is_admin === true) ? '' : (
+        (c.intake_completed === true)
+          ? '<span class="client-pill good" title="Intake form completed">✓ Intake</span>'
+          : '<span class="client-pill bad" title="Intake form not completed">✗ Intake</span>'
+      );
+
+      const pills = [];
+      if (c.is_admin === true) pills.push('<span class="client-pill" title="Admin user">Admin</span>');
+
+      const otherEnabled = otherText.length > 0;
+      const mobileDisplay = (mobileStatus.normalized || safeText(c.mobile)).trim();
+
+      const inputCls = 'w-full bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent';
+      const labelCls = 'block text-sm font-medium mb-1 text-gray-900';
+
+      return `
+        <div class="client-card p-4" data-client-id="${escapeHtml(c.id)}">
+          <div class="client-header flex items-start justify-between gap-3" onclick="window.toggleClientCard('${escapeHtml(c.id)}')">
+            <div class="min-w-0 flex-1">
+              <div class="client-summary">
+              <div class="flex items-center gap-2">
+                <div class="font-semibold text-base sm:text-lg leading-tight text-gray-900">${escapeHtml(name)}</div>
+                ${intakePillHtml}
+              </div>
+
+              <div class="mt-1 flex flex-wrap items-start gap-x-4 gap-y-1 text-sm text-gray-900">
+                <div class="flex items-start gap-2 min-w-0">
+                  <svg class="w-4 h-4 flex-shrink-0 text-gray-700 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                  <span class="${mobileStatus.status === 'valid' ? 'text-gray-900' : 'text-red-600 font-medium'}">
+                    ${escapeHtml(mobileDisplay || '—')}
+                  </span>
+                </div>
+
+                <div class="flex items-start gap-2 min-w-0">
+                  <svg class="w-4 h-4 flex-shrink-0 text-gray-700 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-18 0v10a2 2 0 002 2h14a2 2 0 002-2V8m-18 0l2-2h14l2 2" />
+                  </svg>
+                  <span class="text-gray-900 break-words">${escapeHtml(email || '—')}</span>
+                </div>
+              </div>
+
+              ${c.is_admin !== true ? `
+              <div class="mt-1 flex items-start gap-2 text-sm text-gray-900">
+                <svg class="w-4 h-4 flex-shrink-0 text-gray-700 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h8M8 14h6" />
+                </svg>
+                ${hasLicence
+                  ? `<span class="text-gray-900">${escapeHtml(licence)}</span>`
+                  : `
+                    <svg class="w-4 h-4 flex-shrink-0" fill="#dc2626" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                    <span class="text-red-600 font-medium">License missing</span>
+                  `
+                }
+              </div>
+              ` : ''}
+
+              ${medicalText.length > 0 ? `
+                <div class="mt-1 flex items-center gap-2 text-sm text-gray-900 min-w-0">
+                  <svg class="w-4 h-4 flex-shrink-0 text-gray-700 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                  <span class="truncate flex-1">Medical: ${escapeHtml(medicalText)}</span>
+                </div>
+              ` : ''}
+
+              ${learningSummary ? `
+                <div class="mt-1 flex items-center gap-2 text-sm text-gray-900 min-w-0">
+                  <svg class="w-4 h-4 flex-shrink-0 text-gray-700 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+                  </svg>
+                  <span class="truncate flex-1">Learning: ${escapeHtml(learningSummary)}</span>
+                </div>
+              ` : ''}
+              </div>
+            </div>
+
+            <div class="shrink-0 flex items-center gap-2">
+              <button type="button" class="btn btn-primary px-2 sm:px-4" onclick="event.stopPropagation(); window.toggleClientCard('${escapeHtml(c.id)}')">
+                <span class="hidden sm:inline">Edit</span>
+                <svg class="w-5 h-5 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <span class="client-chevron" data-role="client-chevron">▾</span>
+              </button>
+            </div>
+          </div>
+
+          ${pills.length ? `
+            <div class="mt-2 flex flex-wrap gap-2">
+              ${pills.join('')}
+            </div>
+          ` : ''}
+
+          <div class="hidden mt-4 pt-4 border-t border-gray-400" data-role="client-details" onclick="event.stopPropagation()">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <div class="client-section-title text-sm font-semibold text-gray-900 mb-2">Personal Information</div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label class="${labelCls}">First Name</label>
+                    <input class="${inputCls}" data-field="first_name" value="${escapeHtml(first)}" />
+                  </div>
+                  <div>
+                    <label class="${labelCls}">Last Name</label>
+                    <input class="${inputCls}" data-field="last_name" value="${escapeHtml(last)}" />
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                  <div>
+                    <label class="${labelCls}">Email</label>
+                    <input type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-700" value="${escapeHtml(email)}" disabled />
+                  </div>
+                  <div>
+                    <label class="${labelCls}">Mobile Number</label>
+                    <input class="${inputCls}" data-field="mobile" value="${escapeHtml(safeText(c.mobile))}" />
+                    <div class="text-xs text-red-600 mt-1 hidden" data-role="mobile-help">Enter a valid AU mobile (e.g. 04XX XXX XXX or +614XX XXX XXX)</div>
+                  </div>
+                </div>
+
+                <div class="mt-3">
+                  <label class="${labelCls}">License / Permit Number</label>
+                  <input class="${inputCls}" data-field="learner_permit_number" value="${escapeHtml(safeText(c.learner_permit_number))}" />
+                </div>
+              </div>
+
+              <div>
+                <div class="client-section-title text-sm font-semibold text-gray-900 mb-2">Emergency Contact</div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label class="${labelCls}">Contact Name</label>
+                    <input class="${inputCls}" data-field="emergency_contact_name" value="${escapeHtml(safeText(c.emergency_contact_name))}" />
+                  </div>
+                  <div>
+                    <label class="${labelCls}">Contact Phone</label>
+                    <input class="${inputCls}" data-field="emergency_contact_phone" value="${escapeHtml(safeText(c.emergency_contact_phone))}" />
+                  </div>
+                </div>
+
+                <div class="mt-3">
+                  <label class="${labelCls}">Medical Conditions</label>
+                  <textarea class="${inputCls}" data-field="medical_conditions" rows="3" placeholder="Add any medical conditions…">${escapeHtml(safeText(c.medical_conditions))}</textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-4 border border-gray-300 rounded-lg p-3 learning-box">
+              <div class="client-section-title text-sm font-semibold text-gray-900 mb-2">Learning Information</div>
+              <div class="flex flex-wrap gap-4 items-center">
+                <label class="inline-flex items-center gap-2 text-sm">
+                  <input type="checkbox" data-field="is_beginner" ${c.is_beginner === true ? 'checked' : ''} />
+                  Beginner
+                </label>
+                <label class="inline-flex items-center gap-2 text-sm">
+                  <input type="checkbox" data-field="is_anxious_nervous" ${c.is_anxious_nervous === true ? 'checked' : ''} />
+                  Anxious
+                </label>
+                <label class="inline-flex items-center gap-2 text-sm">
+                  <input type="checkbox" data-field="is_senior" ${c.is_senior === true ? 'checked' : ''} />
+                  Senior
+                </label>
+                <label class="inline-flex items-center gap-2 text-sm">
+                  <input type="checkbox" data-field="learning_other_enabled" ${otherEnabled ? 'checked' : ''} />
+                  Other
+                </label>
+                <input class="${inputCls} max-w-[420px]" data-field="learning_needs_other" value="${escapeHtml(otherText)}" ${otherEnabled ? '' : 'disabled'} placeholder="Other learning needs…" />
+              </div>
+            </div>
+
+            <div class="mt-4">
+              <div class="client-section-title text-sm font-semibold text-gray-900 mb-2">Additional Notes</div>
+              <textarea class="${inputCls}" data-field="notes" rows="3" placeholder="Add notes…">${escapeHtml(safeText(c.notes))}</textarea>
+            </div>
+
+            <div class="mt-4">
+              ${((created || updated) ? `
+                <div class="text-xs text-gray-900 mb-2">
+                  ${[created ? `Created: ${escapeHtml(created)}` : '', updated ? `Updated: ${escapeHtml(updated)}` : ''].filter(Boolean).join(' ')}
+                </div>
+              ` : '')}
+
+              <div class="flex items-center gap-3">
+                <button type="button" class="btn btn-primary" onclick="window.saveClient('${escapeHtml(c.id)}')">Save</button>
+                <button type="button" class="btn btn-outline-blue" onclick="window.toggleClientCard('${escapeHtml(c.id)}')">Cancel</button>
+                <div class="text-sm text-blue-600" data-role="save-msg"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    list.innerHTML = html;
+    restoreExpandedCard();
+  }
+
+  async function loadAdminClients() {
+    if (!window.supabaseClient) {
+      setClientsMsg('Supabase client not ready.', 'text-red-600');
+      return;
+    }
+
+    const list = document.getElementById('adminClientsList');
+    if (list) list.innerHTML = '<div class="text-gray-500">Loading…</div>';
+    setClientsMsg('', '');
+
+    try {
+      const { data, error } = await window.supabaseClient
+        .from('client')
+        .select('id,email,first_name,last_name,mobile,created_at,updated_at,is_admin,intake_completed,is_anxious_nervous,is_beginner,is_senior,learner_permit_number,emergency_contact_name,emergency_contact_phone,medical_conditions,learning_needs_other,notes')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      allAdminClients = Array.isArray(data) ? data : [];
+      window.allAdminClients = allAdminClients;
+
+      renderAdminClients();
+    } catch (e) {
+      console.error('[admin-clients] load failed:', e);
+      setClientsMsg('Failed to load clients.', 'text-red-600');
+      if (list) list.innerHTML = '<div class="text-gray-500">No data.</div>';
+    }
+  }
+
+  function wireClientsEvents() {
+    const validation = document.getElementById('clientValidationFilter');
+    const search = document.getElementById('clientSearch') || document.getElementById('clientSearchInput');
+    const refresh = document.getElementById('clientsRefreshBtn');
+
+    if (validation) {
+      validation.addEventListener('change', () => {
+        renderAdminClients();
+      });
+    }
+
+    if (search) {
+      search.addEventListener('input', () => {
+        clearTimeout(clientsSearchDebounce);
+        clientsSearchDebounce = setTimeout(() => {
+          renderAdminClients();
+        }, 200);
+      });
+    }
+
+    if (refresh) {
+      refresh.addEventListener('click', async () => {
+        await loadAdminClients();
+      });
+    }
+
+    const list = document.getElementById('adminClientsList');
+    if (list && !list.dataset.bound) {
+      list.dataset.bound = '1';
+      list.addEventListener('input', (e) => {
+        const target = e.target;
+        if (!target) return;
+        const card = target.closest('.client-card');
+        if (!card) return;
+
+        const field = target.getAttribute('data-field');
+        if (field === 'mobile') {
+          updateMobileUIForCard(card);
+        }
+        if (field === 'learning_other_enabled') {
+          updateOtherUIForCard(card);
+        }
+      });
+
+      list.addEventListener('change', (e) => {
+        const target = e.target;
+        if (!target) return;
+        const card = target.closest('.client-card');
+        if (!card) return;
+        const field = target.getAttribute('data-field');
+        if (field === 'learning_other_enabled') {
+          updateOtherUIForCard(card);
+        }
+      });
+    }
+  }
+
+  window.toggleClientCard = function(clientId) {
+    if (!clientId) return;
+    const card = document.querySelector(`#adminClientsList .client-card[data-client-id="${clientId}"]`);
+    if (!card) return;
+
+    const details = card.querySelector('[data-role="client-details"]');
+    const chevron = card.querySelector('[data-role="client-chevron"]');
+    if (!details) return;
+
+    const isOpen = !details.classList.contains('hidden');
+
+    if (isOpen) {
+      details.classList.add('hidden');
+      if (chevron) chevron.classList.remove('is-open');
+      expandedClientId = null;
+      return;
+    }
+
+    expandedClientId = clientId;
+    collapseAllClientCards(clientId);
+    details.classList.remove('hidden');
+    if (chevron) chevron.classList.add('is-open');
+    updateOtherUIForCard(card);
+    updateMobileUIForCard(card);
+  };
+
+  window.saveClient = async function(clientId) {
+    if (!clientId) return;
+    if (!window.supabaseClient) {
+      setClientsMsg('Supabase client not ready.', 'text-red-600');
+      return;
+    }
+
+    const card = document.querySelector(`#adminClientsList .client-card[data-client-id="${clientId}"]`);
+    if (!card) return;
+
+    const msgEl = card.querySelector('[data-role="save-msg"]');
+    const getEl = (field) => card.querySelector(`[data-field="${field}"]`);
+    const getValue = (field) => (getEl(field)?.value || '').toString();
+    const getChecked = (field) => (getEl(field)?.checked === true);
+
+    const mobileRaw = getValue('mobile');
+    const mobileNormalized = normalizePhone(mobileRaw);
+    if (mobileNormalized && !isValidMobile(mobileNormalized)) {
+      updateMobileUIForCard(card);
+      if (msgEl) {
+        msgEl.textContent = 'Fix mobile number before saving.';
+        msgEl.className = 'text-sm text-red-600';
+      }
+      const mobileInput = getEl('mobile');
+      if (mobileInput) mobileInput.focus();
+      return;
+    }
+
+    const otherEnabled = getChecked('learning_other_enabled');
+    const otherText = otherEnabled ? getValue('learning_needs_other').trim() : '';
+
+    const payload = {
+      first_name: getValue('first_name').trim(),
+      last_name: getValue('last_name').trim(),
+      mobile: mobileRaw.trim(),
+      learner_permit_number: getValue('learner_permit_number').trim(),
+      emergency_contact_name: getValue('emergency_contact_name').trim(),
+      emergency_contact_phone: getValue('emergency_contact_phone').trim(),
+      medical_conditions: getValue('medical_conditions').trim(),
+      is_beginner: getChecked('is_beginner'),
+      is_anxious_nervous: getChecked('is_anxious_nervous'),
+      is_senior: getChecked('is_senior'),
+      learning_needs_other: otherText,
+      notes: getValue('notes').trim(),
+    };
+
+    try {
+      if (msgEl) {
+        msgEl.textContent = 'Saving…';
+        msgEl.className = 'text-sm text-blue-600';
+      }
+
+      const { error } = await window.supabaseClient
+        .from('client')
+        .update(payload)
+        .eq('id', clientId);
+
+      if (error) throw error;
+
+      // Update local cache
+      const idx = allAdminClients.findIndex(c => c.id === clientId);
+      if (idx !== -1) {
+        allAdminClients[idx] = { ...allAdminClients[idx], ...payload };
+      }
+
+      if (msgEl) {
+        msgEl.textContent = 'Saved';
+        msgEl.className = 'text-sm text-blue-600';
+
+        setTimeout(() => {
+          window.toggleClientCard(clientId);
+
+          // Re-render AFTER message has been visible
+          renderAdminClients();
+        }, 3000);
+      }
+    } catch (e) {
+      console.error('[admin-clients] save failed:', e);
+      if (msgEl) {
+        msgEl.textContent = 'Error saving';
+        msgEl.className = 'text-sm text-red-600';
+      }
+    }
+  };
+
+  // Expose minimal API expected by admin.html
+  window.loadAdminClients = loadAdminClients;
+  window.renderAdminClients = renderAdminClients;
+
+  // Ensure wiring happens once the partial exists in DOM
+  wireClientsEvents();
+})();
+</script>

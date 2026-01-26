@@ -90,6 +90,10 @@
                class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors border-l-4 border-transparent">
               <span class="font-medium">Cancellations</span>
             </a>
+            <a href="#clients" onclick="showSection('clients')" id="nav-clients"
+               class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors border-l-4 border-transparent">
+              <span class="font-medium">Clients</span>
+            </a>
             <a href="#progress" onclick="showSection('progress')" id="nav-progress"
                class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors border-l-4 border-transparent">
               <span class="font-medium">Client Progress</span>
@@ -116,6 +120,7 @@
         <div data-include="partials/admin-calendar.html"></div>
         <div data-include="partials/admin-bookings.html"></div>
         <div data-include="partials/admin-cancellations.html"></div>
+        <div data-include="partials/admin-clients.html"></div>
         <div data-include="partials/admin-progress.html"></div>
         <div data-include="partials/admin-reporting.html"></div>
         <div data-include="partials/admin-messaging.html"></div>
@@ -277,6 +282,22 @@
         }, 50);
       }
       // Note: When source === 'alert', alert handler takes full control to avoid race
+
+      // Clients – sidebar defaults
+      if (section === 'clients' && source === 'sidebar') {
+        setTimeout(async () => {
+          const validation = document.getElementById('clientValidationFilter');
+          const search = document.getElementById('clientSearchInput');
+          if (validation) validation.value = 'all';
+          if (search) search.value = '';
+
+          if (window.loadAdminClients) await window.loadAdminClients();
+        }, 50);
+      } else if (section === 'clients') {
+        setTimeout(async () => {
+          if (window.loadAdminClients) await window.loadAdminClients();
+        }, 50);
+      }
     }
     
     // Notification icon handlers
@@ -530,8 +551,10 @@
         setInterval(window.updateNotificationBadges, 30000);
       }
       
-      // Show first section by default
-      showSection('calendar');
+      // Show first section by default (or from URL hash)
+      const hash = (window.location.hash || '').replace('#', '').trim();
+      const initialSection = hash && document.getElementById(`section-${hash}`) ? hash : 'calendar';
+      showSection(initialSection);
     });
   </script>
   <!-- Google Analytics -->

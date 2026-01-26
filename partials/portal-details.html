@@ -272,9 +272,7 @@
       showError('mobile','mobileError','Enter a valid AU mobile (e.g. 04XX XXX XXX or +61 4XX XXX XXX)');
     } else {
       clearError('mobile','mobileError');
-      // Snap formatting to display format
-      const stored = Validation.normaliseMobileForStorage(v);
-      this.value = Validation.formatAuMobileDisplay(stored);
+      // Don't reformat - store what user entered
     }
   });
   document.getElementById('emergencyContactPhone').addEventListener('blur', function(){
@@ -283,13 +281,14 @@
       clearError('emergencyContactPhone','emergencyContactPhoneError'); 
       return; 
     }
-    const stored = Validation.normalisePhoneForStorage(v);
-    if (!stored) {
+
+    const ok = (Validation.isValidAuPhone && Validation.isValidAuPhone(v)) || false;
+
+    if (!ok) {
       showError('emergencyContactPhone','emergencyContactPhoneError','Enter a valid Australian mobile (04XX XXX XXX) or landline (0X XXXX XXXX)');
     } else {
       clearError('emergencyContactPhone','emergencyContactPhoneError');
-      // Snap formatting to display format
-      this.value = Validation.formatAuPhoneDisplay(stored);
+      // Don't reformat - store what user entered
     }
   });
 
@@ -301,10 +300,10 @@
     // Populate form fields
     document.getElementById('firstName').value = data.first_name || '';
     document.getElementById('lastName').value = data.last_name || '';
-    document.getElementById('mobile').value = Validation.formatAuMobileDisplay(data.mobile || '');
+    document.getElementById('mobile').value = data.mobile || '';
     document.getElementById('learnerPermitNumber').value = data.learner_permit_number || '';
     document.getElementById('emergencyContactName').value = data.emergency_contact_name || '';
-    document.getElementById('emergencyContactPhone').value = Validation.formatAuPhoneDisplay(data.emergency_contact_phone || '');
+    document.getElementById('emergencyContactPhone').value = data.emergency_contact_phone || '';
     document.getElementById('medicalConditions').value = data.medical_conditions || '';
     document.getElementById('isAnxiousNervous').checked = data.is_anxious_nervous || false;
     document.getElementById('isBeginner').checked = data.is_beginner || false;
@@ -374,10 +373,9 @@
     
     // Emergency phone validation - must be valid if provided
     if (ePhone) {
-      const storedPhone = Validation.normalisePhoneForStorage(ePhone);
-      if (!storedPhone) { 
-        showError('emergencyContactPhone', 'emergencyContactPhoneError', 'Enter a valid Australian mobile or landline'); 
-        hasError = true; 
+      if (!Validation.isValidAuPhone(ePhone)) {
+        showError('emergencyContactPhone', 'emergencyContactPhoneError', 'Enter a valid Australian mobile or landline');
+        hasError = true;
       }
     }
 
@@ -399,20 +397,17 @@
       return;
     }
 
-    // Collect form data - normalize phone numbers to canonical storage format
+    // Collect form data - store trimmed raw values (no normalisation for storage)
     const mobileRaw = document.getElementById('mobile').value.trim();
     const emergencyPhoneRaw = document.getElementById('emergencyContactPhone').value.trim();
-    
-    const storedMobile = Validation.normaliseMobileForStorage(mobileRaw).value || '';
-    const storedEmergencyPhone = emergencyPhoneRaw ? Validation.normalisePhoneForStorage(emergencyPhoneRaw) : null;
     
     const formData = {
       first_name: document.getElementById('firstName').value.trim(),
       last_name: document.getElementById('lastName').value.trim(),
-      mobile: storedMobile, // Save canonical format (0404096768 or +61404096768)
+      mobile: mobileRaw,
       learner_permit_number: document.getElementById('learnerPermitNumber').value.trim() || null,
       emergency_contact_name: document.getElementById('emergencyContactName').value.trim() || null,
-      emergency_contact_phone: storedEmergencyPhone, // Save canonical format (mobile or landline)
+      emergency_contact_phone: emergencyPhoneRaw || null,
       medical_conditions: document.getElementById('medicalConditions').value.trim() || null,
       is_anxious_nervous: document.getElementById('isAnxiousNervous').checked,
       is_beginner: document.getElementById('isBeginner').checked,
@@ -435,11 +430,7 @@
       // Update local data
       window.clientData = { ...window.clientData, ...formData };
 
-      // Format phone displays after save
-      document.getElementById('mobile').value = Validation.formatAuMobileDisplay(storedMobile);
-      if (storedEmergencyPhone) {
-        document.getElementById('emergencyContactPhone').value = Validation.formatAuPhoneDisplay(storedEmergencyPhone);
-      }
+      // Leave phone display as entered (no canonical formatting after save)
 
       if (window.showDetailsSavedMessage) {
         window.showDetailsSavedMessage();

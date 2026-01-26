@@ -1003,11 +1003,11 @@
 
     const clientName = clientNameFromClient || bookingNameFromBooking || 'Unknown';
 
-    const normalise = (s) => (s || '').trim().toLowerCase();
+    const normaliseText = (s) => (s || '').trim().toLowerCase();
     const isNameMismatch =
       clientNameFromClient &&
       bookingNameFromBooking &&
-      normalise(clientNameFromClient) !== normalise(bookingNameFromBooking);
+      normaliseText(clientNameFromClient) !== normaliseText(bookingNameFromBooking);
 
     // Validation states
     const isMobileInvalid = booking.is_mobile_valid === false;
@@ -1292,7 +1292,7 @@
           : null;
         const pickupFromInput = pickupInput ? pickupInput.value.trim() : null;
 
-        // For mobile, send the normalized value (same value stored in DB)
+        // For mobile, send the trimmed value (same value stored in DB)
         const mobileToSend = field === 'mobile' ? (valueToStore || '').trim() : null;
 
         const { data: gData, error: gError } = await window.supabaseClient.functions.invoke('update-booking-in-google', {

@@ -80,7 +80,7 @@
   #adminClientsList .client-summary * {
     color: #111827 !important;
   }
-  
+
   /* Exception: allow red text for invalid/missing items */
   #adminClientsList .client-summary .text-red-600 {
     color: #dc2626 !important;
@@ -164,27 +164,30 @@
     el.className = 'text-sm mb-3 ' + (cls || '');
   }
 
-  function normalizePhone(value) {
+  // IMPORTANT:
+  // This function is NOT used to normalise values for storage.
+  // It only strips formatting for validation and search comparisons.
+  function stripPhoneFormatting(value) {
     const raw = (value || '').toString();
-    // Spec says trimming spaces; removing all whitespace is safer for user-entered values.
+    // Strip whitespace for validation/search (not for storage)
     return raw.replace(/\s+/g, '').trim();
   }
 
   function isValidMobile(value) {
-    const v = normalizePhone(value);
+    const v = stripPhoneFormatting(value);
     if (!v) return false;
     return /^(04\d{8}|\+614\d{8}|614\d{8})$/.test(v);
   }
 
   function getMobileStatus(value) {
-    const normalized = normalizePhone(value);
-    if (!normalized) return { status: 'missing', normalized: '' };
-    if (isValidMobile(normalized)) return { status: 'valid', normalized };
-    return { status: 'invalid', normalized };
+    const digits = stripPhoneFormatting(value);
+    if (!digits) return { status: 'missing', digits: '' };
+    if (isValidMobile(digits)) return { status: 'valid', digits };
+    return { status: 'invalid', digits };
   }
 
-  function normalizeAuPhoneForValidation(value) {
-    let v = normalizePhone(value);          // removes whitespace
+  function stripAuPhoneFormatting(value) {
+    let v = stripPhoneFormatting(value);    // strip formatting for validation/search (not for storage)
     v = v.replace(/[()\.\-]/g, '');          // strip punctuation for validation only
 
     if (!v) return '';
@@ -209,7 +212,7 @@
     }
 
     // Fallback (should rarely be used)
-    const v = normalizeAuPhoneForValidation(raw);
+    const v = stripAuPhoneFormatting(raw);
     if (!v) return true;
     if (/^04\d{8}$/.test(v)) return true;
     if (/^0[2378]\d{8}$/.test(v)) return true;
@@ -261,7 +264,7 @@
         const first = safeText(c.first_name).toLowerCase();
         const last = safeText(c.last_name).toLowerCase();
         const email = safeText(c.email).toLowerCase();
-        const mobile = normalizePhone(c.mobile).toLowerCase();
+        const mobile = stripPhoneFormatting(c.mobile).toLowerCase();
         const full = (first + ' ' + last).trim();
 
         return (
@@ -286,24 +289,10 @@
   function updateMobileUIForCard(cardEl) {
     if (!cardEl) return;
     const mobileInput = cardEl.querySelector('[data-field="mobile"]');
-    const pillEl = cardEl.querySelector('[data-role="mobile-pill"]');
     const helpEl = cardEl.querySelector('[data-role="mobile-help"]');
 
-    const { status, normalized } = getMobileStatus(mobileInput ? mobileInput.value : '');
+    const { status, digits } = getMobileStatus(mobileInput ? mobileInput.value : '');
 
-    if (pillEl) {
-      pillEl.classList.remove('good', 'bad');
-      if (status === 'valid') {
-        pillEl.classList.add('good');
-        pillEl.textContent = `Mobile: ${normalized}`;
-      } else if (status === 'missing') {
-        pillEl.classList.add('bad');
-        pillEl.textContent = 'Mobile: Missing';
-      } else {
-        pillEl.classList.add('bad');
-        pillEl.textContent = `Mobile: ${normalized || 'Invalid'}`;
-      }
-    }
 
     if (mobileInput) {
       if (status === 'invalid') {
@@ -433,7 +422,7 @@
       );
 
       const otherEnabled = otherText.length > 0;
-      const mobileDisplay = (mobileStatus.normalized || safeText(c.mobile)).trim();
+      const mobileDisplay = (mobileStatus.digits || safeText(c.mobile)).trim();
 
       const inputCls = 'w-full bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent';
       const labelCls = 'block text-sm font-medium mb-1 text-gray-900';
@@ -774,8 +763,8 @@
     }
 
     const mobileRaw = getValue('mobile');
-    const mobileNormalized = normalizePhone(mobileRaw);
-    if (mobileNormalized && !isValidMobile(mobileNormalized)) {
+    const mobileDigits = stripPhoneFormatting(mobileRaw);
+    if (mobileDigits && !isValidMobile(mobileDigits)) {
       updateMobileUIForCard(card);
       if (msgEl) {
         msgEl.textContent = 'Fix mobile number before saving.';
@@ -820,7 +809,11 @@
       // Update local cache
       const idx = allAdminClients.findIndex(c => c.id === clientId);
       if (idx !== -1) {
-        allAdminClients[idx] = { ...allAdminClients[idx], ...payload };
+        allAdminClients[idx] = {
+          ...allAdminClients[idx],
+          ...payload,
+          updated_at: new Date().toISOString()
+        };
       }
 
       if (msgEl) {

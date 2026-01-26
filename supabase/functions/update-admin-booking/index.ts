@@ -175,10 +175,9 @@ Deno.serve(async (req) => {
       lastName,
       email,
       mobile,
-      pickupLocation,
-      isPaid: _isPaid
+      pickupLocation
     } = payload;
-
+    
     const isPaidBool = !!(payload?.isPaid ?? payload?.is_paid);
 
     // Validate required fields
@@ -240,9 +239,6 @@ ${mobile || 'N/A'}
 
 <b>Pickup Address</b>
 ${pickupLocation || 'N/A'}
-
-<b>Paid?</b>
-${isPaidBool ? 'Yes' : 'No'}
 `.trim();
 
     // Build event summary
@@ -290,8 +286,6 @@ ${isPaidBool ? 'Yes' : 'No'}
         shared: {
           ...existingShared,
           // gcal-sync uses these as source of truth
-          is_booking: "true",
-          is_paid: isPaidBool ? "true" : "false",
           pickup_location: pickupLocation || '',
           mobile: mobile || '',
           service_code: serviceCode || '',
@@ -302,8 +296,6 @@ ${isPaidBool ? 'Yes' : 'No'}
           serviceCode: serviceCode,
           clientEmail: email || '',
           pickup: pickupLocation || '',
-          isPaid: isPaidBool ? 'true' : 'false',
-          isBooking: 'true',
         }
       }
     };
@@ -333,6 +325,18 @@ ${isPaidBool ? 'Yes' : 'No'}
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { data: existingBooking, error: existingErr } = await supabase
+      .from('booking')
+      .select('is_admin_booking')
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (existingErr) {
+      console.warn('[update-admin-booking] Failed to read existing booking for payment guard:', existingErr);
+    }
+
+    const canEditPayments = existingBooking?.is_admin_booking === true;
 
     // Build ISO timestamps for database using Google’s returned dateTime (includes correct offset/DST)
     const startIso = updatedEvent?.start?.dateTime
@@ -376,20 +380,23 @@ ${isPaidBool ? 'Yes' : 'No'}
       }
     }
 
-    const updateData = {
+    const updateData: any = {
       service_code: serviceCode,
       start_time: startIso,
       end_time: endIso,
       start_date: date,
       timezone: "Australia/Melbourne",
       pickup_location: pickupLocation || null,
-      is_paid: isPaidBool,
       client_id: finalClientId || null,
       first_name: firstName || null,
       last_name: lastName || null,
       email: email || null,
       mobile: mobile || null,
     };
+
+    if (canEditPayments) {
+      updateData.is_paid = isPaidBool;
+    }
 
     const { error: dbError } = await supabase
       .from('booking')

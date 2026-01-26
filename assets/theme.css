@@ -76,7 +76,7 @@ select:focus {
 input:disabled,
 textarea:disabled,
 select:disabled {
-  background-color: #f9fafb !important;
+  background-color:#e5e7eb !important;
   color: #6b7280 !important;
   border-color: #d1d5db !important;
 }

@@ -1285,6 +1285,22 @@
         : '';
     }
 
+    const canEditPayments = booking.is_admin_booking === true;
+
+    if (paidCheckbox) {
+      paidCheckbox.disabled = !canEditPayments;
+      paidCheckbox.title = canEditPayments
+        ? 'Mark paid/unpaid'
+        : 'Payment can only be edited for admin-created bookings';
+    }
+
+    if (amountInput) {
+      amountInput.disabled = !canEditPayments;
+      amountInput.title = canEditPayments
+        ? 'Amount (editable)'
+        : 'Amount can only be edited for admin-created bookings';
+    }
+
     // Fill status
     const statusSelect = document.getElementById('bookingStatus');
     if (statusSelect) {
@@ -2250,6 +2266,8 @@
     // Modal checkbox is Paid? (checked = paid). Persist as is_paid.
     const isPaid = document.getElementById("bookingPaid").checked;
 
+    const canEditPayments = editingBookingData?.is_admin_booking === true;
+
     const status = document.getElementById('bookingStatus')?.value || 'confirmed';
     const amountPaidRaw = document.getElementById('bookingAmountPaid')?.value;
     const amountPaidCents = (amountPaidRaw === undefined || String(amountPaidRaw).trim() === '')
@@ -2414,7 +2432,7 @@
         email,
         mobile,
         pickupLocation,
-        isPaid,
+        ...(canEditPayments ? { isPaid } : {}),
       };
 
       console.log("[booking-update] Payload:", payload);
@@ -2482,9 +2500,9 @@
         startIso,
         endIso,
         pickupLocation,
-        isPaid,
+        isPaid: canEditPayments ? isPaid : undefined,
         status,
-        priceCents: Number.isFinite(amountPaidCents) ? amountPaidCents : undefined,
+        priceCents: (canEditPayments && Number.isFinite(amountPaidCents)) ? amountPaidCents : undefined,
         clientId,
         firstName,
         lastName,
@@ -2550,7 +2568,6 @@
       start_time: opts.startIso,
       end_time: opts.endIso,
       pickup_location: opts.pickupLocation || null,
-      is_paid: !!opts.isPaid,
       client_id: opts.clientId || null,
       first_name: opts.firstName || null,
       last_name: opts.lastName || null,
@@ -2558,6 +2575,10 @@
       mobile: opts.mobile || null,
       updated_at: new Date().toISOString(),
     };
+
+    if (opts.isPaid !== undefined) {
+      updateData.is_paid = !!opts.isPaid;
+    }
 
     // Optional fields
     if (typeof opts.status === 'string') {

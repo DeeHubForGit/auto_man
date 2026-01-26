@@ -169,7 +169,6 @@ Deno.serve(async (req) => {
       email,
       mobile,
       pickupLocation,
-      isPaid,
     } = payload;
 
     const isPaidBool = !!(payload?.isPaid ?? payload?.is_paid);
@@ -297,7 +296,6 @@ Deno.serve(async (req) => {
         shared: {
           service_code: serviceCode,
           created_by: "admin",
-          is_paid: isPaidBool ? "true" : "false",
           is_booking: "true", // Mark as booking so gcal-sync colors it correctly
           mobile: safeMobile, // Stable source - immune to Google UI description corruption
           pickup_location: safePickup, // Stable source - immune to Google UI description corruption
@@ -356,6 +354,7 @@ Deno.serve(async (req) => {
       source: "google",
       status: "confirmed",
       is_booking: true,
+      is_admin_booking: true,
       is_paid: isPaidBool,
 
       service_code: serviceCode,

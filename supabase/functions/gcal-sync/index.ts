@@ -381,20 +381,7 @@ Deno.serve(async () => {
       // Google sends: "2025-11-23T15:00:00+11:00" (3 PM Melbourne)
       // We need PostgreSQL to store: "2025-11-23T04:00:00Z" (4 AM UTC)
       const startUTC = new Date(start).toISOString();
-      const endUTC = new Date(end).toISOString();
-
-      // Payment flag (transition): prefer is_paid, fall back to legacy is_payment_required.
-      // is_paid: true => paid, false => unpaid
-      // is_payment_required (legacy): true => unpaid, false => paid
-      const isPaidRaw = String(e.extendedProperties?.shared?.is_paid ?? '').toLowerCase();
-      const legacyPaymentRequiredRaw = String(e.extendedProperties?.shared?.is_payment_required ?? '').toLowerCase();
-
-      let isPaid = false;
-
-      if (isPaidRaw === 'true') isPaid = true;
-      else if (isPaidRaw === 'false') isPaid = false;
-      else if (legacyPaymentRequiredRaw === 'true') isPaid = false;
-      else if (legacyPaymentRequiredRaw === 'false') isPaid = true;
+      const endUTC = new Date(end).toISOString(); 
       
       // Determine service code
       const serviceCode = parsed.service_code ?? inferServiceCode(e.summary, durationMinutes);
@@ -442,8 +429,7 @@ Deno.serve(async () => {
         p_pickup: fields.pickup_location ?? parsed.pickup_location ?? null,
         p_extended: e,  // Store full event object for debugging/audit
         p_is_booking: isBooking,  // Simple booking detection
-        p_title: e.summary ?? null,
-        p_is_paid: isPaid,  // Payment flag for admin bookings
+        p_title: e.summary ?? null
       };
       
       const up = await fetch(`${supa}/rest/v1/rpc/upsert_booking_from_google`, {

@@ -1030,6 +1030,8 @@
       pickupErrorText = 'Please tap the suggested address to use the correct spelling.';
     }
 
+    const canEditPayments = booking.is_admin_booking === true;
+
     return `
       <div class="booking-card p-3 sm:p-4 mb-4 transition-all duration-200 group" id="booking-card-${booking.id}">
         <div class="flex flex-col">
@@ -1143,6 +1145,8 @@
                 <input type="checkbox" 
                   class="payment-toggle-checkbox w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
                   ${booking.is_paid ? 'checked' : ''}
+                  ${canEditPayments ? '' : 'disabled'}
+                  title="${canEditPayments ? 'Mark paid/unpaid' : 'Payment can only be edited for admin-created bookings'}"
                   onchange="togglePaymentStatus('${booking.id}', this.checked)"
                 >
                 <span class="payment-label text-sm ${!booking.is_paid ? 'payment-owing' : 'payment-paid'}">
@@ -1155,11 +1159,12 @@
                 max="9999.99"
                 step="0.01"
                 inputmode="decimal"
-                class="max-w-[120px] px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                class="max-w-[120px] px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                 value="${(typeof booking.price_cents === 'number') ? (booking.price_cents / 100).toFixed(2) : ''}"
+                ${canEditPayments ? '' : 'disabled'}
                 onblur="updateBookingPrice('${booking.id}', this.value)"
                 placeholder="0.00"
-                title="Price (editable)"
+                title="${canEditPayments ? 'Price (editable)' : 'Price can only be edited for admin-created bookings'}"
                 maxlength="13"
                 pattern="^\\d{0,10}(\\.\\d{0,2})?$"
               >
@@ -1455,6 +1460,13 @@
       allAdminBookings.find(b => String(b.id) === String(id)) ||
       adminBookings.find(b => String(b.id) === String(id));
 
+    if (booking && booking.is_admin_booking !== true) {
+      alert('Price can only be edited for admin-created bookings.');
+      await loadAdminBookings();
+      window.restoreScrollPosition();
+      return;
+    }
+
     const original = (typeof booking?.price_cents === 'number') ? booking.price_cents : null;
 
     // Skip if unchanged
@@ -1486,9 +1498,17 @@
   window.togglePaymentStatus = async function(id, isPaid) {
     console.log('[admin-bookings] Payment status toggled:', { isPaid });
     
-    // Find booking in memory
-    const booking = adminBookings.find(b => String(b.id) === String(id));
+    const booking =
+      allAdminBookings.find(b => String(b.id) === String(id)) ||
+      adminBookings.find(b => String(b.id) === String(id));
+
     if (!booking) return;
+
+    if (booking.is_admin_booking !== true) {
+      alert('Paid can only be edited for admin-created bookings.');
+      await loadAdminBookings();
+      return;
+    }
     
     const previous = booking.is_paid;
     

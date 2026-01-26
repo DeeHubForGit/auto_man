@@ -419,7 +419,7 @@
   }
 
   #section-calendar #appt-end[readonly] {
-    opacity: 0.75;
+    opacity: 1;
     cursor: not-allowed;
   }
 
@@ -654,6 +654,20 @@
   #section-calendar .admin-modal-body select,
   #section-calendar .admin-modal-body textarea {
     padding: 4px 6px !important;
+  }
+
+  /* Modal: make disabled and readonly controls look identical */
+  #section-calendar .admin-modal-body .form-input:disabled,
+  #section-calendar .admin-modal-body select:disabled,
+  #section-calendar .admin-modal-body textarea:disabled,
+  #section-calendar .admin-modal-body .form-input[readonly],
+  #section-calendar .admin-modal-body select[readonly],
+  #section-calendar .admin-modal-body textarea[readonly] {
+    background-color: #e5e7eb !important;
+    color: #6b7280 !important;
+    border-color: #d1d5db !important;
+    cursor: not-allowed !important;
+    opacity: 1 !important;
   }
 
   /* iPhone Safari: Date row then Times row, KEEP FIXED WIDTHS (no expand) */
@@ -1006,6 +1020,27 @@
     if (newClientRadio) newClientRadio.disabled = false;
     const existingClientRadio = document.querySelector('input[name="clientMode"][value="existing"]');
     if (existingClientRadio) existingClientRadio.disabled = false;
+
+    const existingClientSelect = document.getElementById('existingClientSelect');
+    if (existingClientSelect) {
+      existingClientSelect.disabled = false;
+      existingClientSelect.style.removeProperty('background-color');
+      existingClientSelect.style.removeProperty('color');
+      existingClientSelect.style.removeProperty('cursor');
+    }
+
+    const newFirstName = document.getElementById('newClientFirstName');
+    const newLastName = document.getElementById('newClientLastName');
+    const newEmail = document.getElementById('newClientEmail');
+    const newMobile = document.getElementById('newClientMobile');
+
+    [newFirstName, newLastName, newEmail, newMobile].forEach((el) => {
+      if (!el) return;
+      el.disabled = false;
+      el.style.removeProperty('background-color');
+      el.style.removeProperty('color');
+      el.style.removeProperty('cursor');
+    });
   }
 
   // Helper to enable/disable appointment type radio buttons
@@ -1286,6 +1321,7 @@
     }
 
     const canEditPayments = booking.is_admin_booking === true;
+    const canEditClient = booking.is_admin_booking === true;
 
     if (paidCheckbox) {
       paidCheckbox.disabled = !canEditPayments;
@@ -1307,13 +1343,60 @@
       statusSelect.value = booking.status || 'confirmed';
     }
 
-    // Client mode: keep Existing/New behavior (do not force or disable client mode radios)
+    // Client mode: only admin-created bookings can change client details
     const existingRadio = document.querySelector('input[name="clientMode"][value="existing"]');
     const newRadio = document.querySelector('input[name="clientMode"][value="new"]');
-    if (existingRadio) existingRadio.disabled = false;
-    if (newRadio) newRadio.disabled = false;
+    const existingClientSelect = document.getElementById('existingClientSelect');
 
-    const existingClientSelect = document.getElementById("existingClientSelect");
+    // Prefill new client fields from booking (useful if user switches modes)
+    const newFirstName = document.getElementById('newClientFirstName');
+    const newLastName = document.getElementById('newClientLastName');
+    const newEmail = document.getElementById('newClientEmail');
+    const newMobile = document.getElementById('newClientMobile');
+
+    const clientEditTitle = canEditClient
+      ? ''
+      : 'Client can only be changed for admin-created bookings';
+
+    if (existingRadio) {
+      existingRadio.disabled = !canEditClient;
+      existingRadio.title = clientEditTitle;
+    }
+    if (newRadio) {
+      newRadio.disabled = !canEditClient;
+      newRadio.title = clientEditTitle;
+    }
+
+    if (existingClientSelect) {
+      existingClientSelect.disabled = !canEditClient;
+      existingClientSelect.title = clientEditTitle;
+
+      if (!canEditClient) {
+        existingClientSelect.style.setProperty('background-color', '#e5e7eb', 'important');
+        existingClientSelect.style.setProperty('color', '#6b7280', 'important');
+        existingClientSelect.style.setProperty('cursor', 'not-allowed', 'important');
+      } else {
+        existingClientSelect.style.removeProperty('background-color');
+        existingClientSelect.style.removeProperty('color');
+        existingClientSelect.style.removeProperty('cursor');
+      }
+    }
+
+    [newFirstName, newLastName, newEmail, newMobile].forEach((el) => {
+      if (!el) return;
+      el.disabled = !canEditClient;
+      el.title = clientEditTitle;
+
+      if (!canEditClient) {
+        el.style.setProperty('background-color', '#e5e7eb', 'important');
+        el.style.setProperty('color', '#6b7280', 'important');
+        el.style.setProperty('cursor', 'not-allowed', 'important');
+      } else {
+        el.style.removeProperty('background-color');
+        el.style.removeProperty('color');
+        el.style.removeProperty('cursor');
+      }
+    });
 
     // Prefill existing client selection if possible
     let matchedExistingClient = false;
@@ -1332,11 +1415,6 @@
       }
     }
 
-    // Prefill new client fields from booking (useful if user switches modes)
-    const newFirstName = document.getElementById("newClientFirstName");
-    const newLastName = document.getElementById("newClientLastName");
-    const newEmail = document.getElementById("newClientEmail");
-    const newMobile = document.getElementById("newClientMobile");
     if (newFirstName) newFirstName.value = booking.first_name || '';
     if (newLastName) newLastName.value = booking.last_name || '';
     if (newEmail) newEmail.value = booking.email || '';

@@ -54,7 +54,7 @@
   #section-clients .client-pill.bad {
     border-color: #fecaca;
     background: #fef2f2;
-    color: #991b1b !important;
+    color: var(--danger) !important;
   }
 
   #section-clients .client-pill.good {
@@ -83,7 +83,7 @@
 
   /* Exception: allow red text for invalid/missing items */
   #adminClientsList .client-summary .text-red-600 {
-    color: #dc2626 !important;
+    color: var(--danger) !important;
   }
 
   #adminClientsList .client-summary svg {
@@ -97,7 +97,7 @@
 
   /* Ensure validation help text stays red (theme override safety) */
   #adminClientsList .client-card [data-role="client-details"] .text-red-600 {
-    color: #dc2626 !important;
+    color: var(--danger) !important;
   }
 
   /* Search box must stay white (theme override safety) */
@@ -296,7 +296,7 @@
 
     if (mobileInput) {
       if (status === 'invalid') {
-        mobileInput.style.setProperty('border-color', '#ef4444', 'important');
+        mobileInput.style.setProperty('border-color', 'var(--danger)', 'important');
       } else {
         mobileInput.style.removeProperty('border-color');
       }
@@ -337,7 +337,7 @@
     const ok = isValidAuPhone(raw);
 
     if (phoneInput) {
-      if (!ok) phoneInput.style.setProperty('border-color', '#ef4444', 'important');
+      if (!ok) phoneInput.style.setProperty('border-color', 'var(--danger)', 'important');
       else phoneInput.style.removeProperty('border-color');
     }
 
@@ -465,7 +465,7 @@
                 ${hasLicence
                   ? `<span class="text-gray-900">${escapeHtml(licence)}</span>`
                   : `
-                    <svg class="w-4 h-4 flex-shrink-0" fill="#dc2626" viewBox="0 0 20 20">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="var(--danger)" viewBox="0 0 20 20">
                       <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
                     </svg>
                     <span class="text-red-600 font-medium">License missing</span>

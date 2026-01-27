@@ -968,6 +968,7 @@
               <input id="bookingAmountPaid" type="number" min="0" step="0.01" inputmode="decimal" class="form-input" style="width: 120px;" placeholder="0.00">
             </div>
             <p class="text-xs text-gray-400 mt-1">Check when payment has been received (cash, transfer, etc)</p>
+            <p id="bookingPriceWarning" class="text-xs mt-1 hidden booking-time-warning"></p>
           </div>
 
           <!-- Status -->
@@ -1063,6 +1064,10 @@
     editingBookingId = null;
     editingBookingData = null;
     editingBookingGoogleEventId = null;
+
+    // Clear price warning
+    const pw = document.getElementById('bookingPriceWarning');
+    if (pw) { pw.textContent = ''; pw.classList.add('hidden'); }
 
     // Re-enable client mode switching for non-edit flows
     const newClientRadio = document.querySelector('input[name="clientMode"][value="new"]');
@@ -1359,6 +1364,9 @@
 
   // Open modal in edit mode for a personal appointment
   function openEditPersonalAppointmentModal({ googleEventId, title, dateStr, startHHMM, endHHMM, location }) {
+    // Reset booking edit state to avoid conflicts
+    resetBookingEditState();
+    
     // Set edit state
     editingPersonalAppt = true;
     editingPersonalGoogleEventId = googleEventId;
@@ -1409,6 +1417,7 @@
     editingBookingId = booking.id;
     editingBookingData = booking;
     editingBookingGoogleEventId = booking.google_event_id || booking.googleEventId || null;
+    bookingAmountManuallyEdited = false;
 
     // Ensure dropdowns are populated before selecting values
     loadServices();
@@ -1453,14 +1462,26 @@
 
     // Fill amount paid (stored in booking.price_cents)
     const amountInput = document.getElementById('bookingAmountPaid');
-    if (amountInput) {
-      amountInput.value = (typeof booking.price_cents === 'number')
-        ? (booking.price_cents / 100).toFixed(2)
-        : '';
-    }
-
     const canEditPayments = booking.is_admin_booking === true;
     const canEditClient = booking.is_admin_booking === true;
+    
+    // If unpaid and payments are editable, default to service price
+    if (amountInput) {
+      if (canEditPayments && !paidCheckbox.checked && booking.service_code) {
+        const serviceCents = SERVICE_PRICE_CENTS[booking.service_code];
+        if (typeof serviceCents === 'number') {
+          amountInput.value = (serviceCents / 100).toFixed(2);
+        } else {
+          amountInput.value = (typeof booking.price_cents === 'number')
+            ? (booking.price_cents / 100).toFixed(2)
+            : '';
+        }
+      } else {
+        amountInput.value = (typeof booking.price_cents === 'number')
+          ? (booking.price_cents / 100).toFixed(2)
+          : '';
+      }
+    }
 
     if (paidCheckbox) {
       paidCheckbox.disabled = !canEditPayments;
@@ -1608,6 +1629,9 @@
       submitBtn.textContent = "Update Booking";
     }
     
+    // Check for price mismatch warning
+    updatePaidVsServicePriceWarning();
+    
     // Open modal
     formHasChanges = false;
     apptBackdrop.classList.remove("hidden");
@@ -1677,6 +1701,78 @@
     if (!el) return;
     el.classList.add('hidden');
     el.innerHTML = '';
+  }
+
+  function updatePaidVsServicePriceWarning() {
+    const warnEl = document.getElementById('bookingPriceWarning');
+    if (!warnEl) return;
+
+    // Only in booking edit mode
+    if (!editingBooking || !editingBookingData) {
+      warnEl.textContent = '';
+      warnEl.classList.add('hidden');
+      return;
+    }
+
+    // Only when payments are editable (admin-created)
+    if (editingBookingData.is_admin_booking !== true) {
+      warnEl.textContent = '';
+      warnEl.classList.add('hidden');
+      return;
+    }
+
+    const paidCheckbox = document.getElementById('bookingPaid');
+    const amountInput = document.getElementById('bookingAmountPaid');
+    const serviceSelect = document.getElementById('bookingService');
+
+    if (!paidCheckbox || !amountInput || !serviceSelect) {
+      warnEl.textContent = '';
+      warnEl.classList.add('hidden');
+      return;
+    }
+
+    // Only warn when marked paid
+    if (!paidCheckbox.checked) {
+      warnEl.textContent = '';
+      warnEl.classList.add('hidden');
+      return;
+    }
+
+    const serviceCode = serviceSelect.value || '';
+    const serviceCents = SERVICE_PRICE_CENTS[serviceCode];
+
+    // If we don't know the service price, don't warn
+    if (typeof serviceCents !== 'number') {
+      warnEl.textContent = '';
+      warnEl.classList.add('hidden');
+      return;
+    }
+
+    const paidRaw = String(amountInput.value || '').trim();
+    const paidCents = paidRaw === '' ? null : Math.round(Number(paidRaw) * 100);
+
+    if (!Number.isFinite(paidCents)) {
+      warnEl.textContent = '';
+      warnEl.classList.add('hidden');
+      return;
+    }
+
+    if (paidCents === serviceCents) {
+      warnEl.textContent = '';
+      warnEl.classList.add('hidden');
+      return;
+    }
+
+    const paidDollars = (paidCents / 100).toFixed(2);
+    const serviceDollars = (serviceCents / 100).toFixed(2);
+
+    if (paidCents < serviceCents) {
+      warnEl.textContent = `Warning: Client has paid $${paidDollars} but the selected service price is $${serviceDollars}.`;
+    } else {
+      warnEl.textContent = `Note: Client has paid $${paidDollars} but the selected service price is $${serviceDollars}.`;
+    }
+
+    warnEl.classList.remove('hidden');
   }
 
   // Apply pickup address suggestion
@@ -1797,9 +1893,19 @@
   document.getElementById('bookingService')?.addEventListener('change', () => {
     updateBookingEndTime();
 
-    // New booking only: default amount from service price (do not overwrite manual edits)
-    if (editingBooking) return;
+    // Auto-fill amount from service price (do not overwrite manual edits)
     if (bookingAmountManuallyEdited) return;
+    
+    // If editing and payments not editable, don't auto-fill
+    if (editingBooking && editingBookingData?.is_admin_booking !== true) return;
+    
+    // If paid checkbox is checked, don't auto-fill amount,
+    // but DO update the paid-vs-service-price warning
+    const paidCheckbox = document.getElementById('bookingPaid');
+    if (paidCheckbox?.checked) {
+      updatePaidVsServicePriceWarning();
+      return;
+    }
 
     const serviceCode = document.getElementById('bookingService')?.value || '';
     const cents = SERVICE_PRICE_CENTS[serviceCode];
@@ -1810,6 +1916,8 @@
     if (typeof cents === 'number') {
       amountInput.value = (cents / 100).toFixed(2);
     }
+    
+    updatePaidVsServicePriceWarning();
   });
 
   // Listen for start time change to update end time
@@ -1851,8 +1959,13 @@
   if (bookingAmountInput) {
     bookingAmountInput.addEventListener('input', () => {
       bookingAmountManuallyEdited = true;
+      updatePaidVsServicePriceWarning();
     });
   }
+
+  document.getElementById('bookingPaid')?.addEventListener('change', () => {
+    updatePaidVsServicePriceWarning();
+  });
 
   // Load clients from database
   async function loadClients() {

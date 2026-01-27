@@ -67,7 +67,7 @@
 
   /* Payment label colours in the Bookings list */
   #adminBookingsList .payment-label.payment-owing {
-    color: #ff4d4d !important;  /* RED when payment still required */
+    color: var(--danger) !important;  /* RED when payment still required */
   }
 
   #adminBookingsList .payment-label.payment-paid {
@@ -76,7 +76,7 @@
 
   /* Red $ icon in booking card title */
   #adminBookingsList .payment-icon {
-    color: #ff4d4d !important;
+    color: var(--danger) !important;
     font-weight: 700;
     margin-left: 6px;
     font-size: 1.1rem;
@@ -229,6 +229,16 @@
     pickupDebouncePlannedValues = {};
   };
   
+  // HTML escape helper to prevent XSS
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+  
   // Client filter state
   let selectedClientId = null;
   let selectedClientName = '';
@@ -263,6 +273,40 @@
     }, 300);
   };
 
+  // Render client search results in dropdown (safe DOM creation)
+  function renderClientDropdownResults(clients, dropdown) {
+    if (!dropdown) return;
+    
+    dropdown.replaceChildren();
+    
+    if (!clients || clients.length === 0) {
+      const emptyDiv = document.createElement('div');
+      emptyDiv.className = 'px-3 py-2 text-sm bg-white text-gray-700';
+      emptyDiv.textContent = 'No clients found';
+      dropdown.appendChild(emptyDiv);
+      return;
+    }
+    
+    clients.forEach(client => {
+      const fullName = [client.first_name, client.last_name].filter(Boolean).join(' ');
+      const displayText = `${fullName} (${client.email || 'no email'})`;
+      
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'w-full text-left px-3 py-2 text-sm hover:bg-blue-50 text-gray-900 border-b border-gray-100 last:border-b-0 client-result-btn';
+      btn.dataset.clientId = client.id || '';
+      btn.dataset.firstName = client.first_name || '';
+      btn.dataset.lastName = client.last_name || '';
+      btn.dataset.email = client.email || '';
+      btn.dataset.mobile = client.mobile || '';
+      btn.textContent = displayText;
+      
+      dropdown.appendChild(btn);
+    });
+    
+    dropdown.classList.remove('hidden');
+  }
+
   // Search clients in database
   async function searchClients(searchTerm) {
     const dropdown = document.getElementById('clientFilterDropdown');
@@ -296,22 +340,15 @@
       // Store results for focus event
       clientSearchResults = clients;
 
-      // Render suggestions
-      dropdown.innerHTML = clients.map(client => {
-        const fullName = [client.first_name, client.last_name].filter(Boolean).join(' ');
-        const displayText = `${fullName} (${client.email || 'no email'})`;
-        return `
-          <button type="button" 
-            class="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 text-gray-900 border-b border-gray-100 last:border-b-0"
-            onclick="selectClient('${client.id}', '${fullName.replace(/'/g, "\\'")}')">
-            ${displayText}
-          </button>
-        `;
-      }).join('');
+      // Render suggestions using helper
+      renderClientDropdownResults(clients, dropdown);
       
     } catch (err) {
       console.error('Exception searching clients:', err);
-      dropdown.innerHTML = '<div class="px-3 py-2 text-sm bg-white text-red-600">Error searching clients</div>';
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'px-3 py-2 text-sm bg-white text-red-600';
+      errorDiv.textContent = 'Error searching clients';
+      dropdown.replaceChildren(errorDiv);
     }
   }
 
@@ -383,19 +420,7 @@
 
       // If we already have cached results, just show them
       if (clientSearchResults && clientSearchResults.length > 0) {
-        const displayResults = clientSearchResults.map(client => {
-          const fullName = [client.first_name, client.last_name].filter(Boolean).join(' ');
-          const displayText = `${fullName} (${client.email || 'no email'})`;
-          return `
-            <button type="button" 
-              class="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 text-gray-900 border-b border-gray-100 last:border-b-0"
-              onclick="selectClient('${client.id}', '${fullName.replace(/'/g, "\\'")}')">
-              ${displayText}
-            </button>
-          `;
-        }).join('');
-        dropdown.innerHTML = displayResults;
-        dropdown.classList.remove('hidden');
+        renderClientDropdownResults(clientSearchResults, dropdown);
         return;
       }
 
@@ -410,6 +435,20 @@
       }, 150);
     });
 
+    // Event delegation for client selection (no inline onclick)
+    dropdown.addEventListener('click', (e) => {
+      const btn = e.target.closest('button.client-result-btn');
+      if (!btn) return;
+      
+      const clientId = btn.dataset.clientId || '';
+      const fullName = [btn.dataset.firstName, btn.dataset.lastName].filter(Boolean).join(' ');
+      
+      // Call existing selectClient function
+      if (window.selectClient) {
+        window.selectClient(clientId, fullName);
+      }
+    });
+
     // Prevent dropdown mousedown from causing input blur
     dropdown.addEventListener('mousedown', (e) => {
       // Stops input losing focus before click registers
@@ -422,6 +461,23 @@
     document.addEventListener('DOMContentLoaded', initClientFilterListeners);
   } else {
     initClientFilterListeners();
+  }
+
+  // Event delegation for apply suggestion buttons (no inline onclick)
+  const bookingsContainer = document.getElementById('adminBookingsList');
+  if (bookingsContainer) {
+    bookingsContainer.addEventListener('click', (e) => {
+      const btn = e.target.closest('button.apply-suggestion-btn');
+      if (!btn) return;
+      
+      const bookingId = btn.dataset.bookingId;
+      const suggestion = decodeURIComponent(btn.dataset.suggestion || '');
+      
+      // Call existing function
+      if (window.applyAdminSuggestion) {
+        window.applyAdminSuggestion(bookingId, suggestion);
+      }
+    });
   }
 
   // Flush pending mobile changes before pickup address update to prevent race condition
@@ -1129,10 +1185,11 @@
                   ${shouldShowSuggestion ? `
                     <button type="button"
                       id="suggestion-btn-${booking.id}"
-                      onclick="applyAdminSuggestion('${booking.id}', '${booking.pickup_location_suggestion.replace(/'/g, "\\'")}')"
-                      class="mt-2 w-full rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-left text-sm text-blue-900 hover:bg-100 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400">
+                      class="apply-suggestion-btn mt-2 w-full rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-left text-sm text-blue-900 hover:bg-100 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      data-booking-id="${booking.id}"
+                      data-suggestion="${encodeURIComponent(booking.pickup_location_suggestion || '')}">
                       <div class="font-semibold mb-0.5 text-xs text-blue-800">Suggested address (tap to use)</div>
-                      <div class="truncate text-blue-700">${booking.pickup_location_suggestion}</div>
+                      <div class="truncate text-blue-700">${escapeHtml(booking.pickup_location_suggestion || '')}</div>
                     </button>
                   ` : ''}
                 </div>

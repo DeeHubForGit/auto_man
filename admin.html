@@ -389,13 +389,14 @@
       if (!window.supabaseClient) return;
       
       try {
-        // Count unrefunded cancellations that are refund eligible
+        // Count unrefunded cancellations that are refund eligible AND paid
         const { data: cancellations, error: cancelError } = await window.supabaseClient
           .from('booking')
-          .select('id, refunded, refund_eligible')
+          .select('id, refunded, refund_eligible, is_paid')
           .eq('status', 'cancelled')
           .eq('is_booking', true)
-          .eq('refund_eligible', true);
+          .eq('refund_eligible', true)
+          .eq('is_paid', true);
         
         const refundCount = cancellations?.filter(b => !b.refunded).length || 0;
         

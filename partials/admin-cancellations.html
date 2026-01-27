@@ -115,6 +115,12 @@
     color: #166534 !important;
     font-weight: 600;
   }
+  
+  /* Refund reason highlights */
+  #section-cancellations .refund-reason-danger {
+    color: var(--danger) !important;
+    font-weight: 600;
+  }
 </style>
 
 <section id="section-cancellations" class="section-content bg-white border rounded-2xl shadow-sm p-5 hidden">
@@ -315,7 +321,7 @@
       
       // Refund eligibility filter (using database field)
       if (refundEligibility !== 'all') {
-        const isEligible = row.refund_eligible === true;
+        const isEligible = (row.refund_eligible === true) && (row.is_paid === true);
         
         if (refundEligibility === 'eligible' && !isEligible) return false;
         if (refundEligibility === 'not-eligible' && isEligible) return false;
@@ -346,7 +352,11 @@
     
     // Update total count and refunds required (count from ALL cancellations, not just filtered)
     if (cancellationsCount) {
-      const refundsRequired = allCancellations.filter(c => c.refund_eligible === true && !c.refunded).length;
+      const refundsRequired = allCancellations.filter(c =>
+        (c.refund_eligible === true) &&
+        (c.is_paid === true) &&
+        (!c.refunded)
+      ).length;
       if (refundsRequired > 0) {
         cancellationsCount.textContent = `(${filtered.length} total, ${refundsRequired} refund${refundsRequired === 1 ? '' : 's'} required)`;
       } else {
@@ -455,7 +465,14 @@
       
       // Display refund eligibility badge (from database field)
       let refundBadge = '';
-      if (row.refund_eligible === true) {
+      if (row.is_paid !== true) {
+        // Not paid - not eligible for refund
+        refundBadge = `<div class="refund-eligibility refund-eligibility--not-eligible"
+          title="Not eligible for refund because this booking was not marked as paid.">
+          <span class="refund-icon">$</span>
+          <span class="refund-status-text">Not eligible</span>
+        </div>`;
+      } else if (row.refund_eligible === true) {
         // Sufficient notice - refund eligible
         refundBadge = `<div class="refund-eligibility refund-eligibility--eligible" 
           title="Cancelled more than 24 hours before lesson start. Eligible for refund.">
@@ -483,8 +500,32 @@
       }) : '';
       const refundedDisplay = row.refunded ? `<span style="color: #065f46; font-weight: 500;">${refundedDate}</span>` : '<span style="color: #6b7280;">Not refunded</span>';
       
+      // Per-row flags for refund eligibility reasons
+      const notPaid = (row.is_paid !== true);
+      const tooLate = (row.refund_eligible === false);
+      const isEligible = (row.refund_eligible === true) && (row.is_paid === true);
+      
       // Determine cancelled date class based on eligibility
-      const cancelledClass = row.refund_eligible ? 'cancelled--eligible' : 'cancelled--not-eligible';
+      const cancelledClass =
+        (row.refund_eligible === true && row.is_paid === true)
+          ? 'cancelled--eligible'
+          : 'cancelled--not-eligible';
+      
+      // Calculate payment display
+      const paidAmount = (typeof row.price_cents === 'number')
+        ? (row.price_cents / 100).toFixed(2)
+        : '';
+      
+      const paidDisplay = row.is_paid === true
+        ? (paidAmount ? `$${paidAmount}` : 'Yes')
+        : 'No';
+      
+      // Conditional danger styling for reasons
+      const paidValueClass = notPaid ? 'refund-reason-danger' : '';
+      const cancelledValueClass = tooLate ? 'refund-reason-danger' : '';
+      
+      // Determine if refund checkbox should be shown
+      const showRefundCheckbox = (row.is_paid === true) && (row.refund_eligible === true);
       
       card.innerHTML = `
         <div class="cancelled-card-header">
@@ -492,17 +533,28 @@
           ${refundBadge}
         </div>
         <div class="text-sm mb-1"><strong>Service:</strong> ${serviceName}</div>
+        <div class="text-sm mb-1">
+          <strong>Paid:</strong>
+          <span class="${paidValueClass}">${paidDisplay}</span>
+        </div>
         <div class="text-sm mb-1"><strong>Original booking:</strong> ${bookingDate}</div>
-        <div class="text-sm mb-2 ${cancelledClass}"><strong>Cancelled:</strong> ${cancelledDate}</div>
+        <div class="text-sm mb-2">
+          <strong>Cancelled:</strong>
+          <span class="${cancelledValueClass}">${cancelledDate}</span>
+        </div>
         <div class="text-sm" style="border-top: 1px solid #e5e7eb; padding-top: 8px; margin-top: 4px;">
-          <label style="display: flex; align-items: center; cursor: pointer; user-select: none;">
-            <input type="checkbox" ${refundedChecked} 
-                   class="refund-checkbox" 
-                   data-booking-id="${row.id}"
-                   style="width: 16px; height: 16px; margin-right: 8px; cursor: pointer;">
-            <span style="font-weight: 500;">Refunded:</span>
-            <span style="margin-left: 6px;">${refundedDisplay}</span>
-          </label>
+          ${showRefundCheckbox ? `
+            <label style="display: flex; align-items: center; cursor: pointer; user-select: none;">
+              <input type="checkbox" ${refundedChecked} 
+                     class="refund-checkbox" 
+                     data-booking-id="${row.id}"
+                     style="width: 16px; height: 16px; margin-right: 8px; cursor: pointer;">
+              <span style="font-weight: 500;">Refunded:</span>
+              <span style="margin-left: 6px;">${refundedDisplay}</span>
+            </label>
+          ` : `
+            <div style="color: #6b7280;"><strong>Refund:</strong> Not applicable</div>
+          `}
         </div>
       `;
       

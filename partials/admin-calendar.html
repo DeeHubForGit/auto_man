@@ -61,7 +61,7 @@
       padding: 0;                       /* tightest fit */
       border-radius: 50%;               /* perfect circle */
       background: transparent;
-      color: #dc2626;                   /* normal soft red */
+      color: var(--danger);             /* normal soft red */
       cursor: pointer;
       display: inline-flex;
       align-items: center;
@@ -74,7 +74,7 @@
 
   #section-calendar .booking-cancel-btn:hover {
       background: rgba(220, 38, 38, 0.10); /* tighter, softer halo */
-      color: #b91c1c;                      /* subtle darkening */
+      color: var(--danger-hover);          /* subtle darkening */
   }
 
   #section-calendar .booking-cancel-btn svg {
@@ -123,7 +123,7 @@
   
   /* Red $ marker for payment required bookings */
   #section-calendar .payment-marker {
-    color: #ff4d4d;
+    color: var(--danger);
     font-weight: 700;
     margin-left: 4px;
     font-size: 0.9em;
@@ -153,7 +153,7 @@
   
   /* Red warning when payment not yet received */
   #section-calendar .payment-toggle.unpaid .payment-label {
-    color: #ff4d4d;
+    color: var(--danger);
   }
   
   /* Ensure header row and time column are visible on dark background */
@@ -330,7 +330,7 @@
 
   /* Error messages must stay red */
   #section-calendar .admin-modal-body p.text-red-500 {
-    color: #ef4444 !important;
+    color: var(--danger) !important;
   }
 
   /* Warning messages must stay orange */
@@ -1119,7 +1119,7 @@
     d.setHours(h, m, 0, 0);
     return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   }
-  
+
   // Update business hours warnings for start/end times
   function updateBusinessHoursWarnings() {
     const startWarn = document.getElementById('appt-start-warning');
@@ -1560,15 +1560,24 @@
     if (newMobile) newMobile.value = booking.mobile || '';
 
     // Choose a default client mode based on what we can prefill
-    if (matchedExistingClient) {
+    if (canEditClient) {
+      // Only auto-switch modes when editing is allowed
+      if (matchedExistingClient) {
+        if (existingRadio) {
+          existingRadio.checked = true;
+          existingRadio.dispatchEvent(new Event('change'));
+        }
+      } else {
+        if (newRadio) {
+          newRadio.checked = true;
+          newRadio.dispatchEvent(new Event('change'));
+        }
+      }
+    } else {
+      // Force Existing client mode when editing is disabled
       if (existingRadio) {
         existingRadio.checked = true;
         existingRadio.dispatchEvent(new Event('change'));
-      }
-    } else {
-      if (newRadio) {
-        newRadio.checked = true;
-        newRadio.dispatchEvent(new Event('change'));
       }
     }
     
@@ -2470,23 +2479,35 @@
     const serviceCode = serviceSelect.value;
     const serviceLabel = serviceSelect.options[serviceSelect.selectedIndex]?.text || "";
 
+    const canEditClient = editingBookingData && editingBookingData.is_admin_booking === true;
     const clientMode = document.querySelector('input[name="clientMode"]:checked')?.value || "existing";
     
     const existingClientSelect = document.getElementById("existingClientSelect");
     const clientId = clientMode === "existing" ? existingClientSelect.value : null;
     
-    const firstName = clientMode === "new" 
-      ? document.getElementById("newClientFirstName").value.trim()
-      : existingClientSelect.selectedOptions[0]?.dataset.firstName || "";
-    const lastName = clientMode === "new"
-      ? document.getElementById("newClientLastName").value.trim()
-      : existingClientSelect.selectedOptions[0]?.dataset.lastName || "";
-    const email = clientMode === "existing"
-      ? existingClientSelect.selectedOptions[0]?.dataset.email || ""
-      : document.getElementById("newClientEmail").value.trim();
-    const mobile = clientMode === "existing"
-      ? existingClientSelect.selectedOptions[0]?.dataset.mobile || ""
-      : document.getElementById("newClientMobile").value.trim();
+    let firstName, lastName, email, mobile;
+    
+    if (canEditClient) {
+      // Editable: use form inputs based on selected mode
+      firstName = clientMode === "new" 
+        ? document.getElementById("newClientFirstName").value.trim()
+        : existingClientSelect.selectedOptions[0]?.dataset.firstName || "";
+      lastName = clientMode === "new"
+        ? document.getElementById("newClientLastName").value.trim()
+        : existingClientSelect.selectedOptions[0]?.dataset.lastName || "";
+      email = clientMode === "existing"
+        ? existingClientSelect.selectedOptions[0]?.dataset.email || ""
+        : document.getElementById("newClientEmail").value.trim();
+      mobile = clientMode === "existing"
+        ? existingClientSelect.selectedOptions[0]?.dataset.mobile || ""
+        : document.getElementById("newClientMobile").value.trim();
+    } else {
+      // Not editable: use existing booking data
+      firstName = editingBookingData.first_name || "";
+      lastName = editingBookingData.last_name || "";
+      email = editingBookingData.email || "";
+      mobile = editingBookingData.mobile || "";
+    }
     
     let pickupLocation = document.getElementById("bookingPickupLocation").value.trim();
 
@@ -2528,12 +2549,13 @@
       hasError = true;
     }
     
-    if (clientMode === "existing") {
+    if (canEditClient && clientMode === "existing") {
       if (!clientId) {
         showApptError("existingClientSelect", "Please select a client");
         hasError = true;
       }
-    } else {
+    } else if (canEditClient) {
+      // Only validate new client fields when editing is allowed
       if (!firstName) {
         showApptError("newClientFirstName", "First name is required");
         hasError = true;
@@ -2653,7 +2675,7 @@
         date,
         startTime: startTime12,
         endTime: endTime12,
-        clientId: clientId || null,
+        clientId: canEditClient ? (clientId || null) : (editingBookingData?.client_id || null),
         firstName,
         lastName: lastName || null,
         email,
@@ -2730,7 +2752,7 @@
         isPaid: canEditPayments ? isPaid : undefined,
         status,
         priceCents: (canEditPayments && Number.isFinite(amountPaidCents)) ? amountPaidCents : undefined,
-        clientId,
+        clientId: canEditClient ? clientId : (editingBookingData?.client_id || null),
         firstName,
         lastName,
         email,

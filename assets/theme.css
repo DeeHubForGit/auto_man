@@ -8,6 +8,8 @@
   --border: #374151;
   --text-light: #e5e7eb;
   --text-gray: #d1d5db;
+  --danger: #dc2626;
+  --danger-hover: #b91c1c;
 }
 
 /* Global styles */

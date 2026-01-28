@@ -37,6 +37,7 @@
     const {
       title = 'Notification',
       message = '',
+      messageHtml = null,
       type = 'info', // 'success', 'error', 'warning', 'info', 'confirm'
       confirmText = 'OK',
       cancelText = 'Cancel',
@@ -55,7 +56,13 @@
 
     // Set content
     modalTitle.textContent = title;
-    modalMessage.textContent = message;
+
+    if (messageHtml) {
+      modalMessage.innerHTML = messageHtml;
+    } else {
+      modalMessage.textContent = message;
+    }
+
     okBtn.textContent = confirmText;
     cancelBtn.textContent = cancelText;
 
@@ -227,6 +234,7 @@
         type: 'confirm', 
         title, 
         message, 
+        messageHtml: options.messageHtml || null,
         onConfirm, 
         onCancel,
         confirmText: options.confirmText || 'Yes',

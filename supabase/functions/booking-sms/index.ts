@@ -366,53 +366,58 @@ serve(async (req) => {
 
     console.log(`[booking-sms] Provider message ID: ${providerMessageId}, status: ${smsStatus}`);
 
-    // Map non-provider statuses to safe values for sms_log constraint
-    const logStatus =
-      smsStatus === "excluded" ? "pending" :
-      smsStatus === "dry_run" ? "pending" :
-      smsStatus;
+    // 6) Log to sms_log table (skip for excluded/dry_run)
+    let logOk = false;
 
-    // 6) Log to sms_log table (fixed column names: body not message_body)
-    const logRes = await fetchJson(
-      `${SUPABASE_URL}/rest/v1/sms_log`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "authorization": `Bearer ${SERVICE_KEY}`,
-          "apikey": SERVICE_KEY,
-          "prefer": "return=representation",
+    if (wasExcluded || smsStatus === "dry_run") {
+      console.log("[booking-sms] Skipping sms_log insert (excluded/dry_run)");
+      logOk = false;
+    } else {
+      const logRes = await fetchJson(
+        `${SUPABASE_URL}/rest/v1/sms_log`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "authorization": `Bearer ${SERVICE_KEY}`,
+            "apikey": SERVICE_KEY,
+            "prefer": "return=representation",
+          },
+          body: JSON.stringify({
+            booking_id: b.id,
+            to_phone: e164,
+            body: message,
+            status: smsStatus,
+            template: "booking_confirmation",
+            provider: "clicksend",
+            provider_message_id: providerMessageId,
+            error_message: errorMessage,
+            sent_at: new Date().toISOString(),
+          }),
         },
-        body: JSON.stringify({
-          booking_id: b.id,
-          to_phone: e164,
-          body: message,
-          status: logStatus,
-          template: "booking_confirmation",
-          provider: "clicksend",
-          provider_message_id: providerMessageId,
-          error_message: errorMessage,
-          sent_at: new Date().toISOString(),
-        }),
-      },
-    );
-
-    if (!logRes.res.ok) {
-      const logError = logRes.raw;
-      console.error(`[booking-sms] Failed to log to sms_log: ${logRes.res.status}`);
-      console.error(`[booking-sms] Log raw: ${logError}`);
-      
-      return json(
-        { error: "SMS may have sent but logging failed. Not latching sms_confirm_sent_at.", details: logRes.raw },
-        502,
       );
+
+      if (!logRes.res.ok) {
+        if (logRes.res.status === 409) {
+          console.warn("[booking-sms] sms_log already exists for this booking/template (409). Continuing.");
+          logOk = true;
+        } else {
+          console.error(`[booking-sms] Failed to log to sms_log: ${logRes.res.status}`);
+          console.error(`[booking-sms] Log raw: ${logRes.raw}`);
+          return json(
+            { error: "SMS may have sent but logging failed. Not latching sms_confirm_sent_at.", details: logRes.raw },
+            502,
+          );
+        }
+      } else {
+        console.log(`[booking-sms] Logged to sms_log successfully`);
+        logOk = true;
+      }
     }
-    
-    console.log(`[booking-sms] Logged to sms_log successfully`);
 
     // 7) Mark sent (idempotency latch) — only when actually sent/pending AND logging succeeded
     // Hard-block latch for excluded or dry_run statuses
-    if (!wasExcluded && smsStatus !== "dry_run" && (smsStatus === "sent" || smsStatus === "pending")) {
+    if (!wasExcluded && smsStatus !== "dry_run" && logOk && (smsStatus === "sent" || smsStatus === "pending")) {
       const { res: updRes, data: updData } = await fetchJson(
         `${SUPABASE_URL}/rest/v1/booking?id=eq.${encodeURIComponent(b.id)}`,
         {
@@ -449,7 +454,7 @@ serve(async (req) => {
       // Diagnostic fields
       sms_enabled: smsEnabled(),
       exclusion_enabled: isSmsExclusionEnabled(),
-      excluded: isSmsExcluded(e164),
+      excluded: isSmsExcluded(b.mobile || ""),
     });
   } catch (err) {
     console.error("[booking-sms] error:", err);

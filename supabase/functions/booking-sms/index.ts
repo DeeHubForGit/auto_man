@@ -5,7 +5,7 @@
 // Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SMS_SENDER (optional)
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { parseAuMobile } from "../_shared/mobile.ts";
+import { parseAuMobile, normaliseAuMobileForCompare } from "../_shared/mobile.ts";
 
 type Json = Record<string, unknown>;
 
@@ -49,6 +49,28 @@ function getOrdinalSuffix(day: number): string {
 function smsEnabled(): boolean {
   const v = (Deno.env.get("SMS_ENABLED") || "").trim().toLowerCase();
   return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+
+function isSmsExclusionEnabled(): boolean {
+  const v = (Deno.env.get("SMS_EXCLUDE_MOBILES_ENABLED") || "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+
+function isSmsExcluded(mobile: string) {
+  if (!isSmsExclusionEnabled()) return false;
+
+  const rawList = (Deno.env.get('SMS_EXCLUDE_MOBILES') || '').trim();
+  if (!rawList) return false;
+
+  const target = normaliseAuMobileForCompare(mobile);
+  if (!target) return false;
+
+  const list = rawList
+    .split(',')
+    .map(s => normaliseAuMobileForCompare(s))
+    .filter(Boolean);
+
+  return list.includes(target);
 }
 
 serve(async (req) => {
@@ -264,75 +286,91 @@ serve(async (req) => {
     let smsStatus: string = "pending";
     let errorMessage: string | null = null;
     let send: { res: Response; data: any; raw: string } | null = null; // <-- declared for safe return use
+    let wasExcluded = false;
 
     if (smsEnabled()) {
-      send = await fetchJson(SMS_FN_URL, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "authorization": `Bearer ${SERVICE_KEY}`,
-          "apikey": SERVICE_KEY,
-        },
-        body: JSON.stringify({ to: e164, message }),
-      });
-
-      console.log(`[booking-sms] SMS function response: ${send.res.status}, ok=${send.res.ok}`);
-
-      if (!send.res.ok || !(send.data as any)?.ok) {
-        console.error(`[booking-sms] SMS send failed:`, send.data);
-        smsStatus = "failed";
-        errorMessage = JSON.stringify(send.data ?? send.raw);
-        
-        // Log the failure to sms_log (fixed column names: body not message_body)
-        await fetchJson(
-          `${SUPABASE_URL}/rest/v1/sms_log`,
-          {
-            method: "POST",
-            headers: {
-              "content-type": "application/json",
-              "authorization": `Bearer ${SERVICE_KEY}`,
-              "apikey": SERVICE_KEY,
-              "prefer": "return=minimal",
-            },
-            body: JSON.stringify({
-              booking_id: b.id,
-              to_phone: e164,
-              body: message,
-              status: smsStatus,
-              template: "booking_confirmation",
-              provider: "clicksend",
-              provider_message_id: null,
-              error_message: errorMessage,
-              sent_at: new Date().toISOString(),
-            }),
-          },
-        );
-        
-        return json(
-          { error: "SMS send failed", details: send.data ?? send.raw },
-          502,
-        );
-      }
-
-      // Extract provider message ID from ClickSend response
-      const clicksendData = (send.data as any)?.clicksend;
-      if (
-        clicksendData?.data?.messages &&
-        Array.isArray(clicksendData.data.messages) &&
-        clicksendData.data.messages.length > 0
-      ) {
-        providerMessageId = clicksendData.data.messages[0].message_id || null;
-        const msgStatus = clicksendData.data.messages[0].status;
-        smsStatus = msgStatus === "SUCCESS" ? "sent" : "pending";
+      if (isSmsExcluded(b.mobile || "")) {
+        console.log('[sms] skipped (excluded number):', b.mobile);
+        // IMPORTANT:
+        // - do NOT set sms_sent_at
+        // - allow existing email fallback logic to run if applicable
+        wasExcluded = true;
+        smsStatus = "excluded";
       } else {
-        smsStatus = "sent";
-      }
+        send = await fetchJson(SMS_FN_URL, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "authorization": `Bearer ${SERVICE_KEY}`,
+            "apikey": SERVICE_KEY,
+          },
+          body: JSON.stringify({ to: e164, message }),
+        });
+
+        console.log(`[booking-sms] SMS function response: ${send.res.status}, ok=${send.res.ok}`);
+
+        if (!send.res.ok || !(send.data as any)?.ok) {
+          console.error(`[booking-sms] SMS send failed:`, send.data);
+          smsStatus = "failed";
+          errorMessage = JSON.stringify(send.data ?? send.raw);
+          
+          // Log the failure to sms_log (fixed column names: body not message_body)
+          await fetchJson(
+            `${SUPABASE_URL}/rest/v1/sms_log`,
+            {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+                "authorization": `Bearer ${SERVICE_KEY}`,
+                "apikey": SERVICE_KEY,
+                "prefer": "return=minimal",
+              },
+              body: JSON.stringify({
+                booking_id: b.id,
+                to_phone: e164,
+                body: message,
+                status: smsStatus,
+                template: "booking_confirmation",
+                provider: "clicksend",
+                provider_message_id: null,
+                error_message: errorMessage,
+                sent_at: new Date().toISOString(),
+              }),
+            },
+          );
+          
+          return json(
+            { error: "SMS send failed", details: send.data ?? send.raw },
+            502,
+          );
+        }
+
+        // Extract provider message ID from ClickSend response
+        const clicksendData = (send.data as any)?.clicksend;
+        if (
+          clicksendData?.data?.messages &&
+          Array.isArray(clicksendData.data.messages) &&
+          clicksendData.data.messages.length > 0
+        ) {
+          providerMessageId = clicksendData.data.messages[0].message_id || null;
+          const msgStatus = clicksendData.data.messages[0].status;
+          smsStatus = msgStatus === "SUCCESS" ? "sent" : "pending";
+        } else {
+          smsStatus = "sent";
+        }
+      } // End of exclusion else block
     } else {
       smsStatus = "dry_run";
       console.log("[booking-sms] SMS_DISABLED via SMS_ENABLED env. Skipping external send.");
     }
 
     console.log(`[booking-sms] Provider message ID: ${providerMessageId}, status: ${smsStatus}`);
+
+    // Map non-provider statuses to safe values for sms_log constraint
+    const logStatus =
+      smsStatus === "excluded" ? "pending" :
+      smsStatus === "dry_run" ? "pending" :
+      smsStatus;
 
     // 6) Log to sms_log table (fixed column names: body not message_body)
     const logRes = await fetchJson(
@@ -349,7 +387,7 @@ serve(async (req) => {
           booking_id: b.id,
           to_phone: e164,
           body: message,
-          status: smsStatus,
+          status: logStatus,
           template: "booking_confirmation",
           provider: "clicksend",
           provider_message_id: providerMessageId,
@@ -361,14 +399,20 @@ serve(async (req) => {
 
     if (!logRes.res.ok) {
       const logError = logRes.raw;
-      console.warn(`[booking-sms] Failed to log to sms_log: ${logRes.res.status}`);
-      console.warn(`[booking-sms] Log error details: ${logError}`);
-    } else {
-      console.log(`[booking-sms] Logged to sms_log successfully`);
+      console.error(`[booking-sms] Failed to log to sms_log: ${logRes.res.status}`);
+      console.error(`[booking-sms] Log raw: ${logError}`);
+      
+      return json(
+        { error: "SMS may have sent but logging failed. Not latching sms_confirm_sent_at.", details: logRes.raw },
+        502,
+      );
     }
+    
+    console.log(`[booking-sms] Logged to sms_log successfully`);
 
-    // 7) Mark sent (idempotency latch) — only when actually sent/pending
-    if (smsStatus === "sent" || smsStatus === "pending") {
+    // 7) Mark sent (idempotency latch) — only when actually sent/pending AND logging succeeded
+    // Hard-block latch for excluded or dry_run statuses
+    if (!wasExcluded && smsStatus !== "dry_run" && (smsStatus === "sent" || smsStatus === "pending")) {
       const { res: updRes, data: updData } = await fetchJson(
         `${SUPABASE_URL}/rest/v1/booking?id=eq.${encodeURIComponent(b.id)}`,
         {
@@ -402,6 +446,10 @@ serve(async (req) => {
       message_preview: message,
       needs_intake: needsIntake,
       status: smsStatus,
+      // Diagnostic fields
+      sms_enabled: smsEnabled(),
+      exclusion_enabled: isSmsExclusionEnabled(),
+      excluded: isSmsExcluded(e164),
     });
   } catch (err) {
     console.error("[booking-sms] error:", err);

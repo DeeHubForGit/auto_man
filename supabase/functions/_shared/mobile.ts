@@ -30,3 +30,22 @@ export function parseAuMobile(mobile: string | null | undefined): {
 
   return { raw, digits, e164, isValid: true };
 }
+
+// Normalise AU mobile for comparison (always returns 04xxxxxxxx format or null)
+export function normaliseAuMobileForCompare(mobile: string | null | undefined): string | null {
+  if (!mobile) return null;
+  
+  const digits = normaliseDigits(mobile.trim());
+  
+  // Convert 614xxxxxxxx to 04xxxxxxxx
+  if (/^614\d{8}$/.test(digits)) {
+    return `04${digits.slice(3)}`;
+  }
+  
+  // Already in 04xxxxxxxx format
+  if (/^04\d{8}$/.test(digits)) {
+    return digits;
+  }
+  
+  return null;
+}

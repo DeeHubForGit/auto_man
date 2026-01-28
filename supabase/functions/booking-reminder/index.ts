@@ -11,7 +11,7 @@
 //   { booking_id?: string, hours?: number, window_minutes?: number, dry_run?: boolean, limit?: number }
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { parseAuMobile } from "../_shared/mobile.ts";
+import { parseAuMobile, normaliseAuMobileForCompare } from "../_shared/mobile.ts";
 
 type Json = Record<string, unknown>;
 
@@ -80,6 +80,28 @@ function fmtShortDateAU(dt: Date) {
 function smsEnabled(): boolean {
   const v = (Deno.env.get("SMS_ENABLED") || "").trim().toLowerCase();
   return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+
+function isSmsExclusionEnabled(): boolean {
+  const v = (Deno.env.get("SMS_EXCLUDE_MOBILES_ENABLED") || "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+
+function isSmsExcluded(mobile: string): boolean {
+  if (!isSmsExclusionEnabled()) return false;
+
+  const rawList = (Deno.env.get("SMS_EXCLUDE_MOBILES") || "").trim();
+  if (!rawList) return false;
+
+  const target = normaliseAuMobileForCompare(mobile);
+  if (!target) return false;
+
+  const list = rawList
+    .split(",")
+    .map((s) => normaliseAuMobileForCompare(s))
+    .filter(Boolean);
+
+  return list.includes(target);
 }
 
 serve(async (req) => {
@@ -261,6 +283,25 @@ serve(async (req) => {
             to: e164,
             message_preview: msg.slice(0, 160) + "…",
           });
+          continue;
+        }
+
+        // Exclusion list (demo/dev safety)
+        if (isSmsExcluded(b.mobile)) {
+          console.log("[booking-reminder] SMS excluded for", {
+            booking_id: b.id,
+            mobile: b.mobile,
+          });
+
+          results.push({
+            id: b.id,
+            ok: true,
+            status: "excluded",
+            to: e164,
+            message_preview: msg.slice(0, 160) + "…",
+          });
+
+          // IMPORTANT: do NOT log to sms_log and do NOT latch sms_reminder_sent_at
           continue;
         }
 

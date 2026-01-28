@@ -13,7 +13,10 @@ import { parseGcalEvent } from "../_shared/parseEvent.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // ---------- ENV FLAGS ----------
-const SMS_ENABLED = (Deno.env.get("SMS_ENABLED") || "false").toLowerCase() === "true";
+const SMS_ENABLED = (() => {
+  const v = (Deno.env.get("SMS_ENABLED") || "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+})();
 
 // ---------- ACCESS TOKEN LOGIC ----------
 const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
@@ -561,15 +564,14 @@ Deno.serve(async () => {
                     } else if (smsData?.ok === true) {
                       console.log(`[gcal-sync] booking-sms ok for booking ${bookingId}`);
 
-                      const { error: smsFlagErr } = await supabase
-                        .from('booking')
-                        .update({ sms_confirm_sent_at: new Date().toISOString() })
-                        .eq('id', bookingId);
+                      const smsStatus = String(smsData?.status || '').toLowerCase();
 
-                      if (smsFlagErr) {
-                        console.warn('[gcal-sync] Failed to set sms_confirm_sent_at (continuing anyway):', bookingId, smsFlagErr);
-                      } else {
+                      // Only count as sent if booking-sms actually sent (or provider accepted)
+                      if (smsStatus === 'sent' || smsStatus === 'pending') {
                         sentSmsThisSync = true;
+                      } else {
+                        // excluded / dry_run / already_sent / etc should not latch or count as sent
+                        console.log('[gcal-sync] booking-sms did not send (status):', bookingId, smsStatus);
                       }
                     } else {
                       console.warn('[gcal-sync] booking-sms returned non-ok (continuing anyway):', bookingId, smsData);

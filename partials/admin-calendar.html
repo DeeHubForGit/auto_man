@@ -2175,21 +2175,44 @@
     return Number.isFinite(n) && n >= 0 ? n : 0;
   }
 
-  // WARNING ONLY: Check local DB for overlapping bookings, then continue.
-  // - Does not block saving.
-  // - Local booking table only (no Google).
+  // Helper to show "Change / Save" warning modal
+  // Returns true if user chooses Save, false if user chooses Change
+  async function confirmChangeOrSave(message, title) {
+    const msg = String(message || '').trim();
+    const heading = title || 'Warning';
+
+    if (window.Modal && window.Modal.confirm) {
+      const proceed = await new Promise((resolve) => {
+        window.Modal.confirm(
+          msg,
+          () => resolve(true),   // Save
+          () => resolve(false),  // Change
+          heading,
+          { confirmText: 'Save', cancelText: 'Change' }
+        );
+      });
+
+      return proceed;
+    }
+
+    // Fallback: OK = Save, Cancel = Change
+    return confirm(`${heading}\n\n${msg}\n\nOK = Save, Cancel = Change`);
+  }
+
+  // Check local DB for overlapping bookings and travel time issues.
+  // Returns true if OK to proceed, false if user chose "Change"
   async function warnIfBookingClash(startIso, endIso, excludeBookingId) {
     try {
-      if (!window.supabaseClient) return;
+      if (!window.supabaseClient) return true;
 
-      if (!startIso || !endIso) return;
+      if (!startIso || !endIso) return true;
 
       const bufferMins = getAppointmentBufferMinutes();
       const bufferMs = bufferMins * 60 * 1000;
 
       const startMs = new Date(startIso).getTime();
       const endMs = new Date(endIso).getTime();
-      if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return;
+      if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return true;
 
       const windowStartIso = new Date(startMs - bufferMs).toISOString();
       const windowEndIso = new Date(endMs + bufferMs).toISOString();
@@ -2212,10 +2235,10 @@
 
       if (error) {
         console.warn('[clash-warning] Clash check query error (continuing anyway):', error);
-        return;
+        return true;
       }
 
-      if (!data || data.length === 0) return;
+      if (!data || data.length === 0) return true;
 
       const overlaps = [];
       const tooClose = [];
@@ -2248,7 +2271,7 @@
         }
       }
 
-      if (overlaps.length === 0 && tooClose.length === 0) return;
+      if (overlaps.length === 0 && tooClose.length === 0) return true;
 
       const overlapLines = overlaps.map(b => {
         const label = b.is_booking
@@ -2283,16 +2306,13 @@
           tooCloseLines.join('\n');
       }
 
-      msg += `\n\nClick OK to continue.`;
+      msg += `\n\nClick "Save" to proceed anyway, or "Change" to modify the date/time.`;
 
-      if (window.Modal && window.Modal.requireOk) {
-        await window.Modal.requireOk(msg, 'Overlap Warning', { confirmText: 'OK' });
-      } else {
-        alert(msg);
-      }
+      const proceed = await confirmChangeOrSave(msg, 'Overlap Warning');
+      return proceed;
     } catch (e) {
       console.warn('[clash-warning] Clash check failed (continuing anyway):', e);
-      return;
+      return true;
     }
   }
   
@@ -2417,7 +2437,11 @@
             console.warn('[clash-warning] Exclude lookup failed (continuing anyway):', e);
           }
         }
-        await warnIfBookingClash(startIso, endIso, excludeId);
+        const okToSave = await warnIfBookingClash(startIso, endIso, excludeId);
+        if (!okToSave) {
+          setAppointmentSaveLoading(false);
+          return;
+        }
         
         const { data, error } = await window.supabaseClient.functions.invoke('update-admin-appointment', {
           body: { 
@@ -2465,7 +2489,11 @@
         // CREATE mode
         console.log("[appointment] Creating personal appointment via edge function");
 
-        await warnIfBookingClash(startIso, endIso, null);
+        const okToSave = await warnIfBookingClash(startIso, endIso, null);
+        if (!okToSave) {
+          setAppointmentSaveLoading(false);
+          return;
+        }
 
         // Call edge function to create Google Calendar event and insert into DB
         const { data, error } = await window.supabaseClient.functions.invoke('create-admin-appointment', {
@@ -2799,12 +2827,19 @@
 
       console.log("[booking-update] Payload:", payload);
 
-      // Local overlap warning only (does not block saving)
+      // Check for overlaps/travel time issues - allow user to change date/time
       const startIso = new Date(`${date}T${startTime}:00`).toISOString();
       const endIso = endTime
         ? new Date(`${date}T${endTime}:00`).toISOString()
         : new Date(`${date}T${startTime}:00`).toISOString();
-      await warnIfBookingClash(startIso, endIso, editingBookingId);
+      const okToSave = await warnIfBookingClash(startIso, endIso, editingBookingId);
+      if (!okToSave) {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = originalBtnText;
+        }
+        return;
+      }
 
       // Call edge function to update Google Calendar event and DB
       const { data, error } = await window.supabaseClient.functions.invoke('update-admin-booking', {
@@ -3153,12 +3188,19 @@
 
       pickupLocation = document.getElementById('bookingPickupLocation')?.value?.trim() || null;
 
-      // Local overlap warning only (does not block saving)
+      // Check for overlaps/travel time issues - allow user to change date/time
       const startIso = new Date(`${date}T${startTime}:00`).toISOString();
       const endIso = endTime
         ? new Date(`${date}T${endTime}:00`).toISOString()
         : new Date(`${date}T${startTime}:00`).toISOString();
-      await warnIfBookingClash(startIso, endIso, null);
+      const okToSave = await warnIfBookingClash(startIso, endIso, null);
+      if (!okToSave) {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = originalBtnText;
+        }
+        return;
+      }
 
       const payload = {
         appointmentType: "booking",

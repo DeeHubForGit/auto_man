@@ -14,7 +14,7 @@
               </div>
               <div class="flex-1 min-w-0">
                 <h3 id="modalTitle" class="text-lg font-semibold text-gray-900 mb-2"></h3>
-                <p id="modalMessage" class="text-sm text-gray-600 leading-relaxed"></p>
+                <p id="modalMessage" class="text-sm text-gray-600 leading-relaxed whitespace-pre-line"></p>
               </div>
             </div>
             <div class="mt-6 flex gap-3 justify-end">

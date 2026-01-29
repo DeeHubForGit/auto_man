@@ -299,6 +299,7 @@ Deno.serve(async (req) => {
           is_booking: "true", // Mark as booking so gcal-sync colors it correctly
           mobile: safeMobile, // Stable source - immune to Google UI description corruption
           pickup_location: safePickup, // Stable source - immune to Google UI description corruption
+          ...(clientId ? { client_id: String(clientId) } : {}), // Allow gcal-sync to preserve/recover client_id
         },
       },
     };
@@ -371,6 +372,11 @@ Deno.serve(async (req) => {
       google_html_link: googleEvent.htmlLink || null,
       google_ical_uid: googleEvent.iCalUID || null,
     };
+    
+    // Add client_id if provided
+    if (typeof clientId === 'string' && clientId.trim()) {
+      bookingRow.client_id = clientId.trim();
+    }
 
     const { data: upserted, error: upsertErr } = await adminSupa
       .from("booking")

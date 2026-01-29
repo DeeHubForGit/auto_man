@@ -161,8 +161,9 @@ function extractFieldsFromEvent(e: any) {
 
   // Start with extendedProperties.shared (stable source of truth)
   const shared = e.extendedProperties?.shared || {};
-  let mobile = shared.mobile?.trim() || null;
-  let pickup = shared.pickup_location?.trim() || null;
+  let mobile = (typeof shared.mobile === "string" ? shared.mobile.trim() : null) || null;
+  let pickup = (typeof shared.pickup_location === "string" ? shared.pickup_location.trim() : null) || null;
+  let client_id = (typeof shared.client_id === "string" ? shared.client_id.trim() : null) || null;
   
   // Parse description fields (will be overridden by extendedProperties if present)
   const fromDesc = parseDescriptionFields(e.description);
@@ -193,6 +194,7 @@ function extractFieldsFromEvent(e: any) {
     // Note: mobile and pickup from .private only if .shared didn't have them
     else if ((key.includes("mobile") || key.includes("phone")) && !mobile) mobile = val;
     else if (key.includes("pickup") && !pickup) pickup = val;
+    else if (key === "client_id" && !client_id) client_id = val;
   }
 
   // Fallback for name from event title, e.g., "Lesson (John Smith)"
@@ -220,7 +222,7 @@ function extractFieldsFromEvent(e: any) {
   // Only treat it as null if it is completely blank/whitespace.
   if (mobile && mobile.trim().length === 0) mobile = null;
   
-  return { first_name, last_name, email, mobile, pickup_location: pickup };
+  return { first_name, last_name, email, mobile, pickup_location: pickup, client_id };
 }
 
 function isNonEmpty(value: any): boolean {
@@ -432,7 +434,8 @@ Deno.serve(async () => {
         p_pickup: fields.pickup_location ?? parsed.pickup_location ?? null,
         p_extended: e,  // Store full event object for debugging/audit
         p_is_booking: isBooking,  // Simple booking detection
-        p_title: e.summary ?? null
+        p_title: e.summary ?? null,
+        p_client_id: fields.client_id ?? null  // Pass client_id if available from extendedProperties
       };
       
       const up = await fetch(`${supa}/rest/v1/rpc/upsert_booking_from_google`, {

@@ -177,7 +177,7 @@ Deno.serve(async (req) => {
       mobile,
       pickupLocation
     } = payload;
-    
+
     const isPaidBool = !!(payload?.isPaid ?? payload?.is_paid);
 
     // Validate required fields
@@ -274,6 +274,40 @@ ${pickupLocation || 'N/A'}
     delete (existingShared as Record<string, unknown>)['is_payment_required'];
     delete (existingPrivate as Record<string, unknown>)['isPaymentRequired'];
 
+    // Handle client creation if new client (before building eventPayload)
+    let finalClientId = clientId;
+    if (!clientId && email) {
+      // Check if client exists by email
+      const { data: existingClient } = await supabase
+        .from('client')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (existingClient) {
+        finalClientId = existingClient.id;
+      } else {
+        // Create new client
+        const { data: newClient, error: clientError } = await supabase
+          .from('client')
+          .insert({
+            first_name: firstName,
+            last_name: lastName,
+            email: email,
+            mobile: mobile,
+          })
+          .select('id')
+          .single();
+
+        if (clientError) {
+          console.error("[update-admin-booking] Failed to create client:", clientError);
+        } else if (newClient) {
+          finalClientId = newClient.id;
+          console.log("[update-admin-booking] Created new client:", newClient.id);
+        }
+      }
+    }
+
     // Update the Google Calendar event
     const eventPayload = {
       summary: summary,
@@ -289,6 +323,7 @@ ${pickupLocation || 'N/A'}
           pickup_location: pickupLocation || '',
           mobile: mobile || '',
           service_code: serviceCode || '',
+          ...(finalClientId ? { client_id: String(finalClientId) } : {}),
         },
         private: {
           ...existingPrivate,
@@ -345,40 +380,6 @@ ${pickupLocation || 'N/A'}
     const endIso = updatedEvent?.end?.dateTime
       ? new Date(updatedEvent.end.dateTime).toISOString()
       : new Date(endDateTime).toISOString();
-
-    // Handle client creation if new client
-    let finalClientId = clientId;
-    if (!clientId && email) {
-      // Check if client exists by email
-      const { data: existingClient } = await supabase
-        .from('client')
-        .select('id')
-        .eq('email', email)
-        .maybeSingle();
-
-      if (existingClient) {
-        finalClientId = existingClient.id;
-      } else {
-        // Create new client
-        const { data: newClient, error: clientError } = await supabase
-          .from('client')
-          .insert({
-            first_name: firstName,
-            last_name: lastName,
-            email: email,
-            mobile: mobile,
-          })
-          .select('id')
-          .single();
-
-        if (clientError) {
-          console.error("[update-admin-booking] Failed to create client:", clientError);
-        } else if (newClient) {
-          finalClientId = newClient.id;
-          console.log("[update-admin-booking] Created new client:", newClient.id);
-        }
-      }
-    }
 
     const updateData: any = {
       service_code: serviceCode,

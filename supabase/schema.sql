@@ -523,28 +523,28 @@ END;
 $$;
 
 -- Function: Upsert booking FROM Google Calendar
-CREATE FUNCTION public.upsert_booking_from_google(p_google_event_id text, p_calendar_id text, p_client_email text, p_first_name text, p_last_name text, p_mobile text, p_service_code text, p_price_cents integer, p_start timestamp without time zone, p_end timestamp without time zone, p_pickup text, p_extended jsonb, p_is_booking boolean, p_title text) RETURNS TABLE(booking_id uuid, was_inserted boolean, sms_sent_at timestamp with time zone)
+CREATE FUNCTION public.upsert_booking_from_google(p_google_event_id text, p_calendar_id text, p_client_email text, p_first_name text, p_last_name text, p_mobile text, p_service_code text, p_price_cents integer, p_start timestamptz, p_end timestamptz, p_pickup text, p_extended jsonb, p_is_booking boolean, p_title text, p_client_id uuid DEFAULT NULL) RETURNS TABLE(booking_id uuid, was_inserted boolean, sms_sent_at timestamp with time zone, email_confirm_sent_at timestamp with time zone)
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO ''
     AS $$
 DECLARE
-  v_client_id    uuid;
+  v_client_id    uuid := p_client_id;
   v_booking_id   uuid;
   v_was_inserted boolean;
   v_sms_sent_at  timestamptz;
-  v_xmax         xid;
+  v_email_sent_at timestamptz;
 BEGIN
-  -- Upsert client (only IF email is provided)
-  IF p_client_email is NOT null THEN
+  -- Upsert client (only IF client_id not provided AND email is available)
+  IF v_client_id IS NULL AND NULLIF(trim(p_client_email), '') IS NOT NULL THEN
     INSERT INTO public.client (email, first_name, last_name, mobile)
     VALUES (p_client_email, p_first_name, p_last_name, p_mobile)
     ON CONFLICT (email) DO UPDATE
       SET first_name = COALESCE(public.client.first_name, EXCLUDED.first_name),
-          last_name  = COALESCE(public.client.last_name,  EXCLUDED.last_name),
-          mobile     = COALESCE(EXCLUDED.mobile,          public.client.mobile),
+          last_name  = COALESCE(public.client.last_name, EXCLUDED.last_name),
+          mobile     = COALESCE(public.client.mobile, EXCLUDED.mobile),
           updated_at = now()
     RETURNING id INTO v_client_id;
-  end IF;
+  END IF;
 
   -- Upsert booking
   INSERT INTO public.booking (
@@ -584,14 +584,14 @@ BEGIN
     p_mobile
   )
   ON CONFLICT (google_event_id) DO UPDATE
-    SET client_id          = COALESCE(EXCLUDED.client_id, public.booking.client_id),
+    SET client_id          = COALESCE(public.booking.client_id, EXCLUDED.client_id),
         google_calendar_id = EXCLUDED.google_calendar_id,
         is_booking         = COALESCE(EXCLUDED.is_booking, public.booking.is_booking),
         service_code       = EXCLUDED.service_code,
         price_cents        = EXCLUDED.price_cents,
         start_time         = EXCLUDED.start_time,
         end_time           = EXCLUDED.end_time,
-        pickup_location    = COALESCE(EXCLUDED.pickup_location, public.booking.pickup_location),
+        pickup_location    = COALESCE(public.booking.pickup_location, EXCLUDED.pickup_location),
         extended           = COALESCE(EXCLUDED.extended, '{}'::jsonb),
         event_title        = COALESCE(EXCLUDED.event_title, public.booking.event_title),
         first_name         = COALESCE(EXCLUDED.first_name, public.booking.first_name),
@@ -601,12 +601,13 @@ BEGIN
         updated_at         = now()
   RETURNING public.booking.id,
             public.booking.sms_confirm_sent_at,
+            public.booking.email_confirm_sent_at,
             (xmax = 0)
-    INTO v_booking_id, v_sms_sent_at, v_was_inserted;
+    INTO v_booking_id, v_sms_sent_at, v_email_sent_at, v_was_inserted;
 
   -- RETURN the result with all required fields
   RETURN query
-    SELECT v_booking_id, v_was_inserted, v_sms_sent_at;
+    SELECT v_booking_id, v_was_inserted, v_sms_sent_at, v_email_sent_at;
 END;
 $$;
 

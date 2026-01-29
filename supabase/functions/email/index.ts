@@ -1,7 +1,6 @@
 // supabase/functions/email/index.ts
-// Send an email via Resend using npm package
+// Send an email via Resend REST API
 // Env: RESEND_API_KEY
-import { Resend } from 'https://esm.sh/resend@4.4.0?target=deno';
 
 const allowedOrigins = [
   'https://www.automandrivingschool.com.au',
@@ -42,13 +41,61 @@ Deno.serve(async (req) => {
   try {
     const { to, subject, html } = await req.json();
 
-    const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
-    const data = await resend.emails.send({
+    if (!to || !subject || !html) {
+      return new Response(JSON.stringify({ ok: false, error: 'Missing to, subject or html' }), {
+        status: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders(req),
+        },
+      });
+    }
+
+    const apiKey = Deno.env.get('RESEND_API_KEY') || '';
+    if (!apiKey) {
+      return new Response(JSON.stringify({ ok: false, error: 'Missing RESEND_API_KEY' }), {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders(req),
+        },
+      });
+    }
+
+    const payload = {
       from: 'Auto-Man Driving School <noreply@automandrivingschool.com.au>',
       to,
       subject,
       html,
+    };
+
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
     });
+
+    const text = await r.text();
+    let data: any = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch (_) {
+      data = { raw: text };
+    }
+
+    if (!r.ok) {
+      console.error('Resend API error', r.status, data);
+      return new Response(JSON.stringify({ ok: false, status: r.status, data }), {
+        status: r.status,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders(req),
+        },
+      });
+    }
 
     return new Response(JSON.stringify({ ok: true, data }), {
       headers: {

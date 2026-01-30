@@ -54,10 +54,13 @@ CREATE TABLE public.client (
     learning_needs_other text,
     notes text,
     is_admin boolean DEFAULT false NOT NULL,
-    intake_completed boolean DEFAULT false
+    intake_completed boolean DEFAULT false,
+    intake_step integer DEFAULT 1 NOT NULL,
+    CONSTRAINT intake_step_range CHECK ((intake_step >= 1) AND (intake_step <= 3))
 );
 
 COMMENT ON COLUMN public.client.intake_completed IS 'Tracks whether client has completed the intake form (permit/licence AND medical conditions)';
+COMMENT ON COLUMN public.client.intake_step IS 'Current step in intake form (1-3). Allows resuming intake across devices.';
 
 -- Service table: defines available driving lesson services
 CREATE TABLE public.service (
@@ -125,6 +128,14 @@ CREATE TABLE public.booking (
     refunded_at timestamp with time zone,
     cancelled_by text,
     refund_eligible boolean,
+    is_mobile_valid boolean,
+    is_pickup_location_valid boolean,
+    validation_checked_at timestamp with time zone,
+    pickup_location_issue text,
+    pickup_location_suggestion text,
+    is_admin_checked boolean DEFAULT false NOT NULL,
+    is_payment_required boolean DEFAULT false NOT NULL,
+    is_paid boolean DEFAULT false,
     CONSTRAINT booking_price_nonneg CHECK (((price_cents IS NULL) OR (price_cents >= 0))),
     CONSTRAINT booking_time_valid CHECK ((end_time > start_time))
 );
@@ -133,6 +144,13 @@ COMMENT ON COLUMN public.booking.refunded IS 'Whether a refund has been processe
 COMMENT ON COLUMN public.booking.refunded_at IS 'Timestamp when the refund was marked as processed';
 COMMENT ON COLUMN public.booking.cancelled_by IS 'Email of person who cancelled (client email, admin email, OR NULL for unknown/Google sync)';
 COMMENT ON COLUMN public.booking.refund_eligible IS 'Automatically calculated: TRUE IF cancelled 24+ hours before start_time, FALSE IF <24h, NULL IF NOT cancelled';
+COMMENT ON COLUMN public.booking.is_mobile_valid IS 'NULL=not checked, TRUE=valid Australian mobile, FALSE=invalid format';
+COMMENT ON COLUMN public.booking.is_pickup_location_valid IS 'NULL=not checked, TRUE=valid address, FALSE=invalid/missing';
+COMMENT ON COLUMN public.booking.validation_checked_at IS 'Timestamp when validation was last performed';
+COMMENT ON COLUMN public.booking.pickup_location_issue IS 'Short code describing the validation issue (e.g. not_found, street_number, suburb_mismatch).';
+COMMENT ON COLUMN public.booking.pickup_location_suggestion IS 'Best-guess validated address string from Google Maps API, if available.';
+COMMENT ON COLUMN public.booking.is_admin_checked IS 'TRUE when admin has reviewed this booking manually. Automatically reset to FALSE after auto-validation.';
+COMMENT ON COLUMN public.booking.is_payment_required IS 'Whether the booking still requires payment. Default false. True only for admin-created bookings where payment is handled outside the system.';
 
 -- Client credit table: tracks lesson package credits
 CREATE TABLE public.client_credit (
@@ -157,6 +175,8 @@ CREATE TABLE public.client_progress (
     notes text,
     updated_at timestamp with time zone DEFAULT now()
 );
+
+COMMENT ON COLUMN public.client_progress.notes IS 'Instructor notes for client progress';
 
 -- Contact messages table: stores contact form submissions
 CREATE TABLE public.contact_messages (
@@ -523,18 +543,40 @@ END;
 $$;
 
 -- Function: Upsert booking FROM Google Calendar
-CREATE FUNCTION public.upsert_booking_from_google(p_google_event_id text, p_calendar_id text, p_client_email text, p_first_name text, p_last_name text, p_mobile text, p_service_code text, p_price_cents integer, p_start timestamptz, p_end timestamptz, p_pickup text, p_extended jsonb, p_is_booking boolean, p_title text, p_client_id uuid DEFAULT NULL) RETURNS TABLE(booking_id uuid, was_inserted boolean, sms_sent_at timestamp with time zone, email_confirm_sent_at timestamp with time zone)
-    LANGUAGE plpgsql SECURITY DEFINER
-    SET search_path TO ''
-    AS $$
+CREATE FUNCTION public.upsert_booking_from_google(
+    p_google_event_id text,
+    p_calendar_id text,
+    p_client_email text,
+    p_first_name text,
+    p_last_name text,
+    p_mobile text,
+    p_service_code text,
+    p_price_cents integer,
+    p_start timestamptz,
+    p_end timestamptz,
+    p_pickup text,
+    p_extended jsonb,
+    p_is_booking boolean,
+    p_title text,
+    p_client_id uuid DEFAULT NULL  -- NEW: optional client_id
+)
+RETURNS TABLE(
+  booking_id uuid,
+  was_inserted boolean,
+  sms_sent_at timestamp with time zone,
+  email_confirm_sent_at timestamp with time zone
+)
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO ''
+AS $$
 DECLARE
-  v_client_id    uuid := p_client_id;
+  v_client_id    uuid := p_client_id;  -- Start with passed-in client_id (may be null)
   v_booking_id   uuid;
   v_was_inserted boolean;
   v_sms_sent_at  timestamptz;
   v_email_sent_at timestamptz;
 BEGIN
-  -- Upsert client (only IF client_id not provided AND email is available)
+  -- Upsert client ONLY if client_id not provided AND email is available
   IF v_client_id IS NULL AND NULLIF(trim(p_client_email), '') IS NOT NULL THEN
     INSERT INTO public.client (email, first_name, last_name, mobile)
     VALUES (p_client_email, p_first_name, p_last_name, p_mobile)
@@ -584,26 +626,34 @@ BEGIN
     p_mobile
   )
   ON CONFLICT (google_event_id) DO UPDATE
-    SET client_id          = COALESCE(public.booking.client_id, EXCLUDED.client_id),
-        google_calendar_id = EXCLUDED.google_calendar_id,
-        is_booking         = COALESCE(EXCLUDED.is_booking, public.booking.is_booking),
-        service_code       = EXCLUDED.service_code,
-        price_cents        = EXCLUDED.price_cents,
-        start_time         = EXCLUDED.start_time,
-        end_time           = EXCLUDED.end_time,
-        pickup_location    = COALESCE(public.booking.pickup_location, EXCLUDED.pickup_location),
-        extended           = COALESCE(EXCLUDED.extended, '{}'::jsonb),
-        event_title        = COALESCE(EXCLUDED.event_title, public.booking.event_title),
-        first_name         = COALESCE(EXCLUDED.first_name, public.booking.first_name),
-        last_name          = COALESCE(EXCLUDED.last_name, public.booking.last_name),
-        email              = COALESCE(EXCLUDED.email, public.booking.email),
-        mobile             = COALESCE(EXCLUDED.mobile, public.booking.mobile),
-        updated_at         = now()
-  RETURNING public.booking.id,
-            public.booking.sms_confirm_sent_at,
-            public.booking.email_confirm_sent_at,
-            (xmax = 0)
-    INTO v_booking_id, v_sms_sent_at, v_email_sent_at, v_was_inserted;
+  SET
+    -- CRITICAL: Preserve existing client_id if present, only fill if missing
+    client_id          = COALESCE(public.booking.client_id, EXCLUDED.client_id),
+    
+    google_calendar_id = EXCLUDED.google_calendar_id,
+    start_time         = EXCLUDED.start_time,
+    end_time           = EXCLUDED.end_time,
+
+    -- Only fill pickup if we don't already have one
+    pickup_location    = COALESCE(public.booking.pickup_location, EXCLUDED.pickup_location),
+
+    -- Keep latest Google payload for audit/debug
+    extended           = COALESCE(EXCLUDED.extended, '{}'::jsonb),
+
+    -- Title can change in Google
+    event_title        = COALESCE(EXCLUDED.event_title, public.booking.event_title),
+
+    updated_at         = now()
+  RETURNING
+  public.booking.id,
+  public.booking.sms_confirm_sent_at,
+  public.booking.email_confirm_sent_at,
+  (xmax = 0)
+  INTO
+  v_booking_id,
+  v_sms_sent_at,
+  v_email_sent_at,
+  v_was_inserted;
 
   -- RETURN the result with all required fields
   RETURN query
@@ -767,6 +817,7 @@ CREATE INDEX idx_booking_upcoming ON public.booking USING btree (start_time) WHE
 CREATE INDEX idx_booking_email_confirm ON public.booking USING btree (email_confirm_sent_at) WHERE (email_confirm_sent_at IS NOT NULL);
 CREATE INDEX idx_booking_refunded ON public.booking USING btree (refunded) WHERE (refunded = true);
 CREATE INDEX idx_booking_refund_eligible ON public.booking USING btree (refund_eligible) WHERE (status = 'cancelled'::public.booking_status);
+CREATE INDEX idx_booking_validation_pending ON public.booking USING btree (validation_checked_at) WHERE ((validation_checked_at IS NULL) OR (is_mobile_valid IS NULL) OR (is_pickup_location_valid IS NULL));
 CREATE INDEX booking_reminder_scan_idx ON public.booking USING btree (start_time) WHERE ((is_booking IS TRUE) AND ((status IS NULL) OR (status = 'confirmed'::public.booking_status)) AND (sms_reminder_sent_at IS NULL));
 
 -- Unique constraint indexes
@@ -872,9 +923,15 @@ CREATE POLICY "Service role full access package" ON public.package TO service_ro
 CREATE POLICY booking_select ON public.booking FOR SELECT TO authenticated 
     USING ((public.is_admin() OR (client_id IN ( SELECT client.id FROM public.client WHERE (client.email = COALESCE(( SELECT (auth.jwt() ->> 'email'::text)), ''::text))))));
 
-CREATE POLICY booking_mutate ON public.booking TO authenticated, anon 
+CREATE POLICY booking_admin_mutate ON public.booking FOR ALL TO authenticated, anon 
     USING (((( SELECT auth.role() AS role) = 'service_role'::text) OR public.is_admin())) 
     WITH CHECK (((( SELECT auth.role() AS role) = 'service_role'::text) OR public.is_admin()));
+
+CREATE POLICY booking_client_update_contact ON public.booking FOR UPDATE TO authenticated 
+    USING ((client_id IN ( SELECT client.id FROM public.client WHERE (client.email = COALESCE((auth.jwt() ->> 'email'::text), ''::text))))) 
+    WITH CHECK ((client_id IN ( SELECT client.id FROM public.client WHERE (client.email = COALESCE((auth.jwt() ->> 'email'::text), ''::text)))));
+
+COMMENT ON POLICY booking_client_update_contact ON public.booking IS 'Allows authenticated clients to update mobile, pickup_location, and validation fields on their own confirmed bookings';
 
 -- Client credit policies
 CREATE POLICY "Users can read own credits" ON public.client_credit FOR SELECT TO authenticated 

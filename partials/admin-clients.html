@@ -183,6 +183,15 @@
 
   <div class="flex flex-wrap items-end gap-3 mb-4">
     <div class="flex flex-col gap-1">
+      <label class="text-sm font-medium text-gray-300">Intake</label>
+      <select id="clientIntakeFilter" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[160px]">
+        <option value="all" selected>All</option>
+        <option value="incomplete">Incomplete</option>
+        <option value="completed">Completed</option>
+      </select>
+    </div>
+
+    <div class="flex flex-col gap-1">
       <label class="text-sm font-medium text-gray-300">Validation</label>
       <select id="clientValidationFilter" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[160px]">
         <option value="all" selected>All</option>
@@ -307,13 +316,14 @@
   }
 
   function applyClientFilters() {
+    const intake = (document.getElementById('clientIntakeFilter')?.value || 'all');
     const validation = (document.getElementById('clientValidationFilter')?.value || 'all');
     const qRaw = (document.getElementById('clientSearch')?.value || document.getElementById('clientSearchInput')?.value || '');
     const q = qRaw.trim().toLowerCase();
 
     let filtered = Array.isArray(allAdminClients) ? allAdminClients.slice() : [];
 
-    // Search first, then validation filter (per spec)
+    // Search first, then intake, then validation
     if (q) {
       filtered = filtered.filter(c => {
         const first = safeText(c.first_name).toLowerCase();
@@ -330,6 +340,13 @@
           mobile.includes(q)
         );
       });
+    }
+
+    // Apply intake filter (exclude admin users)
+    if (intake === 'completed') {
+      filtered = filtered.filter(c => c.is_admin !== true && c.intake_completed === true);
+    } else if (intake === 'incomplete') {
+      filtered = filtered.filter(c => c.is_admin !== true && c.intake_completed !== true);
     }
 
     if (validation === 'valid') {
@@ -786,9 +803,16 @@
   }
 
   function wireClientsEvents() {
+    const intake = document.getElementById('clientIntakeFilter');
     const validation = document.getElementById('clientValidationFilter');
     const search = document.getElementById('clientSearch') || document.getElementById('clientSearchInput');
     const refresh = document.getElementById('clientsRefreshBtn');
+
+    if (intake) {
+      intake.addEventListener('change', () => {
+        renderAdminClients();
+      });
+    }
 
     if (validation) {
       validation.addEventListener('change', () => {
@@ -1076,6 +1100,19 @@
   // Expose minimal API expected by admin.html
   window.loadAdminClients = loadAdminClients;
   window.renderAdminClients = renderAdminClients;
+
+  // Helper to set default filters when opening Clients
+  window.setClientsDefaultFilters = function() {
+    const intake = document.getElementById('clientIntakeFilter');
+    const validation = document.getElementById('clientValidationFilter');
+    const search = document.getElementById('clientSearch') || document.getElementById('clientSearchInput');
+
+    if (intake) intake.value = 'incomplete';
+    if (validation) validation.value = 'all';
+    if (search) search.value = '';
+
+    renderAdminClients();
+  };
 
   // Ensure wiring happens once the partial exists in DOM
   wireClientsEvents();

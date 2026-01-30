@@ -91,8 +91,9 @@
               <span class="font-medium">Cancellations</span>
             </a>
             <a href="#clients" onclick="showSection('clients')" id="nav-clients"
-               class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors border-l-4 border-transparent">
+               class="nav-item flex items-center justify-between px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors border-l-4 border-transparent">
               <span class="font-medium">Clients</span>
+              <span id="clientsIntakeBadge" class="hidden py-0.5 px-2 rounded-full text-xs font-bold shadow-sm" style="background-color: #dbeafe; color: #111827;">0</span>
             </a>
             <a href="#progress" onclick="showSection('progress')" id="nav-progress"
                class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors border-l-4 border-transparent">
@@ -286,12 +287,8 @@
       // Clients – sidebar defaults
       if (section === 'clients' && source === 'sidebar') {
         setTimeout(async () => {
-          const validation = document.getElementById('clientValidationFilter');
-          const search = document.getElementById('clientSearchInput');
-          if (validation) validation.value = 'all';
-          if (search) search.value = '';
-
           if (window.loadAdminClients) await window.loadAdminClients();
+          if (window.setClientsDefaultFilters) window.setClientsDefaultFilters();
         }, 50);
       } else if (section === 'clients') {
         setTimeout(async () => {
@@ -507,7 +504,25 @@
           }
         }
         
-        console.log('[admin] Notification badges updated:', { paymentCount, refundCount, messageCount, uncheckedCount, invalidCount });
+        // Count clients needing intake (non-admin clients where intake_completed is not true)
+        const { count: intakeCount, error: intakeErr } = await window.supabaseClient
+          .from('client')
+          .select('id', { count: 'exact', head: true })
+          .eq('is_admin', false)
+          .or('intake_completed.is.null,intake_completed.eq.false');
+        
+        // Update Clients sidebar badge (Intake count)
+        const clientsIntakeBadge = document.getElementById('clientsIntakeBadge');
+        if (clientsIntakeBadge) {
+          if (intakeCount > 0) {
+            clientsIntakeBadge.textContent = intakeCount;
+            clientsIntakeBadge.classList.remove('hidden');
+          } else {
+            clientsIntakeBadge.classList.add('hidden');
+          }
+        }
+        
+        console.log('[admin] Notification badges updated:', { paymentCount, refundCount, messageCount, uncheckedCount, invalidCount, intakeCount });
       } catch (error) {
         console.error('[admin] Error updating notification badges:', error);
       }

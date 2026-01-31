@@ -191,6 +191,11 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Create service Supabase client (needed below for client lookup/insert and booking update)
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
     console.log("[update-admin-booking] Updating booking:", bookingId);
 
     // Convert 12-hour time to 24-hour
@@ -356,11 +361,7 @@ ${pickupLocation || 'N/A'}
     const updatedEvent = await updateRes.json();
     console.log("[update-admin-booking] ✅ Google Calendar event updated:", updatedEvent.id);
 
-    // Update the booking in the database
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
+    // Read existing booking to check if payment can be edited
     const { data: existingBooking, error: existingErr } = await supabase
       .from('booking')
       .select('is_admin_booking')

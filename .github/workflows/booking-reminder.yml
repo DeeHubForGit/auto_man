@@ -1,8 +1,8 @@
 name: Run Booking Reminder
 
 on:
-  schedule:
-    - cron: "0 * * * *"  # hourly (UTC)
+  # schedule:
+  #  - cron: "0 * * * *"  # hourly (UTC)
   workflow_dispatch:
 
 jobs:

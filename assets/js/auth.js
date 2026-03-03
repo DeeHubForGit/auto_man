@@ -59,15 +59,32 @@
       if (window.Modal) return window.Modal.error('Authentication is not configured. Please contact support.');
       return alert('Auth not configured');
     }
+
     const redirectTo = window.location.origin + '/index.html';
-    const { error } = await window.supabaseClient.auth.signUp({ email, password, options: { emailRedirectTo: redirectTo } });
+
+    const { error } = await window.supabaseClient.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: redirectTo }
+    });
+
     if (error) {
       if (window.Modal) window.Modal.error(error.message, 'Sign-up Error');
       else alert('Sign-up error: ' + error.message);
-    } else {
-      if (window.Modal) window.Modal.success('Please check your email to confirm your account. You may need to check your spam folder.', 'Account Created');
-      else alert('Check your email to confirm your account.');
+      return;
     }
+
+    if (window.Modal) {
+      window.Modal.success(
+        'Please check your email to confirm your account. You may need to check your spam folder.',
+        'Account Created'
+      );
+    } else {
+      alert('Check your email to confirm your account.');
+    }
+
+    // Send them to Login after showing the message
+    window.location.replace('login.html?signup=1');
   }
 
   async function signInWithPassword(email, password){

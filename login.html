@@ -59,14 +59,44 @@
 
   <div data-include="partials/footer.html"></div>
 
+  <!-- Google Analytics -->
+  <div data-include="partials/analytics.html"></div>
+
   <script>
     document.addEventListener('DOMContentLoaded', function(){
+      const params = new URLSearchParams(window.location.search);
+      
+      const email = params.get('email');
+      const verify = params.get('verify');
+      
       const form = document.getElementById('loginForm');
       const emailInput = document.getElementById('loginEmail');
       const passwordInput = document.getElementById('loginPassword');
       const togglePwd = document.getElementById('toggleLoginPwd');
       const emailError = document.getElementById('emailError');
       const passwordError = document.getElementById('passwordError');
+
+      if (!form || !emailInput || !passwordInput) {
+        console.error('Login page: missing form or inputs');
+        return;
+      }
+
+      if (email && emailInput) {
+        emailInput.value = email;
+      }
+
+      if (verify === '1') {
+        const msg = document.createElement('div');
+        msg.className = 'auth-info-message';
+        msg.textContent = 'Sign-up successful. Please verify your email before logging in. Check your inbox or spam folder for the confirmation link.';
+        
+        if (form) form.prepend(msg);
+      }
+
+      // Remove query params from URL after using them
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
 
       // Toggle password visibility
       if (togglePwd) {
@@ -156,18 +186,20 @@
           // This will redirect to portal.html on success or show Modal error on failure
           await AuthUI.signInWithPassword(email, password);
         } catch (err) {
+          console.error('Login error:', err);
           // Error already shown via Modal, but also show inline for better UX
-          const errorMsg = err?.message || 'Login failed';
-          if (errorMsg.toLowerCase().includes('email') || errorMsg.toLowerCase().includes('user') || errorMsg.toLowerCase().includes('invalid')) {
+          const msg = (err && err.message ? String(err.message) : '').toLowerCase();
+
+          if (msg.includes('email not confirmed') || msg.includes('not confirmed')) {
+            showError(emailInput, emailError, 'Email not confirmed.  Please check your inbox or spam folder for the confirmation link.');
+          } else if (msg.includes('invalid') || msg.includes('email') || msg.includes('password') || msg.includes('user')) {
             showError(emailInput, emailError, 'Invalid email or password');
           } else {
-            showError(passwordInput, passwordError, 'Invalid email or password');
+            showError(emailInput, emailError, 'Login failed.  Please try again.');
           }
         }
       });
     });
   </script>
-  <!-- Google Analytics -->
-  <div data-include="partials/analytics.html"></div>
 </body>
 </html>

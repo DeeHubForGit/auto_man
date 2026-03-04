@@ -940,3 +940,16 @@ section.hero-banner p {
   }
 }
 
+/* Auth info message */
+.auth-info-message {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border-radius: 8px;
+
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+
+  color: #e6edf7;
+  font-size: 14px;
+  line-height: 1.5;
+}

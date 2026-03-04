@@ -60,7 +60,7 @@
       return alert('Auth not configured');
     }
 
-    const redirectTo = window.location.origin + '/index.html';
+    const redirectTo = window.location.origin + '/portal.html';
 
     const { error } = await window.supabaseClient.auth.signUp({
       email,
@@ -74,17 +74,7 @@
       return;
     }
 
-    if (window.Modal) {
-      window.Modal.success(
-        'Please check your email to confirm your account. You may need to check your spam folder.',
-        'Account Created'
-      );
-    } else {
-      alert('Check your email to confirm your account.');
-    }
-
-    // Send them to Login after showing the message
-    window.location.replace('login.html?signup=1');
+    window.location.replace('login.html?email=' + encodeURIComponent(email) + '&verify=1');
   }
 
   async function signInWithPassword(email, password){
@@ -93,12 +83,24 @@
       if (window.Modal) window.Modal.error(msg);
       throw new Error(msg);
     }
+
     const { data, error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
+
     if (error) {
       console.error('Login error:', error);
-      if (window.Modal) window.Modal.error(error.message, 'Login Error');
+
+      const msg = (error && error.message ? String(error.message) : '');
+      const lower = msg.toLowerCase();
+
+      // Do not show a popup for expected "not confirmed" state.
+      // login.html shows the inline message.
+      if (!(lower.includes('email not confirmed') || lower.includes('not confirmed'))) {
+        if (window.Modal) window.Modal.error(msg, 'Login Error');
+      }
+
       throw error;
     }
+
     // logged in - redirect to portal immediately
     console.log('Login successful, user:', data.user?.email);
     const next = new URLSearchParams(window.location.search).get('next') || 'portal.html';

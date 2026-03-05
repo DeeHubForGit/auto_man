@@ -141,14 +141,14 @@
   </div>
   
   <!-- Filters -->
-  <div class="flex flex-wrap items-center gap-3 mb-4">
-    <div class="flex flex-col gap-1 min-w-[320px] max-w-[360px]">
+  <div class="flex items-end gap-3 mb-4">
+    <div class="flex flex-col gap-1">
       <label class="text-sm font-medium text-gray-300">Search</label>
       <input 
         id="cancellationSearch" 
         type="text" 
         placeholder="Search by name, email, or service..." 
-        class="w-full min-w-[320px] max-w-[360px] bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        class="w-[260px] bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
       />
     </div>
     <div class="flex flex-col gap-1">
@@ -160,6 +160,19 @@
         <option value="newest">Newest first</option>
         <option value="oldest">Oldest first</option>
         <option value="booking-date">By booking date</option>
+      </select>
+    </div>
+    <div class="flex flex-col gap-1">
+      <label class="text-sm font-medium text-gray-300">Date range</label>
+      <select 
+        id="cancellationDateRange" 
+        class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 w-[160px]"
+      >
+        <option value="7">Last 7 days</option>
+        <option value="30" selected>Last 30 days</option>
+        <option value="60">Last 60 days</option>
+        <option value="90">Last 90 days</option>
+        <option value="all">All time</option>
       </select>
     </div>
     <div class="flex flex-col gap-1">
@@ -230,6 +243,17 @@
   let allCancellations = [];
   let currentPage = 1;
   
+  function getCancellationCutoffISO(daysValue) {
+    if (!daysValue || daysValue === 'all') return null;
+
+    const days = parseInt(daysValue, 10);
+    if (!Number.isFinite(days)) return null;
+
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return d.toISOString();
+  }
+  
   async function loadCancellations(){
     const box = document.getElementById('cancellationsList');
     const reloadBtn = document.getElementById('reloadCancellations');
@@ -256,11 +280,21 @@
     box.innerHTML = '<div class="p-8 text-center text-gray-500">Loading cancellations...</div>';
     
     try {
-      const { data, error, status, statusText } = await window.supabaseClient
+      const dateRangeValue = document.getElementById('cancellationDateRange')?.value || '30';
+      const cutoffISO = getCancellationCutoffISO(dateRangeValue);
+
+      let query = window.supabaseClient
         .from('booking')
         .select('*, service(name)')
         .eq('status', 'cancelled')
-        .eq('is_booking', true)
+        .eq('is_booking', true);
+
+      if (cutoffISO) {
+        // Only include cancellations with a real cancelled_at when using a date range
+        query = query.not('cancelled_at', 'is', null).gte('cancelled_at', cutoffISO);
+      }
+
+      const { data, error, status, statusText } = await query
         .order('cancelled_at', { ascending: false })
         .limit(500);
       
@@ -454,14 +488,18 @@
         hour12: true
       });
       
-      const cancelledDate = row.cancelled_at ? new Date(row.cancelled_at).toLocaleString('en-AU', {
-        day: '2-digit',
-        month: '2-digit',
-        year: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      }) : 'Unknown';
+      const cancelledTimestamp = row.cancelled_at || row.updated_at;
+      
+      const cancelledDate = cancelledTimestamp
+        ? new Date(cancelledTimestamp).toLocaleString('en-AU', {
+            day: '2-digit',
+            month: '2-digit',
+            year: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+          })
+        : 'Unknown';
       
       // Display refund eligibility badge (from database field)
       let refundBadge = '';
@@ -640,6 +678,14 @@
         cancellationSort.addEventListener('change', () => {
           currentPage = 1;
           renderCancellations();
+        });
+      }
+      
+      const cancellationDateRange = document.getElementById('cancellationDateRange');
+      if (cancellationDateRange) {
+        cancellationDateRange.addEventListener('change', () => {
+          currentPage = 1;
+          loadCancellations();
         });
       }
       

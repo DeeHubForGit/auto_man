@@ -81,6 +81,38 @@
     margin-left: 6px;
     font-size: 1.1rem;
   }
+
+  /* ------------------------------
+     Cancel Button (Admin Bookings)
+     Matches Portal Bookings style
+     ------------------------------ */
+  .cancel-btn {
+    padding: 2px 10px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #dc2626;
+    border: 1px solid #dc2626;
+    border-radius: 6px;
+    background: transparent;
+    cursor: pointer;
+    transition:
+      color 0.2s ease,
+      border-color 0.2s ease,
+      border-width 0.2s ease,
+      background-color 0.2s ease;
+  }
+
+  .cancel-btn:hover {
+    background-color: rgba(220, 38, 38, 0.10);
+    color: #b91c1c;
+    border-color: #b91c1c;
+    border-width: 1px;
+  }
+
+  .cancel-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 </style>
 
 <!-- Admin Bookings Section -->
@@ -739,6 +771,7 @@
       .from('booking')
       .select('*, pickup_location_issue, client:client_id(first_name,last_name)') // Fetch client name and issue code
       .eq('is_booking', true)
+      .neq('status', 'cancelled')
       .order('start_time', { ascending: true })
       .limit(500); // Increased limit for client-side pagination
 
@@ -1037,6 +1070,13 @@
     });
     const endTime = new Date(booking.end_time);
     
+    // Cancel button logic
+    const now = new Date();
+    const isUpcoming = startTime >= now;
+    const status = (booking.status || '').toLowerCase();
+    const isConfirmed = status === 'confirmed';
+    let cancelButton = '';
+    
     // Service Name Formatting
     let serviceName = booking.service_code || 'Lesson';
     if (serviceName.includes('auto')) serviceName = 'Auto';
@@ -1087,17 +1127,36 @@
     }
 
     const canEditPayments = booking.is_admin_booking === true;
+    
+    // Build cancel button if applicable
+    if (isConfirmed && isUpcoming) {
+      cancelButton = `
+        <button
+          type="button"
+          onclick="handleAdminCancelBooking('${booking.id}', '${booking.google_event_id || ''}', this)"
+          class="cancel-btn"
+          title="Cancel Booking"
+          aria-label="Cancel Booking">
+          Cancel
+        </button>
+      `;
+    }
 
     return `
       <div class="booking-card p-3 sm:p-4 mb-4 transition-all duration-200 group" id="booking-card-${booking.id}">
         <div class="flex flex-col">
           
           <!-- Header: Service, Duration & Client Name -->
-          <div class="mb-2">
-            <h3 class="text-sm sm:text-base font-semibold text-gray-900">
-              ${serviceName} ${durationStr} (${clientName})${!booking.is_paid ? '<span class="payment-icon">$</span>' : ''}
-            </h3>
-            ${isNameMismatch ? `<div class="text-xs text-gray-600 mt-0.5">Booking name: ${bookingNameFromBooking}</div>` : ''}
+          <div class="mb-2 flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <h3 class="text-sm sm:text-base font-semibold text-gray-900">
+                ${serviceName} ${durationStr} (${clientName})${!booking.is_paid ? '<span class="payment-icon">$</span>' : ''}
+              </h3>
+              ${isNameMismatch ? `<div class="text-xs text-gray-600 mt-0.5">Booking name: ${bookingNameFromBooking}</div>` : ''}
+            </div>
+            <div class="flex-shrink-0">
+              ${cancelButton}
+            </div>
           </div>
 
           <!-- Info Rows -->
@@ -1246,6 +1305,61 @@
   }
 
   // Global handlers
+  window.handleAdminCancelBooking = async function(bookingId, googleEventId, btnEl) {
+    try {
+      const ask = () => {
+        const msg = 'Cancel this booking?';
+        if (window.Modal && window.Modal.confirm) {
+          window.Modal.confirm(
+            msg,
+            () => doCancel(),
+            null,
+            'Cancel Booking'
+          );
+        } else {
+          if (confirm(msg)) doCancel();
+        }
+      };
+
+      const doCancel = async () => {
+        if (btnEl) btnEl.disabled = true;
+
+        // 1) Update booking status in DB
+        const { error } = await window.supabaseClient
+          .from('booking')
+          .update({ status: 'cancelled' })
+          .eq('id', bookingId);
+
+        if (error) throw error;
+
+        // 2) Optional: if there is an existing Google Calendar delete/cancel helper, call it
+        // Keep this guarded so it does not break if not available
+        if (googleEventId && window.cancelGoogleCalendarEvent) {
+          try { await window.cancelGoogleCalendarEvent(googleEventId); } catch(_) {}
+        }
+
+        // 3) Refresh list
+        if (window.loadAdminBookings) {
+          await window.loadAdminBookings();
+        } else {
+          // fallback: remove card locally
+          const card = document.getElementById(`booking-card-${bookingId}`);
+          if (card) card.remove();
+        }
+      };
+
+      ask();
+    } catch (err) {
+      if (btnEl) btnEl.disabled = false;
+      console.error('Cancel booking failed:', err);
+      if (window.Modal && window.Modal.error) {
+        window.Modal.error('Could not cancel booking. Please try again.');
+      } else {
+        alert('Could not cancel booking. Please try again.');
+      }
+    }
+  };
+
   window.updateAdminBookingField = async function(id, field, value) {
     // Store original value for display
     let valueToStore = value;

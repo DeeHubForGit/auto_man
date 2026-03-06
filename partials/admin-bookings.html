@@ -1327,7 +1327,10 @@
         // 1) Update booking status in DB
         const { error } = await window.supabaseClient
           .from('booking')
-          .update({ status: 'cancelled' })
+          .update({
+            status: 'cancelled',
+            cancelled_at: new Date().toISOString()
+          })
           .eq('id', bookingId);
 
         if (error) throw error;

@@ -412,6 +412,7 @@
           .select('id')
           .eq('is_booking', true)
           .eq('is_admin_checked', false)
+          .neq('status', 'cancelled')
           .gte('start_time', today);
           
         const uncheckedCount = uncheckedBookings?.length || 0;
@@ -449,6 +450,7 @@
           .select('id')
           .eq('is_booking', true)
           .eq('is_paid', false)
+          .neq('status', 'cancelled')
           .gte('start_time', today);
         
         const paymentCount = paymentsRequired?.length || 0;

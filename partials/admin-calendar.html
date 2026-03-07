@@ -332,6 +332,10 @@
     color: var(--danger) !important;
   }
 
+  #section-calendar .admin-modal-body #existingClientMissingDetailsMsg {
+    color: var(--danger) !important;
+  }
+
   /* Warning messages must stay orange */
   #section-calendar .admin-modal-body p.booking-time-warning {
     color: #fb923c !important;
@@ -921,6 +925,9 @@
 
           <!-- New client -->
           <div id="newClientFields" style="display:none;">
+            <p id="existingClientMissingDetailsMsg"
+              class="text-xs text-red-500 bg-red-500/10 border border-red-400/30 rounded px-3 py-2 mt-2 hidden">
+            </p>
             <div class="form-group">
               <label for="newClientFirstName">First name<span class="text-red-500">*</span></label>
               <input id="newClientFirstName" type="text" class="form-input">
@@ -966,7 +973,6 @@
 
               <input id="bookingAmountPaid" type="number" min="0" step="0.01" inputmode="decimal" class="form-input" style="width: 120px;" placeholder="0.00">
             </div>
-            <p class="text-xs text-gray-400 mt-1">Check when payment has been received (cash, transfer, etc)</p>
             <p id="bookingPriceWarning" class="text-xs mt-1 hidden booking-time-warning"></p>
           </div>
 
@@ -1010,6 +1016,12 @@
   let editingBookingId = null;
   let editingBookingData = null;
   let editingBookingGoogleEventId = null;
+
+  // Existing client selected, but missing required details.
+  // We show "New" client fields, but we must NOT create a new client record.
+  let missingDetailsExistingClientId = null;
+  let missingDetailsExistingClientEmail = null;
+  let forcedMissingClientMode = false;
 
   // Service duration configuration (in minutes) – populated from config
   const SERVICE_DURATIONS = {};
@@ -1225,6 +1237,8 @@
   function openAppointmentModal(defaults = {}) {
     // Reset form to defaults
     apptForm.reset();
+    clearMissingClientDetailsState();
+    clearNewClientFields();
     bookingAmountManuallyEdited = false;
 
     // Ensure save button is usable when reopening the modal
@@ -1332,6 +1346,7 @@
             clearApptError("bookingPickupLocation");
             hidePickupSuggestion();
             formHasChanges = false;
+            clearMissingClientDetailsState();
           },
           "Unsaved Changes",
           { confirmText: 'Yes', cancelText: 'No' }
@@ -1347,6 +1362,7 @@
         clearApptError("bookingPickupLocation");
         hidePickupSuggestion();
         formHasChanges = false;
+        clearMissingClientDetailsState();
       }
       return;
     }
@@ -1356,6 +1372,7 @@
     clearApptError("bookingPickupLocation");
     hidePickupSuggestion();
     formHasChanges = false;
+    clearMissingClientDetailsState();
     resetPersonalEditState();
     resetBookingEditState();
     setAppointmentTypeRadiosDisabled(false);
@@ -1574,10 +1591,8 @@
       }
     }
 
-    if (newFirstName) newFirstName.value = booking.first_name || '';
-    if (newLastName) newLastName.value = booking.last_name || '';
-    if (newEmail) newEmail.value = booking.email || '';
-    if (newMobile) newMobile.value = booking.mobile || '';
+    // Clear New client fields on edit open to prevent stale data / duplicate clients
+    clearNewClientFields();
 
     // Choose a default client mode based on what we can prefill
     if (canEditClient) {
@@ -1881,11 +1896,61 @@
       if (isNew) {
         existingFields.style.display = 'none';
         newFields.style.display = 'block';
+        // If in forced missing-client mode and same incomplete client still selected, reapply forced state
+        if (forcedMissingClientMode && missingDetailsExistingClientId) {
+          const existingClientSelect = document.getElementById('existingClientSelect');
+          const currentClientId = existingClientSelect?.value || null;
+          if (currentClientId === missingDetailsExistingClientId) {
+            // Same incomplete client still selected - reapply forced state
+            forceNewModeForMissingExistingClient(missingDetailsExistingClientId, missingDetailsExistingClientEmail);
+          }
+        }
       } else {
         existingFields.style.display = 'block';
         newFields.style.display = 'none';
+        // Clear field errors but do NOT clear missing-details state
+        // (state will be cleared only if user selects a different/complete client)
+        clearApptError('newClientFirstName');
+        clearApptError('newClientLastName');
+        clearApptError('newClientMobile');
       }
     });
+  });
+
+  document.getElementById('existingClientSelect')?.addEventListener('change', () => {
+    const opt = getSelectedClientOption();
+    const clientId = document.getElementById('existingClientSelect')?.value || null;
+
+    // Capture previous incomplete client ID before any state changes
+    const previousIncompleteClientId = missingDetailsExistingClientId;
+
+    // If selected client changed to a different client, clear New client fields
+    if (clientId !== previousIncompleteClientId) {
+      clearNewClientFields();
+    }
+
+    // If nothing selected, clear state/message and stale New client values
+    if (!clientId || !opt) {
+      clearMissingClientDetailsState();
+      forcedMissingClientMode = false;
+      clearNewClientFields();
+      return;
+    }
+
+    const missing = getMissingClientFieldsFromOption(opt);
+    if (missing.length === 0) {
+      // If user selects a complete client, clear special state and stale New client values
+      clearMissingClientDetailsState();
+      forcedMissingClientMode = false;
+      clearNewClientFields();
+      return;
+    }
+
+    showMissingClientDetailsMessage(missing);
+
+    // Switch to "New" UI, but do NOT create a new client record.
+    const email = (opt.dataset.email || '').trim();
+    forceNewModeForMissingExistingClient(clientId, email);
   });
 
   // Listen for service selection change to update end time
@@ -2102,10 +2167,197 @@
     return window.Validation?.isProbablyValidAuAddress?.(addr) ?? false;
   }
 
+  function getSelectedClientOption() {
+    const selectEl = document.getElementById('existingClientSelect');
+    if (!selectEl) return null;
+    return selectEl.selectedOptions && selectEl.selectedOptions[0] ? selectEl.selectedOptions[0] : null;
+  }
+
+  function getMissingClientFieldsFromOption(opt) {
+    const missing = [];
+    const firstName = (opt?.dataset?.firstName || '').trim();
+    const lastName  = (opt?.dataset?.lastName || '').trim();
+    const mobile    = (opt?.dataset?.mobile || '').trim();
+
+    if (!firstName) missing.push('First name');
+    if (!lastName) missing.push('Last name');
+    if (!mobile) missing.push('Mobile');
+
+    return missing;
+  }
+
+  function showMissingClientDetailsMessage(missingFields) {
+    const msgEl = document.getElementById('existingClientMissingDetailsMsg');
+    if (!msgEl) return;
+
+    if (!missingFields || missingFields.length === 0) {
+      msgEl.textContent = '';
+      msgEl.classList.add('hidden');
+      return;
+    }
+
+    msgEl.textContent = `This client is missing required details. Please add them below.`;
+    msgEl.classList.remove('hidden');
+  }
+
+  function clearMissingClientDetailsState() {
+    missingDetailsExistingClientId = null;
+    missingDetailsExistingClientEmail = null;
+    forcedMissingClientMode = false;
+
+    showMissingClientDetailsMessage([]);
+
+    const emailEl = document.getElementById('newClientEmail');
+    if (emailEl) {
+      emailEl.disabled = false;
+      emailEl.style.removeProperty('background-color');
+      emailEl.style.removeProperty('color');
+      emailEl.style.removeProperty('cursor');
+    }
+
+    const existingRadio = document.querySelector('input[name="clientMode"][value="existing"]');
+    if (existingRadio) existingRadio.disabled = false;
+  }
+
+  function clearNewClientFields() {
+    const first = document.getElementById('newClientFirstName');
+    const last = document.getElementById('newClientLastName');
+    const email = document.getElementById('newClientEmail');
+    const mobile = document.getElementById('newClientMobile');
+
+    if (first) first.value = '';
+    if (last) last.value = '';
+    if (email) email.value = '';
+    if (mobile) mobile.value = '';
+
+    clearApptError('newClientFirstName');
+    clearApptError('newClientLastName');
+    clearApptError('newClientMobile');
+  }
+
+  function getClientFormState(canEditClient = true) {
+    const clientMode = document.querySelector('input[name="clientMode"]:checked')?.value || "existing";
+    const existingClientSelect = document.getElementById("existingClientSelect");
+    const clientId = clientMode === "existing" ? existingClientSelect?.value || null : null;
+
+    const typedFirstName = document.getElementById("newClientFirstName")?.value.trim() || "";
+    const typedLastName = document.getElementById("newClientLastName")?.value.trim() || "";
+    const typedEmail = document.getElementById("newClientEmail")?.value.trim() || "";
+    const typedMobile = document.getElementById("newClientMobile")?.value.trim() || "";
+
+    const isTrackedIncompleteClient =
+      canEditClient &&
+      clientMode === "existing" &&
+      clientId &&
+      missingDetailsExistingClientId &&
+      clientId === missingDetailsExistingClientId;
+
+    let firstName = "";
+    let lastName = "";
+    let email = "";
+    let mobile = "";
+
+    if (canEditClient) {
+      if (isTrackedIncompleteClient || clientMode === "new") {
+        firstName = typedFirstName;
+        lastName = typedLastName;
+        email = typedEmail;
+        mobile = typedMobile;
+      } else {
+        firstName = existingClientSelect?.selectedOptions[0]?.dataset.firstName || "";
+        lastName = existingClientSelect?.selectedOptions[0]?.dataset.lastName || "";
+        email = existingClientSelect?.selectedOptions[0]?.dataset.email || "";
+        mobile = existingClientSelect?.selectedOptions[0]?.dataset.mobile || "";
+      }
+    }
+
+    let effectiveClientId = clientId;
+    if (isTrackedIncompleteClient) {
+      effectiveClientId = missingDetailsExistingClientId;
+    } else if (clientMode === "new" && missingDetailsExistingClientId) {
+      effectiveClientId = missingDetailsExistingClientId;
+    }
+
+    return {
+      clientMode,
+      clientId,
+      existingClientSelect,
+      typedFirstName,
+      typedLastName,
+      typedEmail,
+      typedMobile,
+      isTrackedIncompleteClient,
+      firstName,
+      lastName,
+      email,
+      mobile,
+      effectiveClientId
+    };
+  }
+
+  function forceNewModeForMissingExistingClient(clientId, email) {
+    missingDetailsExistingClientId = clientId;
+    missingDetailsExistingClientEmail = email || '';
+    forcedMissingClientMode = true;
+
+    const newRadio = document.querySelector('input[name="clientMode"][value="new"]');
+    if (newRadio && !newRadio.checked) {
+      newRadio.checked = true;
+      newRadio.dispatchEvent(new Event('change'));
+    }
+
+    // Ensure message is visible in New mode (message element lives in newClientFields)
+    const opt = getSelectedClientOption();
+    const missing = getMissingClientFieldsFromOption(opt);
+    showMissingClientDetailsMessage(missing);
+
+    // Populate New client fields from the selected existing client's data
+    // Only populate fields that are currently empty to preserve user-entered values
+    if (opt && opt.value === clientId) {
+      const firstNameEl = document.getElementById('newClientFirstName');
+      if (firstNameEl) {
+        const currentFirstName = (firstNameEl.value || '').trim();
+        if (!currentFirstName) {
+          firstNameEl.value = opt.dataset.firstName || '';
+        }
+      }
+
+      const lastNameEl = document.getElementById('newClientLastName');
+      if (lastNameEl) {
+        const currentLastName = (lastNameEl.value || '').trim();
+        if (!currentLastName) {
+          lastNameEl.value = opt.dataset.lastName || '';
+        }
+      }
+
+      const mobileEl = document.getElementById('newClientMobile');
+      if (mobileEl) {
+        const currentMobile = (mobileEl.value || '').trim();
+        if (!currentMobile) {
+          mobileEl.value = opt.dataset.mobile || '';
+        }
+      }
+    }
+
+    const emailEl = document.getElementById('newClientEmail');
+    if (emailEl) {
+      emailEl.value = missingDetailsExistingClientEmail || '';
+      emailEl.disabled = true;
+      emailEl.style.setProperty('background-color', '#e5e7eb', 'important');
+      emailEl.style.setProperty('color', '#6b7280', 'important');
+      emailEl.style.setProperty('cursor', 'not-allowed', 'important');
+    }
+
+    const existingRadio = document.querySelector('input[name="clientMode"][value="existing"]');
+    if (existingRadio) existingRadio.disabled = true;
+  }
+
   // Enhanced pickup validation with helpful error messages (uses validation.js)
   function validatePickupAddressForBooking(addr) {
     const trimmed = (addr || '').trim();
-    if (!trimmed) {
+
+    // Treat "None" as missing (seen in some saved bookings)
+    if (!trimmed || trimmed.toLowerCase() === 'none') {
       return { valid: false, message: 'Pickup address is required' };
     }
 
@@ -2620,27 +2872,16 @@
     const serviceLabel = serviceSelect.options[serviceSelect.selectedIndex]?.text || "";
 
     const canEditClient = editingBookingData && editingBookingData.is_admin_booking === true;
-    const clientMode = document.querySelector('input[name="clientMode"]:checked')?.value || "existing";
-    
-    const existingClientSelect = document.getElementById("existingClientSelect");
-    const clientId = clientMode === "existing" ? existingClientSelect.value : null;
+    const clientState = getClientFormState(canEditClient);
     
     let firstName, lastName, email, mobile;
     
     if (canEditClient) {
-      // Editable: use form inputs based on selected mode
-      firstName = clientMode === "new" 
-        ? document.getElementById("newClientFirstName").value.trim()
-        : existingClientSelect.selectedOptions[0]?.dataset.firstName || "";
-      lastName = clientMode === "new"
-        ? document.getElementById("newClientLastName").value.trim()
-        : existingClientSelect.selectedOptions[0]?.dataset.lastName || "";
-      email = clientMode === "existing"
-        ? existingClientSelect.selectedOptions[0]?.dataset.email || ""
-        : document.getElementById("newClientEmail").value.trim();
-      mobile = clientMode === "existing"
-        ? existingClientSelect.selectedOptions[0]?.dataset.mobile || ""
-        : document.getElementById("newClientMobile").value.trim();
+      // Editable: use client state from form
+      firstName = clientState.firstName;
+      lastName = clientState.lastName;
+      email = clientState.email;
+      mobile = clientState.mobile;
     } else {
       // Not editable: use existing booking data
       firstName = editingBookingData.first_name || "";
@@ -2689,10 +2930,81 @@
       hasError = true;
     }
     
-    if (canEditClient && clientMode === "existing") {
-      if (!clientId) {
+    // Client validation
+    if (clientState.isTrackedIncompleteClient) {
+      // Validate typed New field values for the tracked incomplete client
+      // Check for validation errors first
+      let hasClientError = false;
+      
+      if (!firstName) {
+        hasClientError = true;
+      }
+      if (!lastName) {
+        hasClientError = true;
+      }
+      if (!email) {
+        hasClientError = true;
+      } else if (!window.Validation?.isValidEmail?.(email)) {
+        hasClientError = true;
+      }
+      if (!mobile) {
+        hasClientError = true;
+      } else if (!window.Validation?.isValidAuMobile?.(mobile)) {
+        hasClientError = true;
+      }
+      
+      // If there are validation errors, switch UI to New mode first
+      if (hasClientError) {
+        const emailForForce = missingDetailsExistingClientEmail || clientState.typedEmail || clientState.existingClientSelect.selectedOptions[0]?.dataset.email || '';
+        forceNewModeForMissingExistingClient(clientState.clientId, emailForForce);
+      }
+      
+      // Now show all validation errors
+      if (!firstName) {
+        showApptError("newClientFirstName", "First name is required");
+        hasError = true;
+      }
+      if (!lastName) {
+        showApptError("newClientLastName", "Last name is required");
+        hasError = true;
+      }
+      if (!email) {
+        showApptError("newClientEmail", "Email is required");
+        hasError = true;
+      } else if (!window.Validation?.isValidEmail?.(email)) {
+        showApptError("newClientEmail", "Please enter a valid email address");
+        hasError = true;
+      }
+      if (!mobile) {
+        showApptError("newClientMobile", "Mobile is required");
+        hasError = true;
+      } else if (!window.Validation?.isValidAuMobile?.(mobile)) {
+        showApptError("newClientMobile", "Enter a valid AU mobile (e.g. 04XX XXX XXX or +61 4XX XXX XXX)");
+        hasError = true;
+      }
+    } else if (canEditClient && clientState.clientMode === "existing") {
+      if (!clientState.clientId) {
         showApptError("existingClientSelect", "Please select a client");
         hasError = true;
+      } else {
+        // Guard: prevent saving if selected client is missing required details
+        const opt = getSelectedClientOption();
+        const missing = getMissingClientFieldsFromOption(opt);
+        if (missing.length > 0) {
+          showMissingClientDetailsMessage(missing);
+          forceNewModeForMissingExistingClient(clientState.clientId, opt?.dataset?.email || '');
+          hasError = true;
+          // Show errors for missing fields only
+          if (missing.includes('First name')) {
+            showApptError("newClientFirstName", "First name is required");
+          }
+          if (missing.includes('Last name')) {
+            showApptError("newClientLastName", "Last name is required");
+          }
+          if (missing.includes('Mobile')) {
+            showApptError("newClientMobile", "Mobile is required");
+          }
+        }
       }
     } else if (canEditClient) {
       // Only validate new client fields when editing is allowed
@@ -2760,8 +3072,8 @@
       const isGoogleUnavailable =
         window.Validation?.isGoogleValidationUnavailable?.(backendValidation.meta) === true;
 
-      const pickupValidToStore = isGoogleUnavailable ? null : true;
-      const pickupIssueToStore = null;
+      const pickupValidToStore = isGoogleUnavailable ? null : !!backendValidation.valid;
+      const pickupIssueToStore = (!backendValidation.valid && !isGoogleUnavailable) ? (backendValidation.issue || 'invalid') : null;
       const pickupSuggestionToStore = null;
       const checkedAtToStore = isGoogleUnavailable ? null : new Date().toISOString();
 
@@ -2815,7 +3127,7 @@
         date,
         startTime: startTime12,
         endTime: endTime12,
-        clientId: canEditClient ? (clientId || null) : (editingBookingData?.client_id || null),
+        clientId: canEditClient ? (clientState.clientId || null) : (editingBookingData?.client_id || null),
         firstName,
         lastName: lastName || null,
         email,
@@ -2838,6 +3150,24 @@
           saveBtn.textContent = originalBtnText;
         }
         return;
+      }
+
+      // Update client record if this is a tracked incomplete client
+      if (clientState.isTrackedIncompleteClient && missingDetailsExistingClientId) {
+        const { error: updErr } = await window.supabaseClient
+          .from('client')
+          .update({
+            first_name: firstName,
+            last_name: lastName,
+            mobile: mobile,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', missingDetailsExistingClientId);
+
+        if (updErr) {
+          console.error("[booking-update] Failed to update existing client details:", updErr);
+          throw new Error(updErr.message || "Failed to update client details");
+        }
       }
 
       // Call edge function to update Google Calendar event and DB
@@ -2899,7 +3229,7 @@
         isPaid: canEditPayments ? isPaid : undefined,
         status,
         priceCents: (canEditPayments && Number.isFinite(amountPaidCents)) ? amountPaidCents : undefined,
-        clientId: canEditClient ? clientId : (editingBookingData?.client_id || null),
+        clientId: canEditClient ? clientState.clientId : (editingBookingData?.client_id || null),
         firstName,
         lastName,
         email,
@@ -2954,6 +3284,7 @@
   }
 
   // Update the DB row for a booking immediately after a successful Google update
+  // Update the DB row for a booking immediately after a successful Google update
   async function updateBookingRowInDb(bookingId, opts) {
     if (!bookingId) return;
 
@@ -3004,6 +3335,20 @@
 
     if (error) {
       console.warn('[booking-update] DB update failed (webhook will eventually correct it):', error);
+      return;
+    }
+
+    // If status was set to cancelled, ensure cancelled_at is populated (but do not overwrite it)
+    if (opts.status === 'cancelled') {
+      const { error: cancelAtErr } = await window.supabaseClient
+        .from('booking')
+        .update({ cancelled_at: new Date().toISOString() })
+        .eq('id', bookingId)
+        .is('cancelled_at', null);
+
+      if (cancelAtErr) {
+        console.warn('[booking-update] Failed to set cancelled_at:', cancelAtErr);
+      }
     }
   }
 
@@ -3024,23 +3369,9 @@
     const serviceCode = serviceSelect.value;
     const serviceLabel = serviceSelect.options[serviceSelect.selectedIndex]?.text || "";
 
-    const clientMode = document.querySelector('input[name="clientMode"]:checked')?.value || "existing";
+    const clientState = getClientFormState();
     
-    const existingClientSelect = document.getElementById("existingClientSelect");
-    const clientId = clientMode === "existing" ? existingClientSelect.value : null;
-    
-    const firstName = clientMode === "new" 
-      ? document.getElementById("newClientFirstName").value.trim()
-      : existingClientSelect.selectedOptions[0]?.dataset.firstName || "";
-    const lastName = clientMode === "new"
-      ? document.getElementById("newClientLastName").value.trim()
-      : existingClientSelect.selectedOptions[0]?.dataset.lastName || "";
-    const email = clientMode === "existing"
-      ? existingClientSelect.selectedOptions[0]?.dataset.email || ""
-      : document.getElementById("newClientEmail").value.trim();
-    const mobile = clientMode === "existing"
-      ? existingClientSelect.selectedOptions[0]?.dataset.mobile || ""
-      : document.getElementById("newClientMobile").value.trim();
+    const { clientMode, clientId, existingClientSelect, isTrackedIncompleteClient, firstName, lastName, email, mobile, effectiveClientId, typedEmail } = clientState;
     
     let pickupLocation = document.getElementById("bookingPickupLocation").value.trim();
 
@@ -3080,10 +3411,81 @@
       hasError = true;
     }
     
-    if (clientMode === "existing") {
+    // Client validation
+    if (clientState.isTrackedIncompleteClient) {
+      // Validate typed New field values for the tracked incomplete client
+      // Check for validation errors first
+      let hasClientError = false;
+      
+      if (!firstName) {
+        hasClientError = true;
+      }
+      if (!lastName) {
+        hasClientError = true;
+      }
+      if (!email) {
+        hasClientError = true;
+      } else if (!window.Validation?.isValidEmail?.(email)) {
+        hasClientError = true;
+      }
+      if (!mobile) {
+        hasClientError = true;
+      } else if (!window.Validation?.isValidAuMobile?.(mobile)) {
+        hasClientError = true;
+      }
+      
+      // If there are validation errors, switch UI to New mode first
+      if (hasClientError) {
+        const emailForForce = missingDetailsExistingClientEmail || clientState.typedEmail || clientState.existingClientSelect.selectedOptions[0]?.dataset.email || '';
+        forceNewModeForMissingExistingClient(clientState.clientId, emailForForce);
+      }
+      
+      // Now show all validation errors
+      if (!firstName) {
+        showApptError("newClientFirstName", "First name is required");
+        hasError = true;
+      }
+      if (!lastName) {
+        showApptError("newClientLastName", "Last name is required");
+        hasError = true;
+      }
+      if (!email) {
+        showApptError("newClientEmail", "Email is required");
+        hasError = true;
+      } else if (!window.Validation?.isValidEmail?.(email)) {
+        showApptError("newClientEmail", "Please enter a valid email address");
+        hasError = true;
+      }
+      if (!mobile) {
+        showApptError("newClientMobile", "Mobile is required");
+        hasError = true;
+      } else if (!window.Validation?.isValidAuMobile?.(mobile)) {
+        showApptError("newClientMobile", "Enter a valid AU mobile (e.g. 04XX XXX XXX or +61 4XX XXX XXX)");
+        hasError = true;
+      }
+    } else if (clientState.clientMode === "existing") {
       if (!clientId) {
         showApptError("existingClientSelect", "Please select a client");
         hasError = true;
+      } else {
+        // Guard: prevent saving if selected client is missing required details
+        const opt = getSelectedClientOption();
+        const missing = getMissingClientFieldsFromOption(opt);
+        if (missing.length > 0) {
+          showMissingClientDetailsMessage(missing);
+          forceNewModeForMissingExistingClient(clientId, opt?.dataset?.email || '');
+          hasError = true;
+          // Show errors for missing fields only
+          if (missing.includes('First name')) {
+            showApptError("newClientFirstName", "First name is required");
+          }
+          if (missing.includes('Last name')) {
+            showApptError("newClientLastName", "Last name is required");
+          }
+          if (missing.includes('Mobile')) {
+            showApptError("newClientMobile", "Mobile is required");
+          }
+        }
       }
     } else {
       if (!firstName) {
@@ -3150,8 +3552,8 @@
       const isGoogleUnavailable =
         window.Validation?.isGoogleValidationUnavailable?.(backendValidation.meta) === true;
 
-      const pickupValidToStore = isGoogleUnavailable ? null : true;
-      const pickupIssueToStore = null;
+      const pickupValidToStore = isGoogleUnavailable ? null : !!backendValidation.valid;
+      const pickupIssueToStore = (!backendValidation.valid && !isGoogleUnavailable) ? (backendValidation.issue || 'invalid') : null;
       const pickupSuggestionToStore = null;
       const checkedAtToStore = isGoogleUnavailable ? null : new Date().toISOString();
 
@@ -3208,7 +3610,7 @@
         date,
         startTime: startTime12,
         endTime: endTime12,
-        clientId: clientId || null,
+        clientId: effectiveClientId || null,
         firstName,
         lastName: lastName || null,
         email,
@@ -3218,6 +3620,24 @@
       };
 
       console.log("[booking] Payload:", payload);
+
+      if ((clientState.clientMode === "new" && missingDetailsExistingClientId) || clientState.isTrackedIncompleteClient) {
+        const clientIdToUpdate = missingDetailsExistingClientId || clientState.effectiveClientId;
+        const { error: updErr } = await window.supabaseClient
+          .from('client')
+          .update({
+            first_name: firstName,
+            last_name: lastName,
+            mobile: mobile,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', clientIdToUpdate);
+
+        if (updErr) {
+          console.error("[booking] Failed to update existing client details:", updErr);
+          throw new Error(updErr.message || "Failed to update client details");
+        }
+      }
 
       // Call edge function to create Google Calendar event
       const { data, error } = await window.supabaseClient.functions.invoke('create-admin-booking', {
@@ -3233,6 +3653,9 @@
         console.error("[booking] Edge function returned error:", data);
         throw new Error(data?.error || "Failed to create booking");
       }
+
+      // Clear special state now that details are saved and booking is created
+      clearMissingClientDetailsState();
 
       console.log("[booking] ✅ Booking created successfully:", data);
       const googleEventId = data?.googleEvent?.id;
@@ -3360,6 +3783,7 @@
       setTimeout(pollForEvent, 2000);
     } catch (err) {
       console.error("[booking] Error creating booking:", err);
+      clearMissingClientDetailsState();
       if (window.Modal && window.Modal.alert) {
         window.Modal.alert("Failed to create booking. Please try again.");
       } else {

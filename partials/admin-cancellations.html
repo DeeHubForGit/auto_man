@@ -606,8 +606,9 @@
   } else {
     window.adminCancellationsReady = true;
     
-    // Expose renderCancellations globally for filter reset from admin.html
+    // Expose renderCancellations and loadCancellations globally for filter reset from admin.html
     window.renderCancellations = renderCancellations;
+    window.loadCancellations = loadCancellations;
     
     const initCancellations = () => {
       const reloadCancellationsBtn = document.getElementById('reloadCancellations');

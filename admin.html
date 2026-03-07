@@ -231,21 +231,23 @@
       // Reset filters to default when navigating to cancellations from sidebar
       if (section === 'cancellations' && source === 'sidebar') {
         setTimeout(() => {
+          const dateRangeSelect = document.getElementById('cancellationDateRange');
           const searchInput = document.getElementById('cancellationSearch');
           const sortSelect = document.getElementById('cancellationSort');
           const eligibilityFilter = document.getElementById('refundEligibilityFilter');
           const statusFilter = document.getElementById('refundStatusFilter');
           const perPageSelect = document.getElementById('cancellationsPerPage');
           
+          if (dateRangeSelect) dateRangeSelect.value = '30';
           if (searchInput) searchInput.value = '';
           if (sortSelect) sortSelect.value = 'newest';
           if (eligibilityFilter) eligibilityFilter.value = 'all';
           if (statusFilter) statusFilter.value = 'all';
           if (perPageSelect) perPageSelect.value = '10';
           
-          // Trigger render with reset filters
-          if (window.renderCancellations) {
-            window.renderCancellations();
+          // Trigger reload with reset filters (loadCancellations fetches from DB with date range)
+          if (window.loadCancellations) {
+            window.loadCancellations();
           }
         }, 50);
       }
@@ -303,9 +305,14 @@
       showSection('cancellations', 'alert');
       // Wait for section to be visible, then set filters
       setTimeout(() => {
+        const dateRangeSelect = document.getElementById('cancellationDateRange');
         const eligibilityFilter = document.getElementById('refundEligibilityFilter');
         const statusFilter = document.getElementById('refundStatusFilter');
-        console.log('[admin] Setting filters:', { eligibilityFilter: !!eligibilityFilter, statusFilter: !!statusFilter });
+        console.log('[admin] Setting filters:', { dateRangeSelect: !!dateRangeSelect, eligibilityFilter: !!eligibilityFilter, statusFilter: !!statusFilter });
+        if (dateRangeSelect) {
+          dateRangeSelect.value = 'all';
+          dateRangeSelect.dispatchEvent(new Event('change'));
+        }
         if (eligibilityFilter) {
           eligibilityFilter.value = 'eligible';
           eligibilityFilter.dispatchEvent(new Event('change'));

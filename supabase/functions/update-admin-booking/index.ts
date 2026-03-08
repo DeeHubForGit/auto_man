@@ -247,7 +247,9 @@ ${pickupLocation || 'N/A'}
 `.trim();
 
     // Build event summary
-    const summary = `${serviceLabel || serviceCode} - ${clientName}`;
+    const summary = clientName
+      ? `${serviceLabel || serviceCode} (${clientName})`
+      : (serviceLabel || serviceCode);
 
     // Fetch existing event so we can merge extendedProperties (avoid clobbering other flags)
     const existingUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(googleEventId)}`;

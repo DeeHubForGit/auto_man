@@ -4,6 +4,7 @@
 // =====================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildBookingTitle } from "../_shared/bookingTitle.ts";
 
 // ---------- ACCESS TOKEN LOGIC ----------
 const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.events";
@@ -247,14 +248,13 @@ ${mobile || 'N/A'}
 ${pickupLocation || 'N/A'}
 `.trim();
 
-    // Build event summary
-    const baseSummary = clientName
-      ? `${serviceLabel || serviceCode} (${clientName})`
-      : (serviceLabel || serviceCode);
-
-    const summary = isTest === true
-      ? `[TEST] ${baseSummary}`
-      : baseSummary;
+    // Build event summary using shared helper
+    const summary = buildBookingTitle({
+      serviceLabel: serviceLabel || serviceCode,
+      firstName: firstName,
+      lastName: lastName,
+      isTest: isTest,
+    }) || (serviceLabel || serviceCode);
 
     // Fetch existing event so we can merge extendedProperties (avoid clobbering other flags)
     const existingUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(googleEventId)}`;

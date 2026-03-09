@@ -5,6 +5,7 @@
 // =================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildBookingTitle } from "../_shared/bookingTitle.ts";
 
 // ---------- ACCESS TOKEN LOGIC ----------
 const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar";
@@ -250,12 +251,13 @@ Deno.serve(async (req) => {
       .join(" ")
       .trim();
 
-    // Build event summary to match Google Scheduling format: "Service (Client Name)"
-    const baseSummary = clientName ? `${serviceLabel} (${clientName})` : serviceLabel;
-
-    const summary = isTest === true
-      ? `[TEST] ${baseSummary}`
-      : baseSummary;
+    // Build event summary using shared helper
+    const summary = buildBookingTitle({
+      serviceLabel: serviceLabel,
+      firstName: clientFirstName,
+      lastName: clientLastName,
+      isTest: isTest,
+    }) || serviceLabel;
 
     // Build description with safe fallbacks
     const bookedByLabel = clientName || 'Admin booking';

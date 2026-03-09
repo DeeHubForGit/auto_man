@@ -175,7 +175,8 @@ Deno.serve(async (req) => {
       lastName,
       email,
       mobile,
-      pickupLocation
+      pickupLocation,
+      isTest
     } = payload;
 
     const isPaidBool = !!(payload?.isPaid ?? payload?.is_paid);
@@ -247,9 +248,13 @@ ${pickupLocation || 'N/A'}
 `.trim();
 
     // Build event summary
-    const summary = clientName
+    const baseSummary = clientName
       ? `${serviceLabel || serviceCode} (${clientName})`
       : (serviceLabel || serviceCode);
+
+    const summary = isTest === true
+      ? `[TEST] ${baseSummary}`
+      : baseSummary;
 
     // Fetch existing event so we can merge extendedProperties (avoid clobbering other flags)
     const existingUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(googleEventId)}`;

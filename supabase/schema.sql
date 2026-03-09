@@ -56,17 +56,20 @@ CREATE TABLE public.client (
     is_admin boolean DEFAULT false NOT NULL,
     intake_completed boolean DEFAULT false,
     intake_step integer DEFAULT 1 NOT NULL,
+    is_test boolean DEFAULT false NOT NULL,
     CONSTRAINT intake_step_range CHECK ((intake_step >= 1) AND (intake_step <= 3))
 );
 
 COMMENT ON COLUMN public.client.intake_completed IS 'Tracks whether client has completed the intake form (permit/licence AND medical conditions)';
 COMMENT ON COLUMN public.client.intake_step IS 'Current step in intake form (1-3). Allows resuming intake across devices.';
+COMMENT ON COLUMN public.client.is_test IS 'Marks this client as a test client for testing purposes. Test bookings will not trigger SMS/email notifications.';
 
 -- Service table: defines available driving lesson services
 CREATE TABLE public.service (
     id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
     code text NOT NULL,
     name text NOT NULL,
+    short_name text,
     description text,
     duration_minutes integer NOT NULL,
     price_cents integer NOT NULL,
@@ -76,6 +79,8 @@ CREATE TABLE public.service (
     sort_order integer,
     CONSTRAINT service_google_booking_url_format CHECK (((google_booking_url IS NULL) OR (google_booking_url ~ '^https://calendar\.app\.google/[A-Za-z0-9]+$'::text)))
 );
+
+COMMENT ON COLUMN public.service.short_name IS 'Compact service label for SMS and space-constrained UI, e.g. Auto – 1 hr.';
 
 -- Package table: defines lesson packages for bulk purchase
 CREATE TABLE public.package (
@@ -136,6 +141,10 @@ CREATE TABLE public.booking (
     is_admin_checked boolean DEFAULT false NOT NULL,
     is_payment_required boolean DEFAULT false NOT NULL,
     is_paid boolean DEFAULT false,
+    is_test boolean DEFAULT false NOT NULL,
+    is_sms_enabled boolean DEFAULT true NOT NULL,
+    is_email_enabled boolean DEFAULT true NOT NULL,
+    sms_new_booking_sent_at timestamp with time zone,
     CONSTRAINT booking_price_nonneg CHECK (((price_cents IS NULL) OR (price_cents >= 0))),
     CONSTRAINT booking_time_valid CHECK ((end_time > start_time))
 );
@@ -151,6 +160,10 @@ COMMENT ON COLUMN public.booking.pickup_location_issue IS 'Short code describing
 COMMENT ON COLUMN public.booking.pickup_location_suggestion IS 'Best-guess validated address string from Google Maps API, if available.';
 COMMENT ON COLUMN public.booking.is_admin_checked IS 'TRUE when admin has reviewed this booking manually. Automatically reset to FALSE after auto-validation.';
 COMMENT ON COLUMN public.booking.is_payment_required IS 'Whether the booking still requires payment. Default false. True only for admin-created bookings where payment is handled outside the system.';
+COMMENT ON COLUMN public.booking.is_test IS 'Marks this booking as a test booking. Inherited from client.is_test when created via webhook. Test bookings will not trigger SMS/email notifications.';
+COMMENT ON COLUMN public.booking.is_sms_enabled IS 'Controls whether SMS notifications are enabled for this booking. Test bookings default to false, real bookings default to true.';
+COMMENT ON COLUMN public.booking.is_email_enabled IS 'Controls whether email notifications are enabled for this booking. Test bookings default to false, real bookings default to true.';
+COMMENT ON COLUMN public.booking.sms_new_booking_sent_at IS 'Timestamp when the owner notification SMS for a new booking was sent. Used to prevent duplicate alerts.';
 
 -- Client credit table: tracks lesson package credits
 CREATE TABLE public.client_credit (
@@ -575,6 +588,10 @@ DECLARE
   v_was_inserted boolean;
   v_sms_sent_at  timestamptz;
   v_email_sent_at timestamptz;
+  v_client_is_test boolean := false;  -- Default to false (real client)
+  v_booking_is_test boolean;
+  v_sms_enabled boolean;
+  v_email_enabled boolean;
 BEGIN
   -- Upsert client ONLY if client_id not provided AND email is available
   IF v_client_id IS NULL AND NULLIF(trim(p_client_email), '') IS NOT NULL THEN
@@ -587,6 +604,21 @@ BEGIN
           updated_at = now()
     RETURNING id INTO v_client_id;
   END IF;
+
+  -- Fetch client's is_test status if we have a client_id
+  IF v_client_id IS NOT NULL THEN
+    SELECT COALESCE(is_test, false)
+    INTO v_client_is_test
+    FROM public.client
+    WHERE id = v_client_id;
+  END IF;
+
+  -- Determine booking flags based on client test status
+  -- Test client → is_test=true, notifications disabled
+  -- Real client → is_test=false, notifications enabled
+  v_booking_is_test := v_client_is_test;
+  v_sms_enabled := NOT v_client_is_test;
+  v_email_enabled := NOT v_client_is_test;
 
   -- Upsert booking
   INSERT INTO public.booking (
@@ -605,7 +637,10 @@ BEGIN
     first_name,
     last_name,
     email,
-    mobile
+    mobile,
+    is_test,
+    is_sms_enabled,
+    is_email_enabled
   )
   VALUES (
     v_client_id,
@@ -623,7 +658,10 @@ BEGIN
     p_first_name,
     p_last_name,
     p_client_email,
-    p_mobile
+    p_mobile,
+    v_booking_is_test,
+    v_sms_enabled,
+    v_email_enabled
   )
   ON CONFLICT (google_event_id) DO UPDATE
   SET
@@ -801,6 +839,7 @@ ALTER TABLE ONLY public.availability_slot_old
 -- Client indexes
 CREATE INDEX idx_client_email ON public.client USING btree (email);
 CREATE INDEX idx_client_intake_completed ON public.client USING btree (intake_completed) WHERE (intake_completed = false);
+CREATE INDEX idx_client_is_test ON public.client USING btree (is_test);
 
 -- Service indexes
 CREATE INDEX idx_service_sort_order ON public.service USING btree (sort_order);
@@ -819,6 +858,7 @@ CREATE INDEX idx_booking_refunded ON public.booking USING btree (refunded) WHERE
 CREATE INDEX idx_booking_refund_eligible ON public.booking USING btree (refund_eligible) WHERE (status = 'cancelled'::public.booking_status);
 CREATE INDEX idx_booking_validation_pending ON public.booking USING btree (validation_checked_at) WHERE ((validation_checked_at IS NULL) OR (is_mobile_valid IS NULL) OR (is_pickup_location_valid IS NULL));
 CREATE INDEX booking_reminder_scan_idx ON public.booking USING btree (start_time) WHERE ((is_booking IS TRUE) AND ((status IS NULL) OR (status = 'confirmed'::public.booking_status)) AND (sms_reminder_sent_at IS NULL));
+CREATE INDEX idx_booking_is_test ON public.booking USING btree (is_test);
 
 -- Unique constraint indexes
 CREATE UNIQUE INDEX ux_booking_client_start_min ON public.booking USING btree (client_id, start_minute) WHERE ((source = 'portal'::text) AND (is_deleted = false));

@@ -3248,6 +3248,7 @@
         email,
         mobile,
         pickupLocation,
+        isTest: document.getElementById('bookingIsTest')?.checked === true,
         ...(canEditPayments ? { isPaid } : {}),
       };
 

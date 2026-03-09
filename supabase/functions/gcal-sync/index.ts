@@ -476,6 +476,31 @@ Deno.serve(async () => {
           if (row && row.booking_id) {
             const bookingId = row.booking_id;
 
+            // ---------- OWNER ALERT SMS (independent of customer notifications) ----------
+            try {
+              console.log(`[gcal-sync] Invoking new-booking-owner-sms: ${bookingId}`);
+              const { data: ownerSmsData, error: ownerSmsErr } = await supabase.functions.invoke('new-booking-owner-sms', {
+                body: { booking_id: bookingId },
+              });
+
+              if (ownerSmsErr) {
+                console.warn('[gcal-sync] new-booking-owner-sms invoke failed (non-fatal):', bookingId, ownerSmsErr);
+              } else if (ownerSmsData?.ok === true) {
+                const ownerStatus = String(ownerSmsData?.status || '');
+                if (ownerStatus === 'sent' || ownerStatus === 'pending') {
+                  console.log(`[gcal-sync] new-booking-owner-sms sent for booking ${bookingId}`);
+                } else if (ownerSmsData?.skipped) {
+                  console.log(`[gcal-sync] new-booking-owner-sms skipped for booking ${bookingId}: ${ownerSmsData.skipped}`);
+                } else {
+                  console.log(`[gcal-sync] new-booking-owner-sms status ${ownerStatus} for booking ${bookingId}`);
+                }
+              } else {
+                console.warn('[gcal-sync] new-booking-owner-sms returned non-ok (non-fatal):', bookingId, ownerSmsData);
+              }
+            } catch (ownerSmsCheckErr) {
+              console.warn('[gcal-sync] new-booking-owner-sms check failed (non-fatal):', bookingId, ownerSmsCheckErr);
+            }
+
             // Send confirmation SMS if not already sent (calendar-created bookings).
             // Fail-safe: log and continue if anything fails.
             let b: any = null;

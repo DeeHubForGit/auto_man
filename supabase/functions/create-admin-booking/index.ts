@@ -169,6 +169,7 @@ Deno.serve(async (req) => {
       email,
       mobile,
       pickupLocation,
+      isTest
     } = payload;
 
     const isPaidBool = !!(payload?.isPaid ?? payload?.is_paid);
@@ -250,7 +251,11 @@ Deno.serve(async (req) => {
       .trim();
 
     // Build event summary to match Google Scheduling format: "Service (Client Name)"
-    const summary = clientName ? `${serviceLabel} (${clientName})` : serviceLabel;
+    const baseSummary = clientName ? `${serviceLabel} (${clientName})` : serviceLabel;
+
+    const summary = isTest === true
+      ? `[TEST] ${baseSummary}`
+      : baseSummary;
 
     // Build description with safe fallbacks
     const bookedByLabel = clientName || 'Admin booking';

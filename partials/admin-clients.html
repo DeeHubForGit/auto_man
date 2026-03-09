@@ -789,6 +789,13 @@
             </div>
 
             <div class="mt-4">
+              <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-900">
+                <input type="checkbox" data-field="is_test" ${c.is_test === true ? 'checked' : ''} />
+                Test Client
+              </label>
+            </div>
+
+            <div class="mt-4">
               <div class="client-section-title text-sm font-semibold text-gray-900 mb-2">Additional Notes</div>
               <textarea class="${inputCls}" data-field="notes" rows="3" placeholder="Add notes…">${escapeHtml(safeText(c.notes))}</textarea>
             </div>
@@ -828,7 +835,7 @@
     try {
       const { data, error } = await window.supabaseClient
         .from('client')
-        .select('id,email,first_name,last_name,mobile,created_at,updated_at,is_admin,intake_completed,is_anxious_nervous,is_beginner,is_senior,learner_permit_number,emergency_contact_name,emergency_contact_phone,medical_conditions,learning_needs_other,notes')
+        .select('id,email,first_name,last_name,mobile,created_at,updated_at,is_admin,intake_completed,is_test,is_anxious_nervous,is_beginner,is_senior,learner_permit_number,emergency_contact_name,emergency_contact_phone,medical_conditions,learning_needs_other,notes')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -1097,6 +1104,7 @@
       learning_needs_other: otherText,
       notes: getValue('notes').trim(),
       intake_completed: getChecked('intake_completed'),
+      is_test: getChecked('is_test'),
     };
 
     try {

@@ -1298,6 +1298,15 @@
               </label>
             </div>
 
+            <!-- Booking Flags (Phase 1) -->
+            ${booking.is_test === true ? `
+            <div class="flex items-center gap-3 pt-1 text-xs text-gray-600">
+              <span>Test: <strong class="text-orange-600">Yes</strong></span>
+              <span>SMS: <strong>${booking.is_sms_enabled === false ? 'Off' : 'On'}</strong></span>
+              <span>Email: <strong>${booking.is_email_enabled === false ? 'Off' : 'On'}</strong></span>
+            </div>
+            ` : ''}
+
           </div>
         </div>
       </div>

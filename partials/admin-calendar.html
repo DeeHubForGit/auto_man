@@ -69,6 +69,8 @@
       margin-left: auto;
       margin-right: -4px;
       flex-shrink: 0;                   /* prevent shrinking */
+      align-self: flex-start;
+      margin-top: 0px;
   }
 
   #section-calendar .booking-cancel-btn:hover {
@@ -103,16 +105,6 @@
   #section-calendar .booking-card-text {
     flex: 1;
     min-width: 0;
-  }
-  
-  #section-calendar .booking-cancel-btn {
-    align-self: flex-start;
-    margin-top: 0px;
-  }
-  
-  /* Show cancel button always for now */
-  #section-calendar .booking-card .booking-cancel-btn {
-    display: inline-flex;
   }
   
   /* Ensure status dropdown is always visible in expanded state */
@@ -153,6 +145,12 @@
   /* Red warning when payment not yet received */
   #section-calendar .payment-toggle.unpaid .payment-label {
     color: var(--danger);
+  }
+  
+  /* Test booking styling */
+  #section-calendar .calendar-event-test {
+    background-color: #ede9fe !important;
+    border-left: 3px solid #8b5cf6 !important;
   }
   
   /* Ensure header row and time column are visible on dark background */
@@ -986,6 +984,25 @@
               <option value="no_show">No Show</option>
             </select>
           </div>
+
+          <!-- Test and Notification Flags -->
+          <div class="form-group" id="bookingFlagsSection">
+            <label class="text-sm font-medium text-gray-700 mb-2 block">Booking Flags</label>
+            <div class="flex flex-col gap-2">
+              <label class="inline-flex items-center gap-2 text-sm">
+                <input type="checkbox" id="bookingIsTest" class="cursor-pointer">
+                <span>Test booking</span>
+              </label>
+              <label class="inline-flex items-center gap-2 text-sm">
+                <input type="checkbox" id="bookingIsSmsEnabled" class="cursor-pointer">
+                <span>SMS enabled</span>
+              </label>
+              <label class="inline-flex items-center gap-2 text-sm">
+                <input type="checkbox" id="bookingIsEmailEnabled" class="cursor-pointer">
+                <span>Email enabled</span>
+              </label>
+            </div>
+          </div>
         </div>
 
         <div class="admin-modal-footer">
@@ -1309,6 +1326,17 @@
     document.getElementById("appt-end").value = defaults.endTime || "";
     document.getElementById("appt-location").value = defaults.location || "";
 
+    // Set default booking flags for new bookings (non-test by default)
+    const bookingIsTest = document.getElementById('bookingIsTest');
+    const bookingIsSmsEnabled = document.getElementById('bookingIsSmsEnabled');
+    const bookingIsEmailEnabled = document.getElementById('bookingIsEmailEnabled');
+    if (bookingIsTest) bookingIsTest.checked = false;
+    if (bookingIsSmsEnabled) bookingIsSmsEnabled.checked = true;
+    if (bookingIsEmailEnabled) bookingIsEmailEnabled.checked = true;
+
+    // Hide flags by default (will be shown if test client is selected)
+    hideBookingFlagsSection();
+
     // Clear all validation errors
     clearApptError("appt-title");
     clearApptError("appt-date");
@@ -1324,6 +1352,9 @@
 
     // Update business hours warnings after setting default times
     updateBusinessHoursWarnings();
+
+    // Update flags visibility based on initial state
+    updateBookingFlagsVisibility();
 
     formHasChanges = false; // Reset change tracking
     apptBackdrop.classList.remove("hidden");
@@ -1519,6 +1550,14 @@
       statusSelect.value = booking.status || 'confirmed';
     }
 
+    // Fill booking flags (Phase 1)
+    const bookingIsTest = document.getElementById('bookingIsTest');
+    const bookingIsSmsEnabled = document.getElementById('bookingIsSmsEnabled');
+    const bookingIsEmailEnabled = document.getElementById('bookingIsEmailEnabled');
+    if (bookingIsTest) bookingIsTest.checked = !!booking.is_test;
+    if (bookingIsSmsEnabled) bookingIsSmsEnabled.checked = booking.is_sms_enabled !== false;
+    if (bookingIsEmailEnabled) bookingIsEmailEnabled.checked = booking.is_email_enabled !== false;
+
     // Client mode: only admin-created bookings can change client details
     const existingRadio = document.querySelector('input[name="clientMode"][value="existing"]');
     const newRadio = document.querySelector('input[name="clientMode"][value="new"]');
@@ -1645,6 +1684,9 @@
     
     // Check for price mismatch warning
     updatePaidVsServicePriceWarning();
+    
+    // Update booking flags visibility based on selected client
+    updateBookingFlagsVisibility();
     
     // Open modal
     formHasChanges = false;
@@ -1914,6 +1956,8 @@
         clearApptError('newClientLastName');
         clearApptError('newClientMobile');
       }
+      // Update flags visibility when mode changes
+      updateBookingFlagsVisibility();
     });
   });
 
@@ -1943,6 +1987,11 @@
       clearMissingClientDetailsState();
       forcedMissingClientMode = false;
       clearNewClientFields();
+      
+      // Apply booking defaults based on client's is_test status
+      applyBookingDefaultsFromClient(opt);
+      // Update flags visibility
+      updateBookingFlagsVisibility();
       return;
     }
 
@@ -1951,6 +2000,11 @@
     // Switch to "New" UI, but do NOT create a new client record.
     const email = (opt.dataset.email || '').trim();
     forceNewModeForMissingExistingClient(clientId, email);
+    
+    // Apply booking defaults for incomplete client too
+    applyBookingDefaultsFromClient(opt);
+    // Update flags visibility for incomplete test client
+    updateBookingFlagsVisibility();
   });
 
   // Listen for service selection change to update end time
@@ -2039,7 +2093,7 @@
     try {
       const { data: clients, error } = await window.supabaseClient
         .from('client')
-        .select('id, first_name, last_name, email, mobile')
+        .select('id, first_name, last_name, email, mobile, is_test')
         .order('first_name');
 
       if (error) {
@@ -2057,7 +2111,7 @@
       selectEl.innerHTML = '<option value="">Select a client...</option>' +
         clients.map(c => {
           const fullName = [c.first_name, c.last_name].filter(Boolean).join(' ');
-          return `<option value="${c.id}" data-first-name="${c.first_name || ''}" data-last-name="${c.last_name || ''}" data-email="${c.email || ''}" data-mobile="${c.mobile || ''}">${fullName} (${c.email || 'no email'})</option>`;
+          return `<option value="${c.id}" data-first-name="${c.first_name || ''}" data-last-name="${c.last_name || ''}" data-email="${c.email || ''}" data-mobile="${c.mobile || ''}" data-is-test="${c.is_test === true}">${fullName} (${c.email || 'no email'})</option>`;
         }).join('');
 
       console.log(`[admin-calendar] Loaded ${clients.length} clients`);
@@ -2233,6 +2287,67 @@
     clearApptError('newClientFirstName');
     clearApptError('newClientLastName');
     clearApptError('newClientMobile');
+  }
+
+  function applyBookingDefaultsFromClient(clientOption) {
+    if (!clientOption) return;
+    
+    const isTest = clientOption.dataset.isTest === 'true';
+    
+    const bookingIsTest = document.getElementById('bookingIsTest');
+    const bookingIsSmsEnabled = document.getElementById('bookingIsSmsEnabled');
+    const bookingIsEmailEnabled = document.getElementById('bookingIsEmailEnabled');
+    
+    if (bookingIsTest) bookingIsTest.checked = isTest;
+    if (bookingIsSmsEnabled) bookingIsSmsEnabled.checked = !isTest;
+    if (bookingIsEmailEnabled) bookingIsEmailEnabled.checked = !isTest;
+  }
+
+  function showBookingFlagsSection() {
+    const el = document.getElementById('bookingFlagsSection');
+    if (!el) return;
+    el.style.display = '';
+  }
+
+  function hideBookingFlagsSection() {
+    const el = document.getElementById('bookingFlagsSection');
+    if (!el) return;
+    el.style.display = 'none';
+  }
+
+  function isSelectedExistingClientTest() {
+    const selectEl = document.getElementById('existingClientSelect');
+    const opt = selectEl?.selectedOptions?.[0];
+    if (!opt) return false;
+    return (opt.dataset.isTest || '').toLowerCase() === 'true';
+  }
+
+  function updateBookingFlagsVisibility(options = {}) {
+    const forceShow = options.forceShow === true;
+
+    if (forceShow) {
+      showBookingFlagsSection();
+      return;
+    }
+
+    // If the selected/linked client is a test client, always show flags.
+    if (isSelectedExistingClientTest()) {
+      showBookingFlagsSection();
+      return;
+    }
+
+    // If this is the special missing-details existing-client flow,
+    // keep flags visible when that selected existing client is test.
+    if (typeof missingDetailsExistingClientId !== 'undefined' && missingDetailsExistingClientId) {
+      const selectedWasTest = isSelectedExistingClientTest();
+      if (selectedWasTest) {
+        showBookingFlagsSection();
+        return;
+      }
+    }
+
+    // Otherwise hide for normal clients
+    hideBookingFlagsSection();
   }
 
   function getClientFormState(canEditClient = true) {
@@ -3240,7 +3355,19 @@
         pickupIssue: pickupIssueToStore,
         pickupSuggestion: pickupSuggestionToStore,
         validationCheckedAt: checkedAtToStore,
+
+        // Booking flags (Phase 1)
+        isTest: document.getElementById('bookingIsTest')?.checked === true,
+        isSmsEnabled: document.getElementById('bookingIsSmsEnabled')?.checked === true,
+        isEmailEnabled: document.getElementById('bookingIsEmailEnabled')?.checked === true,
       });
+
+      // Update in-memory edit object to keep modal state consistent
+      if (editingBookingData) {
+        editingBookingData.is_test = document.getElementById('bookingIsTest')?.checked === true;
+        editingBookingData.is_sms_enabled = document.getElementById('bookingIsSmsEnabled')?.checked === true;
+        editingBookingData.is_email_enabled = document.getElementById('bookingIsEmailEnabled')?.checked === true;
+      }
 
       if (saveBtn) {
         saveBtn.textContent = 'Saved';
@@ -3284,7 +3411,6 @@
   }
 
   // Update the DB row for a booking immediately after a successful Google update
-  // Update the DB row for a booking immediately after a successful Google update
   async function updateBookingRowInDb(bookingId, opts) {
     if (!bookingId) return;
 
@@ -3326,6 +3452,17 @@
     }
     if (opts.validationCheckedAt !== undefined) {
       updateData.validation_checked_at = opts.validationCheckedAt;
+    }
+
+    // Booking flags (Phase 1)
+    if (opts.isTest !== undefined) {
+      updateData.is_test = !!opts.isTest;
+    }
+    if (opts.isSmsEnabled !== undefined) {
+      updateData.is_sms_enabled = !!opts.isSmsEnabled;
+    }
+    if (opts.isEmailEnabled !== undefined) {
+      updateData.is_email_enabled = !!opts.isEmailEnabled;
     }
 
     const { error } = await window.supabaseClient
@@ -3617,6 +3754,9 @@
         mobile,
         pickupLocation,
         isPaid,
+        isTest: document.getElementById('bookingIsTest')?.checked === true,
+        isSmsEnabled: document.getElementById('bookingIsSmsEnabled')?.checked === true,
+        isEmailEnabled: document.getElementById('bookingIsEmailEnabled')?.checked === true,
       };
 
       console.log("[booking] Payload:", payload);
@@ -3670,6 +3810,10 @@
         extraUpdate.validation_checked_at = checkedAtToStore;
         if (typeof status === 'string') extraUpdate.status = status;
         if (Number.isFinite(amountPaidCents)) extraUpdate.price_cents = amountPaidCents;
+        // Add booking flags (Phase 1)
+        extraUpdate.is_test = document.getElementById('bookingIsTest')?.checked === true;
+        extraUpdate.is_sms_enabled = document.getElementById('bookingIsSmsEnabled')?.checked === true;
+        extraUpdate.is_email_enabled = document.getElementById('bookingIsEmailEnabled')?.checked === true;
         if (Object.keys(extraUpdate).length > 0) {
           const { error: extraErr } = await window.supabaseClient
             .from('booking')
@@ -3979,8 +4123,8 @@
         case 'manual_60': return 'Manual - 1h';
         case 'manual_90': return 'Manual - 1.5h';
         case 'manual_120': return 'Manual - 2h';
-        case 'senior_auto_60': return 'Senior auto - 1h';
-        case 'senior_manual_60': return 'Senior manual - 1h';
+        case 'senior_auto_60': return 'Snr Auto - 1h';
+        case 'senior_manual_60': return 'Snr Manual - 1h';
         default: return 'Lesson';
       }
     };
@@ -4103,7 +4247,9 @@
         // Use is_booking flag to determine display type
         if (booking.is_booking) {
           // This is a booking with client information - show service name
-          bookingDiv.className = 'booking-card text-xs border-l-2 border-blue-600 p-1 rounded absolute left-0 right-0 z-10';
+          bookingDiv.className = booking.is_test === true
+            ? 'booking-card calendar-event-test text-xs border-l-2 border-blue-600 p-1 rounded absolute left-0 right-0 z-10'
+            : 'booking-card text-xs border-l-2 border-blue-600 p-1 rounded absolute left-0 right-0 z-10';
           bookingDiv.style.backgroundColor = '#bfdbfe';
           bookingDiv.style.color = '#111827';
           const padAdjust = isMobile ? 4 : 8; // subtract internal card padding so the block visually fits one rectangle
@@ -4117,7 +4263,12 @@
           const paidYesNo = booking.is_paid ? 'Yes' : 'No';
           
           // Get short service label
-          const titleText = getServiceShortLabel(booking.service_code);
+          const serviceLabel = getServiceShortLabel(booking.service_code);
+          
+          // Add TEST prefix for test bookings
+          const titleText = booking.is_test === true
+            ? `TEST ${serviceLabel}`
+            : serviceLabel;
           
           // Build a compact location label for mobile
           let locationLabel = '';

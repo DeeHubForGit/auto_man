@@ -16,6 +16,14 @@ function sanitizeString(str: string, maxLength: number): string {
   return str.trim().slice(0, maxLength);
 }
 
+function containsHtmlTags(value: string): boolean {
+  return /<[^>]+>/.test(value);
+}
+
+function containsSuspiciousScriptPattern(value: string): boolean {
+  return /<script|<img|<svg|<iframe|javascript:|srcdoc\s*=|onerror\s*=|onload\s*=|onmouseover\s*=|onfocus\s*=|onpageshow\s*=|eval\s*\(|document\.cookie/i.test(value);
+}
+
 // Simple in-memory rate limiter (sliding window)
 // For production with multiple instances, consider Upstash Redis
 const rateLimitMap = new Map<string, number[]>();
@@ -115,6 +123,11 @@ serve(async (req) => {
       return json({ error: 'Name must be between 1 and 100 characters' }, 400, req);
     }
 
+    // Reject HTML/XSS attempts in name
+    if (containsHtmlTags(sanitizedName) || containsSuspiciousScriptPattern(sanitizedName)) {
+      return json({ error: 'Name cannot contain HTML or code' }, 400, req);
+    }
+
     if (!isValidEmail(sanitizedEmail)) {
       return json({ error: 'Invalid email format' }, 400, req);
     }
@@ -125,6 +138,11 @@ serve(async (req) => {
 
     if (sanitizedMessage.length > 5000) {
       return json({ error: 'Message is too long (max 5000 characters)' }, 400, req);
+    }
+
+    // Reject HTML/XSS attempts in message
+    if (containsHtmlTags(sanitizedMessage) || containsSuspiciousScriptPattern(sanitizedMessage)) {
+      return json({ error: 'Message cannot contain HTML or script-like content. Please enter plain text only' }, 400, req);
     }
 
     if (sanitizedPhone && !isValidAUPhone(sanitizedPhone)) {

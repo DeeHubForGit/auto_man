@@ -206,6 +206,15 @@
       }
     }
     
+    // Security validation helpers
+    function containsHtmlTags(value) {
+      return /<[^>]+>/.test(value);
+    }
+
+    function containsSuspiciousScriptPattern(value) {
+      return /<script|<img|<svg|<iframe|javascript:|srcdoc\s*=|onerror\s*=|onload\s*=|onmouseover\s*=|onfocus\s*=|onpageshow\s*=|eval\s*\(|document\.cookie/i.test(value);
+    }
+    
     // Setup validation
     const nameInput = document.getElementById('name');
     const emailInput = document.getElementById('email');
@@ -265,6 +274,8 @@
       const val = this.value.trim();
       if (!val) {
         showError('message', 'messageError', 'Message is required');
+      } else if (val.length < 10) {
+        showError('message', 'messageError', 'Message must be at least 10 characters');
       } else {
         clearError('message', 'messageError');
       }
@@ -277,7 +288,7 @@
     });
 
     // Contact form handler
-    document.getElementById('contactForm')?.addEventListener('submit', function (e) {
+    document.getElementById('contactForm')?.addEventListener('submit', async function (e) {
       e.preventDefault();
       const formMessage = document.getElementById('formMessage');
       const submitButton = this.querySelector('button[type="submit"]');
@@ -318,6 +329,20 @@
       if (!message) {
         showError('message', 'messageError', 'Message is required');
         hasError = true;
+      } else if (message.length < 10) {
+        showError('message', 'messageError', 'Message must be at least 10 characters');
+        hasError = true;
+      }
+      
+      // Check for HTML/script content (client-side security validation)
+      if (name && (containsHtmlTags(name) || containsSuspiciousScriptPattern(name))) {
+        showError('name', 'nameError', 'HTML or script content is not allowed in this form. Please enter plain text only.');
+        hasError = true;
+      }
+      
+      if (message && (containsHtmlTags(message) || containsSuspiciousScriptPattern(message))) {
+        showError('message', 'messageError', 'HTML or script content is not allowed in this form. Please enter plain text only.');
+        hasError = true;
       }
       
       if (hasError) {
@@ -336,30 +361,101 @@
 
       // Send via Supabase Edge Function (via client)
       if (!window.supabaseClient) {
-        throw new Error('Supabase not ready');
-      }
-      window.supabaseClient.functions.invoke('contact', { body: formData })
-      .then(() => {
-        formMessage.textContent = "Thank you! We'll get back to you soon.";
-        formMessage.className = 'mt-4 text-center text-blue-dark font-semibold';
-        formMessage.classList.remove('hidden');
-        (document.getElementById('contactForm')).reset();
-        clearError('name', 'nameError');
-        clearError('email', 'emailError');
-        clearError('phone', 'phoneError');
-        clearError('message', 'messageError');
-      })
-      .catch((err) => {
-        console.error('Contact submit error:', err);
-        formMessage.textContent = 'Sorry, something went wrong. Please email darren@automandrivingschool.com.au or try again later.';
+        console.error('Supabase client not ready');
+        formMessage.textContent = 'Sorry, something went wrong. Please email info@automandrivingschool.com.au or try again later.';
         formMessage.className = 'mt-4 text-center text-red-600 font-semibold';
         formMessage.classList.remove('hidden');
-      })
-      .finally(() => {
         submitButton.disabled = false;
         submitButton.textContent = originalButtonText;
         setTimeout(() => formMessage.classList.add('hidden'), 7000);
-      });
+        return;
+      }
+
+      try {
+        const { data, error } = await window.supabaseClient.functions.invoke('contact', { body: formData });
+
+        if (error) {
+          // Edge Function returned an error - extract the friendly message
+          console.error('Contact submit error:', error);
+          
+          let serverMsg = '';
+          
+          // Try to extract server error message from various locations
+          if (error.context?.body) {
+            // The body might be a string or JSON
+            try {
+              const parsed = typeof error.context.body === 'string' 
+                ? JSON.parse(error.context.body) 
+                : error.context.body;
+              
+              if (parsed.error) {
+                serverMsg = parsed.error;
+              } else if (typeof error.context.body === 'string' && error.context.body.length < 200) {
+                // Use the body directly if it's a short string
+                serverMsg = error.context.body;
+              }
+            } catch (parseErr) {
+              // If parsing fails, use body as-is if it's a reasonable length
+              if (typeof error.context.body === 'string' && error.context.body.length < 200) {
+                serverMsg = error.context.body;
+              }
+            }
+          } else if (error.message && !error.message.includes('non-2xx status code')) {
+            // Use error.message if it's not the generic Supabase message
+            serverMsg = error.message;
+          }
+          
+          // Determine the appropriate error message
+          let errorMsg;
+          
+          // Check if the error is about HTML/script content being blocked
+          const isHtmlScriptError = serverMsg && (
+            serverMsg.toLowerCase().includes('html') || 
+            serverMsg.toLowerCase().includes('script') ||
+            serverMsg.includes('cannot contain')
+          );
+          
+          if (isHtmlScriptError) {
+            // Show friendly HTML/script message
+            errorMsg = 'HTML or script content is not allowed in this form. Please enter plain text only.';
+          } else if (serverMsg && (
+            serverMsg.includes('must be at least') ||
+            serverMsg.includes('must be between') ||
+            serverMsg.includes('Invalid email format') ||
+            serverMsg.includes('Invalid Australian phone') ||
+            serverMsg.includes('Too many contact form submissions')
+          )) {
+            // Show validation messages directly from server
+            errorMsg = serverMsg;
+          } else {
+            // Generic fallback for unexpected errors
+            errorMsg = 'Sorry, something went wrong. Please email info@automandrivingschool.com.au or try again later.';
+          }
+          
+          formMessage.textContent = errorMsg;
+          formMessage.className = 'mt-4 text-center text-red-600 font-semibold';
+          formMessage.classList.remove('hidden');
+        } else {
+          // Success
+          formMessage.textContent = "Thank you! We'll get back to you soon.";
+          formMessage.className = 'mt-4 text-center text-blue-dark font-semibold';
+          formMessage.classList.remove('hidden');
+          (document.getElementById('contactForm')).reset();
+          clearError('name', 'nameError');
+          clearError('email', 'emailError');
+          clearError('phone', 'phoneError');
+          clearError('message', 'messageError');
+        }
+      } catch (err) {
+        console.error('Contact submit error:', err);
+        formMessage.textContent = 'Sorry, something went wrong. Please email info@automandrivingschool.com.au or try again later.';
+        formMessage.className = 'mt-4 text-center text-red-600 font-semibold';
+        formMessage.classList.remove('hidden');
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = originalButtonText;
+        setTimeout(() => formMessage.classList.add('hidden'), 7000);
+      }
     });
   </script>
   <!-- Google Analytics -->

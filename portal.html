@@ -112,6 +112,13 @@
   <div data-include="partials/footer.html"></div>
 
   <script>
+    // HTML escape helper to prevent XSS
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
     let currentUser = null;
     let clientData = null;
 
@@ -734,18 +741,37 @@
         console.error('Error loading bookings:', err);
         const list = document.getElementById('upcoming-list');
         if (list) {
-          list.innerHTML = `
-            <div class="text-center py-8">
-              <svg class="mx-auto h-12 w-12 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p class="text-red-600 mt-4">Could not load bookings</p>
-              <p class="text-gray-500 text-sm mt-2">${err.message || 'Please try again'}</p>
-              <button onclick="loadBookings()" class="btn btn-primary mt-4 px-4 py-2">
-                Retry
-              </button>
-            </div>`;
+          // Safe DOM rendering for error
+          const errorDiv = document.createElement('div');
+          errorDiv.className = 'text-center py-8';
+          
+          const svgIcon = document.createElement('div');
+          svgIcon.innerHTML = `
+            <svg class="mx-auto h-12 w-12 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>`;
+          
+          const errorTitle = document.createElement('p');
+          errorTitle.className = 'text-red-600 mt-4';
+          errorTitle.textContent = 'Could not load bookings';
+          
+          const errorMsg = document.createElement('p');
+          errorMsg.className = 'text-gray-500 text-sm mt-2';
+          errorMsg.textContent = err.message || 'Please try again';
+          
+          const retryBtn = document.createElement('button');
+          retryBtn.className = 'btn btn-primary mt-4 px-4 py-2';
+          retryBtn.textContent = 'Retry';
+          retryBtn.onclick = loadBookings;
+          
+          errorDiv.appendChild(svgIcon.firstElementChild);
+          errorDiv.appendChild(errorTitle);
+          errorDiv.appendChild(errorMsg);
+          errorDiv.appendChild(retryBtn);
+          
+          list.innerHTML = '';
+          list.appendChild(errorDiv);
         }
       } finally {
         finished = true;
@@ -807,6 +833,21 @@
             initPickupValidationUI(cardEl, booking);
           }
         });
+        
+        // Add event delegation for cancel buttons
+        const cancelBtnListener = (e) => {
+          const btn = e.target.closest('.cancel-btn');
+          if (!btn) return;
+          
+          const bookingId = btn.getAttribute('data-booking-id') || '';
+          const googleEventId = btn.getAttribute('data-google-event-id') || '';
+          handleCancelBooking(bookingId, googleEventId, btn);
+        };
+        
+        // Remove old listener if exists and add new one
+        container.removeEventListener('click', container._cancelBtnListener);
+        container._cancelBtnListener = cancelBtnListener;
+        container.addEventListener('click', cancelBtnListener);
       }
       
       // Set aria-busy to false after rendering
@@ -1166,6 +1207,15 @@
 
       const duration = Math.round((endTime - startTime) / (1000 * 60));
 
+      // Escape all text values for XSS protection
+      const safeDateStr = escapeHtml(dateStr);
+      const safeTimeStr = escapeHtml(timeStr);
+      const safeEndTimeStr = escapeHtml(endTimeStr);
+      const safeDuration = escapeHtml(String(duration));
+      const safeOwnerName = escapeHtml(window.SITE_CONFIG?.OWNER_NAME || '');
+      const safePhoneDisplay = escapeHtml(window.SITE_CONFIG?.PHONE_NUMBER_DISPLAY || '');
+      const safePhoneLink = escapeHtml(window.SITE_CONFIG?.PHONE_NUMBER_LINK || '');
+
       let statusBadge = renderStatusChip(booking.status);
       let cancelButton = '';
       
@@ -1208,10 +1258,13 @@
       
       if (isConfirmed && isUpcoming) {
         // Cancel button in header for confirmed upcoming bookings (still allowed even when locked)
+        const safeBookingId = escapeHtml(String(booking.id || ''));
+        const safeGoogleEventId = escapeHtml(String(booking.google_event_id || ''));
         cancelButton = `
         <button 
-          onclick="handleCancelBooking('${booking.id}', '${booking.google_event_id || ''}', this)" 
           class="cancel-btn" 
+          data-booking-id="${safeBookingId}"
+          data-google-event-id="${safeGoogleEventId}"
           title="Cancel Booking" 
           aria-label="Cancel Booking">
           Cancel
@@ -1220,13 +1273,14 @@
 
       // Service name
       const serviceName = getServiceName(booking.service_code);
+      const safeServiceName = escapeHtml(serviceName);
 
       return `
         <div id="booking-card-${booking.id}" class="booking-card bg-gray-100 border border-gray-300 rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow">
           <!-- Header with title, status, and cancel -->
           <div class="flex items-start justify-between gap-2 mb-2">
             <div class="flex items-center gap-2 flex-1 min-w-0">
-              <h3 class="text-sm sm:text-base font-semibold text-gray-900">${serviceName}</h3>
+              <h3 class="text-sm sm:text-base font-semibold text-gray-900">${safeServiceName}</h3>
               ${statusBadge}
             </div>
             <div class="flex-shrink-0">
@@ -1242,14 +1296,14 @@
                   <svg class="w-4 h-4 flex-shrink-0 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  <span class="text-gray-900">${dateStr}</span>
+                  <span class="text-gray-900">${safeDateStr}</span>
                 </div>
                 
                 <div class="flex items-center gap-2">
                   <svg class="w-4 h-4 flex-shrink-0 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span class="text-gray-900 break-words">${timeStr} - ${endTimeStr} (${duration} minutes)</span>
+                  <span class="text-gray-900 break-words">${safeTimeStr} - ${safeEndTimeStr} (${safeDuration} minutes)</span>
                 </div>
 
                 <div class="flex items-start gap-2" id="mobile-row-${booking.id}">
@@ -1261,10 +1315,10 @@
                       <div class="flex items-center gap-2">
                         <input 
                           type="text" 
-                          value="${booking.mobile || ''}"
+                          value="${escapeHtml(booking.mobile || '')}"
                           data-booking-id="${booking.id}"
                           data-field="mobile"
-                          data-original="${booking.mobile || ''}"
+                          data-original="${escapeHtml(booking.mobile || '')}"
                           data-is-invalid="${booking.is_mobile_valid === false}"
                           oninput="validateBookingMobile(this)"
                           onblur="saveBookingField(this)"
@@ -1301,7 +1355,7 @@
                         <div class="flex items-center gap-2">
                           <input 
                             type="text" 
-                            value="${booking.pickup_location || ''}"
+                            value="${escapeHtml(booking.pickup_location || '')}"
                             class="pickup-address-input w-full px-2 py-1 text-sm ${!booking.pickup_location || booking.pickup_location.trim() === '' ? 'text-red-600 border-red-400' : booking.is_pickup_location_valid === false ? 'text-red-600 border-red-400' : booking.is_pickup_location_valid == null ? 'text-blue-600 border-blue-400' : 'text-gray-900 border-gray-300'} border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="Enter full address"
                           />
@@ -1332,7 +1386,7 @@
                       </div>
                     ` : `
                       <div class="flex items-center gap-2">
-                        <span class="text-gray-900 break-words">${booking.pickup_location || 'No pickup address'}</span>
+                        <span class="text-gray-900 break-words">${escapeHtml(booking.pickup_location || 'No pickup address')}</span>
                         <svg class="w-5 h-5 flex-shrink-0 ${pickupShowIcon ? '' : 'hidden'}" fill="${pickupIconFill}" viewBox="0 0 20 20">
                           <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
                         </svg>
@@ -1359,10 +1413,10 @@
                     <p>
                       Bookings cannot be changed less than 12 hours before your lesson.
                       If you need to update your information, please contact 
-                      <span class="font-semibold">${window.SITE_CONFIG.OWNER_NAME}</span> 
+                      <span class="font-semibold">${safeOwnerName}</span> 
                       on 
-                      <a href="tel:${window.SITE_CONFIG.PHONE_NUMBER_LINK}" class="text-blue-600 hover:underline">
-                        ${window.SITE_CONFIG.PHONE_NUMBER_DISPLAY}.
+                      <a href="tel:${safePhoneLink}" class="text-blue-600 hover:underline">
+                        ${safePhoneDisplay}.
                       </a>
                     </p>
                   </div>

@@ -192,6 +192,12 @@
 
 <script>
 (function() {
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
   // Contact Messages - Store for filtering and pagination
   let allContactMessages = [];
   let currentPage = 1;
@@ -229,7 +235,11 @@
       
       if (error) {
         console.error('[admin-contacts] Error loading contacts:', error);
-        box.innerHTML = `<div class="p-4 text-center text-red-600">Error: ${error.message}</div>`;
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'p-4 text-center text-red-600';
+        errorDiv.textContent = `Error: ${error.message}`;
+        box.innerHTML = '';
+        box.appendChild(errorDiv);
         return;
       }
       
@@ -239,7 +249,11 @@
       
     } catch (e) {
       console.error('[admin-contacts] Unexpected error loading contacts:', e);
-      box.innerHTML = `<div class="p-4 text-center text-red-600">Error: ${e?.message || String(e)}</div>`;
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'p-4 text-center text-red-600';
+      errorDiv.textContent = `Error: ${e?.message || String(e)}`;
+      box.innerHTML = '';
+      box.appendChild(errorDiv);
     } finally {
       // Hide loading spinner
       if (reloadText) reloadText.classList.remove('hidden');
@@ -336,10 +350,14 @@
     box.innerHTML = '';
     
     if (filtered.length === 0) {
-      const emptyMsg = searchTerm 
-        ? `<div class="p-8 text-center text-gray-500">No messages match "${searchTerm}"</div>`
-        : '<div class="p-8 text-center text-gray-500">📭 No contact messages yet</div>';
-      box.innerHTML = emptyMsg;
+      const emptyDiv = document.createElement('div');
+      emptyDiv.className = 'p-8 text-center text-gray-500';
+      if (searchTerm) {
+        emptyDiv.textContent = `No messages match "${searchTerm}"`;
+      } else {
+        emptyDiv.textContent = '📭 No contact messages yet';
+      }
+      box.appendChild(emptyDiv);
       return;
     }
     
@@ -352,10 +370,10 @@
       card.setAttribute('data-message-id', row.id);
       card.setAttribute('data-is-read', isRead);
       
-      const name = row.name || 'Anonymous';
-      const email = row.email || '';
-      const phone = row.phone || '';
-      const message = row.message || '';
+      const name = escapeHtml(row.name || 'Anonymous');
+      const email = escapeHtml(row.email || '');
+      const phone = escapeHtml(row.phone || '');
+      const message = escapeHtml(row.message || '');
       const date = new Date(row.created_at).toLocaleString('en-AU', {
         day: '2-digit',
         month: '2-digit',
@@ -488,7 +506,10 @@
   
   // Show reply modal
   function showReplyModal(recipientEmail, recipientName) {
-    const firstName = recipientName.split(' ')[0]; // Get first name
+    // Escape values again (they were unescaped when read from attributes)
+    const safeEmail = escapeHtml(recipientEmail);
+    const safeName = escapeHtml(recipientName);
+    const firstName = safeName.split(' ')[0]; // Get first name (already escaped)
     
     // Create modal HTML
     const modalHTML = `
@@ -500,7 +521,7 @@
             <div class="space-y-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">To:</label>
-                <input type="email" id="replyTo" value="${recipientEmail}" readonly class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50" />
+                <input type="email" id="replyTo" value="${safeEmail}" readonly class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50" />
               </div>
               
               <div>

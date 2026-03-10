@@ -12,6 +12,12 @@
 
 <script>
 (function() {
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
   async function loadMyContactMessages() {
     const box = document.getElementById('myContactsList');
     const countEl = document.getElementById('myContactsCount');
@@ -63,10 +69,10 @@
         const card = document.createElement('div');
         card.className = 'contact-card mb-3';
         
-        const name = row.name || 'Anonymous';
-        const email = row.email || '';
-        const phone = row.phone || '';
-        const message = row.message || '';
+        const name = escapeHtml(row.name || 'Anonymous');
+        const email = escapeHtml(row.email || '');
+        const phone = escapeHtml(row.phone || '');
+        const message = escapeHtml(row.message || '');
         const date = new Date(row.created_at).toLocaleString('en-AU', {
           day: '2-digit',
           month: '2-digit',

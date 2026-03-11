@@ -69,40 +69,62 @@ serve(async (req) => {
       return json(req, { error: 'Server configuration error' }, 500);
     }
 
-    // Service role client (validates auth, bypasses RLS for admin check, rate limiting, and logging)
+    // Service role client (used for auth validation, admin check, rate limiting, logging)
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Extract token from Authorization header
     const token = authHeader.replace('Bearer ', '').trim();
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
-    if (authError || !user) {
-      return json(req, { error: 'Unauthorized: Invalid token' }, 401);
-    }
+    // 3. Determine caller type: internal trusted caller or admin UI user
+    let isInternalCaller = false;
+    let actorClientId: string | null = null;
 
-    // 3. Check admin status
-    const { data: clientRecord, error: clientError } = await supabaseAdmin
-      .from('client')
-      .select('id, is_admin')
-      .eq('email', user.email)
-      .single();
+    if (token === supabaseServiceKey) {
+      // Internal trusted caller (e.g. booking-sms function)
+      isInternalCaller = true;
+      actorClientId = null;
+    } else {
+      // Admin UI caller - validate user and check admin status
+      const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
-    if (clientError || !clientRecord) {
-      console.error('[sms] Error fetching client record:', clientError);
-      return json(req, { error: 'Forbidden: User not found' }, 403);
-    }
+      if (authError || !user) {
+        return json(req, { error: 'Unauthorized: Invalid token' }, 401);
+      }
 
-    if (!clientRecord.is_admin) {
-      return json(req, { error: 'Forbidden: Admin access required' }, 403);
+      // Check admin status and get client ID
+      const { data: clientRecord, error: clientError } = await supabaseAdmin
+        .from('client')
+        .select('id, is_admin')
+        .eq('email', user.email)
+        .single();
+
+      if (clientError || !clientRecord) {
+        console.error('[sms] Error fetching client record:', clientError);
+        return json(req, { error: 'Forbidden: User not found' }, 403);
+      }
+
+      if (!clientRecord.is_admin) {
+        return json(req, { error: 'Forbidden: Admin access required' }, 403);
+      }
+
+      isInternalCaller = false;
+      actorClientId = clientRecord.id;
     }
 
     // 4. Parse and validate inputs
     const body = await req.json().catch(() => ({}));
-    let { to, message } = body;
+    let { to, message, template, client_id, booking_id } = body;
 
-    // Type validation
+    // Type validation for required fields
     if (typeof to !== 'string' || typeof message !== 'string') {
       return json(req, { error: 'Invalid input types: to and message must be strings' }, 400);
     }
+
+    // Optional metadata from internal callers
+    const smsTemplate = typeof template === 'string' && template ? template : 'admin_sms';
+    const logClientId = isInternalCaller 
+      ? (typeof client_id === 'string' ? client_id : null)
+      : actorClientId;
 
     // Trim values
     to = to.trim();
@@ -128,37 +150,39 @@ serve(async (req) => {
       return json(req, { error: 'Invalid AU mobile. Use 04XXXXXXXX or +614XXXXXXXX' }, 400);
     }
 
-    // 5. Rate limiting using sms_log table (with service role)
-    // Limit 1: Max 10 SMS per admin user in 10 minutes
-    const { count: userSmsCount, error: userCountError } = await supabaseAdmin
-      .from('sms_log')
-      .select('id', { count: 'exact', head: true })
-      .eq('client_id', clientRecord.id)
-      .eq('template', 'admin_sms')
-      .gte('sent_at', new Date(Date.now() - 10 * 60 * 1000).toISOString());
+    // 5. Rate limiting using sms_log table (only for admin UI SMS)
+    if (!isInternalCaller && smsTemplate === 'admin_sms') {
+      // Limit 1: Max 10 SMS per admin user in 10 minutes
+      const { count: userSmsCount, error: userCountError } = await supabaseAdmin
+        .from('sms_log')
+        .select('id', { count: 'exact', head: true })
+        .eq('client_id', actorClientId)
+        .eq('template', 'admin_sms')
+        .gte('sent_at', new Date(Date.now() - 10 * 60 * 1000).toISOString());
 
-    if (userCountError) {
-      console.error('[sms] Error checking user rate limit:', userCountError);
-    } else if (userSmsCount !== null && userSmsCount >= 10) {
-      return json(req, { 
-        error: 'Rate limit exceeded: Maximum 10 SMS per 10 minutes per user' 
-      }, 429);
-    }
+      if (userCountError) {
+        console.error('[sms] Error checking user rate limit:', userCountError);
+      } else if (userSmsCount !== null && userSmsCount >= 10) {
+        return json(req, { 
+          error: 'Rate limit exceeded: Maximum 10 SMS per 10 minutes per user' 
+        }, 429);
+      }
 
-    // Limit 2: Max 3 SMS to same recipient in 10 minutes
-    const { count: recipientSmsCount, error: recipientCountError } = await supabaseAdmin
-      .from('sms_log')
-      .select('id', { count: 'exact', head: true })
-      .eq('to_phone', e164)
-      .eq('template', 'admin_sms')
-      .gte('sent_at', new Date(Date.now() - 10 * 60 * 1000).toISOString());
+      // Limit 2: Max 3 SMS to same recipient in 10 minutes
+      const { count: recipientSmsCount, error: recipientCountError } = await supabaseAdmin
+        .from('sms_log')
+        .select('id', { count: 'exact', head: true })
+        .eq('to_phone', e164)
+        .eq('template', 'admin_sms')
+        .gte('sent_at', new Date(Date.now() - 10 * 60 * 1000).toISOString());
 
-    if (recipientCountError) {
-      console.error('[sms] Error checking recipient rate limit:', recipientCountError);
-    } else if (recipientSmsCount !== null && recipientSmsCount >= 3) {
-      return json(req, { 
-        error: 'Rate limit exceeded: Maximum 3 SMS per recipient per 10 minutes' 
-      }, 429);
+      if (recipientCountError) {
+        console.error('[sms] Error checking recipient rate limit:', recipientCountError);
+      } else if (recipientSmsCount !== null && recipientSmsCount >= 3) {
+        return json(req, { 
+          error: 'Rate limit exceeded: Maximum 3 SMS per recipient per 10 minutes' 
+        }, 429);
+      }
     }
 
     // 6. Send SMS via ClickSend
@@ -197,9 +221,10 @@ serve(async (req) => {
     // 7. Log SMS send to sms_log (using service role)
     const providerId = data?.data?.messages?.[0]?.message_id || null;
     const logEntry = {
-      client_id: clientRecord.id,
+      booking_id: typeof booking_id === 'string' ? booking_id : null,
+      client_id: logClientId,
       to_phone: e164,
-      template: 'admin_sms',
+      template: smsTemplate,
       body: message,
       provider: 'clicksend',
       provider_message_id: providerId,
@@ -207,6 +232,13 @@ serve(async (req) => {
       error_message: res.ok ? null : JSON.stringify(data),
       sent_at: new Date().toISOString(),
     };
+
+    console.log('[sms] Logging SMS', {
+      booking_id: typeof booking_id === 'string' ? booking_id : null,
+      client_id: logClientId,
+      template: smsTemplate,
+      to_phone: e164,
+    });
 
     const { error: logError } = await supabaseAdmin
       .from('sms_log')

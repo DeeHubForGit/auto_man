@@ -305,7 +305,14 @@ serve(async (req) => {
           continue;
         }
 
-        // Send via existing sms function
+        // Send via central sms function
+        console.log("[booking-reminder] sending via central sms", {
+          booking_id: b.id,
+          client_id: b.client_id ?? null,
+          template: "booking_reminder",
+          to: e164,
+        });
+
         const send = await fetchJson(`${SUPABASE_URL}/functions/v1/sms`, {
           method: "POST",
           headers: {
@@ -313,45 +320,16 @@ serve(async (req) => {
             authorization: `Bearer ${SERVICE_KEY}`,
             apikey: SERVICE_KEY,
           },
-          body: JSON.stringify({ to: e164, message: msg }),
-        });
-
-        let status = "pending";
-        let provider_message_id: string | null = null;
-
-        if (!send.res.ok || !(send.data as any)?.ok) {
-          status = "failed";
-        } else {
-          const cs = (send.data as any)?.clicksend;
-          if (cs?.data?.messages?.length) {
-            provider_message_id = cs.data.messages[0]?.message_id ?? null;
-            status = cs.data.messages[0]?.status === "SUCCESS" ? "sent" : "pending";
-          } else {
-            status = "sent";
-          }
-        }
-
-        // Log to sms_log
-        await fetchJson(`${SUPABASE_URL}/rest/v1/sms_log`, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            authorization: `Bearer ${SERVICE_KEY}`,
-            apikey: SERVICE_KEY,
-            prefer: "return=minimal",
-          },
           body: JSON.stringify({
-            booking_id: b.id,
-            to_phone: e164,
-            body: msg,
-            status,
+            to: e164,
+            message: msg,
             template: "booking_reminder",
-            provider: "clicksend",
-            provider_message_id,
-            error_message: status === "failed" ? JSON.stringify(send.data) : null,
-            sent_at: new Date().toISOString(),
+            client_id: b.client_id,
+            booking_id: b.id,
           }),
         });
+
+        const status = !send.res.ok || !(send.data as any)?.ok ? "failed" : "sent";
 
         if (status === "failed") {
           results.push({ id: b.id, error: "send_failed", send: send.data });
@@ -370,7 +348,7 @@ serve(async (req) => {
           body: JSON.stringify({ sms_reminder_sent_at: new Date().toISOString() }),
         });
 
-        results.push({ id: b.id, ok: true, to: e164, status, provider_message_id });
+        results.push({ id: b.id, ok: true, to: e164, status });
       } catch (innerErr) {
         results.push({ id: (b && b.id) || null, error: String(innerErr) });
       }

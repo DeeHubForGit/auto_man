@@ -86,6 +86,13 @@
   <div data-include="partials/footer.html"></div>
 
   <script>
+    // XSS prevention helper
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text || '';
+      return div.innerHTML;
+    }
+
     document.addEventListener('DOMContentLoaded', function(){
       // Parse service from query and infer duration
       const params = new URLSearchParams(location.search);
@@ -170,7 +177,7 @@
             btn.classList.add('ring-4','ring-blue-300');
             selectedBtn = btn;
             const dateStr = date.toLocaleDateString(undefined, { weekday:'long', day:'numeric', month:'long', year:'numeric' });
-            msgEl.innerHTML = `Timeslot selected:<br><strong>${serviceName}</strong><br>${dateStr} at ${labelStr}`;
+            msgEl.innerHTML = `Timeslot selected:<br><strong>${escapeHtml(serviceName)}</strong><br>${escapeHtml(dateStr)} at ${escapeHtml(labelStr)}`;
             msgEl.classList.remove('hidden');
           });
           slotsEl.appendChild(btn);

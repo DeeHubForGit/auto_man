@@ -1,4 +1,5 @@
 <!-- Admin Contact Messages Section -->
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
 <style>
   /* Custom scrollbar for contact messages */
   #contactsScrollContainer {
@@ -582,6 +583,12 @@ Auto-Man Driving School
         }
         return;
       }
+
+      // Sanitize HTML message to prevent XSS and malicious HTML
+      const cleanMessage = DOMPurify.sanitize(message, {
+        ALLOWED_TAGS: ['b', 'i', 'strong', 'em', 'p', 'br', 'ul', 'ol', 'li'],
+        ALLOWED_ATTR: []
+      });
       
       // Disable button while sending
       sendBtn.disabled = true;
@@ -595,19 +602,38 @@ Auto-Man Driving School
         if (!supabaseUrl || !supabaseKey) {
           throw new Error('Supabase configuration not found');
         }
+
+        // Ensure the user session exists before sending email
+        const {
+          data: { session }
+        } = await window.supabaseClient.auth.getSession();
+
+        if (!session || !session.access_token) {
+          console.error('[admin-contacts] No active session found');
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Send';
+          if (window.Modal && window.Modal.error) {
+            window.Modal.error('Your login session has expired. Please refresh the page and log in again.');
+          } else {
+            alert('Your login session has expired. Please refresh the page and log in again.');
+          }
+          return;
+        }
+
+        const accessToken = session.access_token;
         
         const response = await fetch(`${supabaseUrl}/functions/v1/email`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseKey}`,
+            'Authorization': `Bearer ${accessToken}`,
             'apikey': supabaseKey
           },
           body: JSON.stringify({
             to: to,
             subject: subject,
             text: message,
-            html: message.replace(/\n/g, '<br>')
+            html: cleanMessage.replace(/\n/g, '<br>')
           })
         });
         
@@ -724,8 +750,6 @@ Auto-Man Driving School
             e.stopPropagation();
             const card = unreadBtn.closest('.contact-card');
             const messageId = card ? card.getAttribute('data-message-id') : null;
-            
-            console.log('[admin-contacts] Mark as unread clicked, card:', card, 'messageId:', messageId);
             
             if (messageId) {
               markMessageAsUnread(messageId);

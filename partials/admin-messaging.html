@@ -1,5 +1,4 @@
 <script src="/assets/js/validation.js"></script>
-<script src="/assets/js/messaging.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
 <!-- Admin Send SMS & Email Section -->
 <style>
@@ -211,40 +210,64 @@
 
     // Clear bodyMsg before sending
     bodyMsgEl.textContent = '';
-    
-    if (!window.Messaging?.sendSms) {
-      statusEl.textContent = 'Error: messaging.js not loaded';
-      statusEl.className = 'text-sm text-red-600';
-      return;
-    }
 
     statusEl.textContent = 'Sending...';
     statusEl.className = 'text-sm text-blue-400';
 
-    const result = await window.Messaging.sendSms({ to, message });
-
-    if (!result.ok) {
-      if (result.error === 'MISSING_TO') {
-        toMsgEl.textContent = 'Please enter mobile.';
-        toMsgEl.className = 'text-sm mt-2 text-red-600';
-      } else if (result.error === 'INVALID_MOBILE') {
-        toMsgEl.textContent = 'Please enter a valid AU mobile (e.g. 04XX XXX XXX or +614XX XXX XXX)';
-        toMsgEl.className = 'text-sm mt-2 text-red-600';
-      } else if (result.error === 'MISSING_MESSAGE') {
-        bodyMsgEl.textContent = 'Please enter a message.';
-        bodyMsgEl.className = 'text-sm mt-2 text-red-600';
-      } else {
-        statusEl.textContent = 'Error: ' + result.error;
-        statusEl.className = 'text-sm text-red-600';
-      }
+    // Get Supabase configuration
+    const supabaseUrl = window.SITE_CONFIG?.SUPABASE_URL || window.SUPABASE_URL;
+    const supabaseKey = window.SITE_CONFIG?.SUPABASE_ANON_KEY || window.SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      statusEl.textContent = 'Error: Supabase configuration not found';
+      statusEl.className = 'text-sm text-red-600';
       return;
     }
 
-    statusEl.textContent = '✓ Sent';
-    statusEl.className = 'text-sm text-blue-400';
-    setTimeout(() => {
-      statusEl.textContent = '';
-    }, 5000);
+    try {
+      // Get current session
+      const { data: { session } } = await window.supabaseClient.auth.getSession();
+
+      if (!session || !session.access_token) {
+        statusEl.textContent = 'Error: Your login session has expired. Please refresh and log in again.';
+        statusEl.className = 'text-sm text-red-600';
+        return;
+      }
+      
+      // Call the hardened SMS Edge Function directly
+      const response = await fetch(`${supabaseUrl}/functions/v1/sms`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': supabaseKey
+        },
+        body: JSON.stringify({
+          to,
+          message
+        })
+      });
+      
+      if (!response.ok) {
+        let errorData = {};
+        try {
+          errorData = await response.json();
+        } catch {}
+        statusEl.textContent = 'Error: ' + (errorData.error || `HTTP ${response.status}`);
+        statusEl.className = 'text-sm text-red-600';
+        return;
+      }
+      
+      statusEl.textContent = '✓ Sent';
+      statusEl.className = 'text-sm text-blue-400';
+      setTimeout(() => {
+        statusEl.textContent = '';
+      }, 5000);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      statusEl.textContent = 'Error: ' + errorMessage;
+      statusEl.className = 'text-sm text-red-600';
+    }
   }
 
   async function sendEmail(){
@@ -346,7 +369,10 @@
       });
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        let errorData = {};
+        try {
+          errorData = await response.json();
+        } catch {}
         statusEl.textContent = 'Error: ' + (errorData.error || `HTTP ${response.status}`);
         statusEl.className = 'text-sm text-red-600';
         return;

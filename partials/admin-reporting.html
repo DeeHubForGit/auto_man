@@ -238,6 +238,13 @@
 
 <script>
   (function () {
+    // HTML escape helper to prevent XSS
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
     let reportBookings = [];
     let reportClientId = null;
     let reportClientName = '';
@@ -312,11 +319,15 @@
 
         dropdown.innerHTML = clients.map(client => {
           const fullName = [client.first_name, client.last_name].filter(Boolean).join(' ');
-          const displayText = `${fullName} (${client.email || 'no email'})`;
+          const safeClientId = escapeHtml(String(client.id || ''));
+          const safeFullName = escapeHtml(fullName);
+          const safeEmail = escapeHtml(client.email || 'no email');
+          const displayText = `${safeFullName} (${safeEmail})`;
           return `
             <button type="button" 
               class="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 text-gray-900 border-b border-gray-100 last:border-b-0"
-              onclick="selectReportClient('${client.id}', '${fullName.replace(/'/g, "\\'")}')">
+              data-client-id="${safeClientId}"
+              data-client-name="${safeFullName}">
               ${displayText}
             </button>
           `;
@@ -389,11 +400,15 @@
         if (reportClientSearchResults && reportClientSearchResults.length > 0) {
           const displayResults = reportClientSearchResults.map(client => {
             const fullName = [client.first_name, client.last_name].filter(Boolean).join(' ');
-            const displayText = `${fullName} (${client.email || 'no email'})`;
+            const safeClientId = escapeHtml(String(client.id || ''));
+            const safeFullName = escapeHtml(fullName);
+            const safeEmail = escapeHtml(client.email || 'no email');
+            const displayText = `${safeFullName} (${safeEmail})`;
             return `
               <button type="button" 
                 class="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 text-gray-900 border-b border-gray-100 last:border-b-0"
-                onclick="selectReportClient('${client.id}', '${fullName.replace(/'/g, "\\'")}')">
+                data-client-id="${safeClientId}"
+                data-client-name="${safeFullName}">
                 ${displayText}
               </button>
             `;
@@ -414,6 +429,16 @@
 
       dropdown.addEventListener('mousedown', (e) => {
         e.preventDefault();
+      });
+
+      // Event delegation for client selection
+      dropdown.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-client-id]');
+        if (!btn) return;
+        
+        const clientId = btn.getAttribute('data-client-id') || '';
+        const clientName = btn.getAttribute('data-client-name') || '';
+        selectReportClient(clientId, clientName);
       });
     }
 
@@ -458,7 +483,11 @@
 
       if (error) {
         console.error('Error loading report:', error);
-        loadingState.innerHTML = `<div class="p-4 bg-red-50 text-red-800 rounded border border-red-200">Error loading report: ${error.message}</div>`;
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'p-4 bg-red-50 text-red-800 rounded border border-red-200';
+        errorDiv.textContent = `Error loading report: ${error.message}`;
+        loadingState.innerHTML = '';
+        loadingState.appendChild(errorDiv);
         return;
       }
 
@@ -503,7 +532,8 @@
 
         const bookingNameFromBooking = `${booking.first_name || ''} ${booking.last_name || ''}`.trim();
 
-        const clientName = clientNameFromClient || bookingNameFromBooking || 'Unknown';
+        const clientName = escapeHtml(clientNameFromClient || bookingNameFromBooking || 'Unknown');
+        const bookingNameEscaped = escapeHtml(bookingNameFromBooking);
 
         const normalise = (s) => (s || '').trim().toLowerCase();
         const isNameMismatch =
@@ -517,18 +547,24 @@
         const price = typeof booking.price_cents === 'number' ? `$${(booking.price_cents / 100).toFixed(2)}` : '';
         const paid = booking.is_paid === true ? 'Yes' : 'No';
 
+        const safeDate = escapeHtml(date);
+        const safeStartTime = escapeHtml(startTimeStr);
+        const safeEndTime = escapeHtml(endTimeStr);
+        const safePrice = escapeHtml(price);
+        const safePaid = escapeHtml(paid);
+
         return `
           <tr>
             <td>
               <div class="report-client-name">${clientName}</div>
-              ${isNameMismatch ? `<div class="report-booking-name">Booking name: ${bookingNameFromBooking}</div>` : ''}
+              ${isNameMismatch ? `<div class="report-booking-name">Booking name: ${bookingNameEscaped}</div>` : ''}
             </td>
-            <td>${serviceLabel}</td>
-            <td>${date}</td>
-            <td>${startTimeStr}</td>
-            <td>${endTimeStr}</td>
-            <td>${price}</td>
-            <td>${paid}</td>
+            <td>${escapeHtml(serviceLabel)}</td>
+            <td>${safeDate}</td>
+            <td>${safeStartTime}</td>
+            <td>${safeEndTime}</td>
+            <td>${safePrice}</td>
+            <td>${safePaid}</td>
           </tr>
         `;
       }).join('');

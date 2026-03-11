@@ -294,43 +294,16 @@ serve(async (req) => {
       body: JSON.stringify({ 
         to: b.email, 
         subject: emailSubject,
-        html: emailHtml 
+        html: emailHtml,
+        type: 'booking_confirmation',
+        client_id: b.client_id
       }),
     });
 
     console.log(`[booking-email] Email function response: ${send.res.status}, ok=${send.res.ok}`);
 
-    let emailStatus: string = "pending";
-    let errorMessage: string | null = null;
-
     if (!send.res.ok || !(send.data as any)?.ok) {
       console.error(`[booking-email] Email send failed:`, send.data);
-      emailStatus = "failed";
-      errorMessage = JSON.stringify(send.data ?? send.raw);
-      
-      // Log the failure to email_log
-      await fetchJson(
-        `${SUPABASE_URL}/rest/v1/email_log`,
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "authorization": `Bearer ${SERVICE_KEY}`,
-            "apikey": SERVICE_KEY,
-            "prefer": "return=minimal",
-          },
-          body: JSON.stringify({
-            booking_id: b.id,
-            client_id: b.client_id,
-            to_email: b.email,
-            type: "booking_confirmation",
-            subject: emailSubject,
-            status: emailStatus,
-            error_message: errorMessage,
-            sent_at: new Date().toISOString(),
-          }),
-        },
-      );
       
       return json(
         { error: "Email send failed", details: send.data ?? send.raw },
@@ -338,44 +311,9 @@ serve(async (req) => {
       );
     }
 
-    // Email sent successfully
-    emailStatus = "sent";
+    console.log(`[booking-email] Email sent successfully`);
 
-    console.log(`[booking-email] Email sent successfully, status: ${emailStatus}`);
-
-    // 6) Log to email_log table
-    const logRes = await fetchJson(
-      `${SUPABASE_URL}/rest/v1/email_log`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "authorization": `Bearer ${SERVICE_KEY}`,
-          "apikey": SERVICE_KEY,
-          "prefer": "return=representation",
-        },
-        body: JSON.stringify({
-          booking_id: b.id,
-          client_id: b.client_id,
-          to_email: b.email,
-          type: "booking_confirmation",
-          subject: emailSubject,
-          status: emailStatus,
-          error_message: null,
-          sent_at: new Date().toISOString(),
-        }),
-      },
-    );
-
-    if (!logRes.res.ok) {
-      console.warn(`[booking-email] Failed to log to email_log: ${logRes.res.status}`);
-      const logError = logRes.raw;  // Use the already-consumed raw text
-      console.warn(`[booking-email] Log error details: ${logError}`);
-    } else {
-      console.log(`[booking-email] Logged to email_log successfully`);
-    }
-
-    // 7) Mark sent (idempotency latch)
+    // 6) Mark sent (idempotency latch)
     const { res: updRes, data: updData } = await fetchJson(
       `${SUPABASE_URL}/rest/v1/booking?id=eq.${encodeURIComponent(b.id)}`,
       {
@@ -404,7 +342,6 @@ serve(async (req) => {
       ok: true,
       booking_id: b.id,
       sent_to: b.email,
-      resend: (send.data as any)?.data ?? null,
       needs_intake: needsIntake,
     });
   } catch (err) {

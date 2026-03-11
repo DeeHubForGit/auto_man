@@ -81,11 +81,10 @@ Deno.serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
     
-    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
-      console.error('Missing SUPABASE_URL, SUPABASE_ANON_KEY, or SUPABASE_SERVICE_ROLE_KEY');
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
       return new Response(JSON.stringify({ ok: false, error: 'Server configuration error' }), {
         status: 500,
         headers: {
@@ -101,52 +100,65 @@ Deno.serve(async (req) => {
     // Extract token from Authorization header
     const token = authHeader.replace('Bearer ', '').trim();
 
-    // Validate user via Supabase Auth
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    // 3. Determine caller type: internal trusted caller or admin UI user
+    let isInternalCaller = false;
+    let actorClientId: string | null = null;
 
-    if (authError || !user) {
-      return new Response(JSON.stringify({ ok: false, error: 'Unauthorized: Invalid token' }), {
-        status: 401,
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders(req),
-        },
-      });
-    }
+    if (token === supabaseServiceKey) {
+      // Internal trusted caller (e.g. booking-email function)
+      isInternalCaller = true;
+      actorClientId = null;
+    } else {
+      // Admin UI caller - validate user and check admin status
+      const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
-    // 3. Check admin status
-    const { data: clientRecord, error: clientError } = await supabaseAdmin
-      .from('client')
-      .select('is_admin')
-      .eq('email', user.email)
-      .single();
+      if (authError || !user) {
+        return new Response(JSON.stringify({ ok: false, error: 'Unauthorized: Invalid token' }), {
+          status: 401,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders(req),
+          },
+        });
+      }
 
-    if (clientError || !clientRecord) {
-      console.error('Error fetching client record:', clientError);
-      return new Response(JSON.stringify({ ok: false, error: 'Forbidden: User not found' }), {
-        status: 403,
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders(req),
-        },
-      });
-    }
+      // Check admin status and get client ID
+      const { data: clientRecord, error: clientError } = await supabaseAdmin
+        .from('client')
+        .select('id, is_admin')
+        .eq('email', user.email)
+        .single();
 
-    if (!clientRecord.is_admin) {
-      return new Response(JSON.stringify({ ok: false, error: 'Forbidden: Admin access required' }), {
-        status: 403,
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders(req),
-        },
-      });
+      if (clientError || !clientRecord) {
+        console.error('Error fetching client record:', clientError);
+        return new Response(JSON.stringify({ ok: false, error: 'Forbidden: User not found' }), {
+          status: 403,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders(req),
+          },
+        });
+      }
+
+      if (!clientRecord.is_admin) {
+        return new Response(JSON.stringify({ ok: false, error: 'Forbidden: Admin access required' }), {
+          status: 403,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders(req),
+          },
+        });
+      }
+
+      isInternalCaller = false;
+      actorClientId = clientRecord.id;
     }
 
     // 4. Parse and validate inputs
     const body = await req.json();
-    let { to, subject, html } = body;
+    let { to, subject, html, type, client_id } = body;
 
-    // Type validation
+    // Type validation for required fields
     if (typeof to !== 'string' || typeof subject !== 'string' || typeof html !== 'string') {
       return new Response(JSON.stringify({ ok: false, error: 'Invalid input types: to, subject, and html must be strings' }), {
         status: 400,
@@ -156,6 +168,12 @@ Deno.serve(async (req) => {
         },
       });
     }
+
+    // Optional metadata from internal callers
+    const emailType = typeof type === 'string' && type ? type : 'admin_email';
+    const logClientId = isInternalCaller 
+      ? (typeof client_id === 'string' ? client_id : null)
+      : actorClientId;
 
     // Trim values
     to = to.trim();
@@ -219,50 +237,53 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 5. Rate limiting using email_log table (with service role)
-    // Limit 1: Max 10 emails per user in 10 minutes
-    const { count: userEmailCount, error: userCountError } = await supabaseAdmin
-      .from('email_log')
-      .select('id', { count: 'exact', head: true })
-      .eq('client_id', user.id)
-      .gte('sent_at', new Date(Date.now() - 10 * 60 * 1000).toISOString());
+    // 5. Rate limiting using email_log table (only for admin UI emails)
+    if (!isInternalCaller && emailType === 'admin_email') {
+      // Limit 1: Max 10 emails per user in 10 minutes
+      const { count: userEmailCount, error: userCountError } = await supabaseAdmin
+        .from('email_log')
+        .select('id', { count: 'exact', head: true })
+        .eq('client_id', actorClientId)
+        .eq('type', 'admin_email')
+        .gte('sent_at', new Date(Date.now() - 10 * 60 * 1000).toISOString());
 
-    if (userCountError) {
-      console.error('Error checking user rate limit:', userCountError);
-    } else if (userEmailCount !== null && userEmailCount >= 10) {
-      return new Response(JSON.stringify({ 
-        ok: false, 
-        error: 'Rate limit exceeded: Maximum 10 emails per 10 minutes per user' 
-      }), {
-        status: 429,
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders(req),
-        },
-      });
-    }
+      if (userCountError) {
+        console.error('Error checking user rate limit:', userCountError);
+      } else if (userEmailCount !== null && userEmailCount >= 10) {
+        return new Response(JSON.stringify({ 
+          ok: false, 
+          error: 'Rate limit exceeded: Maximum 10 emails per 10 minutes per user' 
+        }), {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders(req),
+          },
+        });
+      }
 
-    // Limit 2: Max 3 emails to same recipient in 10 minutes
-    const { count: recipientEmailCount, error: recipientCountError } = await supabaseAdmin
-      .from('email_log')
-      .select('id', { count: 'exact', head: true })
-      .eq('to_email', to)
-      .eq('type', 'admin_email')
-      .gte('sent_at', new Date(Date.now() - 10 * 60 * 1000).toISOString());
+      // Limit 2: Max 3 emails to same recipient in 10 minutes
+      const { count: recipientEmailCount, error: recipientCountError } = await supabaseAdmin
+        .from('email_log')
+        .select('id', { count: 'exact', head: true })
+        .eq('to_email', to)
+        .eq('type', 'admin_email')
+        .gte('sent_at', new Date(Date.now() - 10 * 60 * 1000).toISOString());
 
-    if (recipientCountError) {
-      console.error('Error checking recipient rate limit:', recipientCountError);
-    } else if (recipientEmailCount !== null && recipientEmailCount >= 3) {
-      return new Response(JSON.stringify({ 
-        ok: false, 
-        error: 'Rate limit exceeded: Maximum 3 emails per recipient per 10 minutes' 
-      }), {
-        status: 429,
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders(req),
-        },
-      });
+      if (recipientCountError) {
+        console.error('Error checking recipient rate limit:', recipientCountError);
+      } else if (recipientEmailCount !== null && recipientEmailCount >= 3) {
+        return new Response(JSON.stringify({ 
+          ok: false, 
+          error: 'Rate limit exceeded: Maximum 3 emails per recipient per 10 minutes' 
+        }), {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders(req),
+          },
+        });
+      }
     }
 
     // 6. Send email via Resend
@@ -303,10 +324,10 @@ Deno.serve(async (req) => {
 
     // 7. Log email send to email_log (using service role)
     const logEntry = {
-      client_id: user.id,
+      client_id: logClientId,
       to_email: to,
       subject: subject,
-      type: 'admin_email',
+      type: emailType,
       status: r.ok ? 'sent' : 'failed',
       error_message: r.ok ? null : JSON.stringify(data),
       sent_at: new Date().toISOString(),

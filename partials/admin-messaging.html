@@ -1,5 +1,6 @@
 <script src="/assets/js/validation.js"></script>
 <script src="/assets/js/messaging.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
 <!-- Admin Send SMS & Email Section -->
 <style>
   /* Force white backgrounds and black text for messaging inputs - override dark theme */
@@ -89,6 +90,13 @@
 
 <script>
 (function() {
+  // XSS prevention helper
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text || '';
+    return div.innerHTML;
+  }
+
   // Send SMS & Email logic
   let msgClientByEmail = {}; // Store client data by email for quick lookup
 
@@ -120,9 +128,10 @@
       msgClientByEmail = {}; // Reset
       
       rows.forEach(c => {
-        const name = [c.first_name, c.last_name].filter(Boolean).join(' ');
-        const label = name ? `${name} <${c.email}>` : c.email;
-        opts.push(`<option value="${c.email}">${label}</option>`);
+        const safeName = [c.first_name, c.last_name].filter(Boolean).map(escapeHtml).join(' ');
+        const safeEmail = escapeHtml(c.email || '');
+        const label = safeName ? `${safeName} <${safeEmail}>` : safeEmail;
+        opts.push(`<option value="${safeEmail}">${label}</option>`);
         msgClientByEmail[c.email] = c; // Store for lookup
       });
       
@@ -291,46 +300,67 @@
     subjMsgEl.textContent = '';
     bodyMsgEl.textContent = '';
 
-    if (!window.Messaging?.sendEmail) {
-      statusEl.textContent = 'Error: messaging.js not loaded';
+    statusEl.textContent = 'Sending...';
+    statusEl.className = 'text-sm text-blue-400';
+
+    // Get Supabase configuration
+    const supabaseUrl = window.SITE_CONFIG?.SUPABASE_URL || window.SUPABASE_URL;
+    const supabaseKey = window.SITE_CONFIG?.SUPABASE_ANON_KEY || window.SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      statusEl.textContent = 'Error: Supabase configuration not found';
       statusEl.className = 'text-sm text-red-600';
       return;
     }
 
-    statusEl.textContent = 'Sending...';
-    statusEl.className = 'text-sm text-blue-400';
+    try {
+      // Get current session
+      const { data: { session } } = await window.supabaseClient.auth.getSession();
 
-    const result = await window.Messaging.sendEmail({
-      to,
-      subject,
-      text
-    });
-
-    if (!result.ok) {
-      if (result.error === 'MISSING_TO') {
-        toMsgEl.textContent = 'Please enter email address.';
-        toMsgEl.className = 'text-sm mt-2 text-red-600';
-      } else if (result.error === 'INVALID_EMAIL') {
-        toMsgEl.textContent = 'Please enter a valid email address.';
-        toMsgEl.className = 'text-sm mt-2 text-red-600';
-      } else if (result.error === 'MISSING_SUBJECT') {
-        subjMsgEl.textContent = 'Please enter subject.';
-        subjMsgEl.className = 'text-sm mt-2 text-red-600';
-      } else if (result.error === 'MISSING_BODY') {
-        bodyMsgEl.textContent = 'Please enter message body.';
-        bodyMsgEl.className = 'text-sm mt-2 text-red-600';
-      } else {
-        statusEl.textContent = 'Error: ' + result.error;
+      if (!session || !session.access_token) {
+        statusEl.textContent = 'Error: Your login session has expired. Please refresh and log in again.';
         statusEl.className = 'text-sm text-red-600';
+        return;
       }
-      return;
-    }
 
-    statusEl.textContent = '✓ Email sent';
-    statusEl.className = 'text-sm text-blue-400';
-    setTimeout(() => {
-      statusEl.textContent = '';
-    }, 5000);
+      // Sanitize HTML message to prevent XSS
+      const cleanMessage = DOMPurify.sanitize(text, {
+        ALLOWED_TAGS: ['b', 'i', 'strong', 'em', 'p', 'br', 'ul', 'ol', 'li'],
+        ALLOWED_ATTR: []
+      });
+      
+      // Call the hardened Edge Function directly
+      const response = await fetch(`${supabaseUrl}/functions/v1/email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': supabaseKey
+        },
+        body: JSON.stringify({
+          to,
+          subject,
+          text,
+          html: cleanMessage.replace(/\n/g, '<br>')
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        statusEl.textContent = 'Error: ' + (errorData.error || `HTTP ${response.status}`);
+        statusEl.className = 'text-sm text-red-600';
+        return;
+      }
+      
+      statusEl.textContent = '✓ Email sent';
+      statusEl.className = 'text-sm text-blue-400';
+      setTimeout(() => {
+        statusEl.textContent = '';
+      }, 5000);
+    } catch (error) {
+      statusEl.textContent = 'Error: ' + (error.message || String(error));
+      statusEl.className = 'text-sm text-red-600';
+    }
   }
 
   function clearSms() {

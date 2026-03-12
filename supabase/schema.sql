@@ -57,12 +57,14 @@ CREATE TABLE public.client (
     intake_completed boolean DEFAULT false,
     intake_step integer DEFAULT 1 NOT NULL,
     is_test boolean DEFAULT false NOT NULL,
+    password_changed_at timestamp with time zone,
     CONSTRAINT intake_step_range CHECK ((intake_step >= 1) AND (intake_step <= 3))
 );
 
 COMMENT ON COLUMN public.client.intake_completed IS 'Tracks whether client has completed the intake form (permit/licence AND medical conditions)';
 COMMENT ON COLUMN public.client.intake_step IS 'Current step in intake form (1-3). Allows resuming intake across devices.';
 COMMENT ON COLUMN public.client.is_test IS 'Marks this client as a test client for testing purposes. Test bookings will not trigger SMS/email notifications.';
+COMMENT ON COLUMN public.client.password_changed_at IS 'Timestamp of last password change. Used to invalidate sessions issued before password change.';
 
 -- Service table: defines available driving lesson services
 CREATE TABLE public.service (
@@ -680,6 +682,9 @@ BEGIN
 
     -- Title can change in Google
     event_title        = COALESCE(EXCLUDED.event_title, public.booking.event_title),
+
+    -- IMPORTANT: Do NOT update test/notification flags on existing bookings
+    -- They are set once at creation and preserved thereafter
 
     updated_at         = now()
   RETURNING

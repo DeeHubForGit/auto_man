@@ -3,8 +3,69 @@
   function ready(fn){ if(document.readyState!=='loading'){ fn(); } else { document.addEventListener('DOMContentLoaded', fn); } }
   function byId(id){ return document.getElementById(id); }
 
+  // Check if session should be invalidated due to password change
+  async function checkPasswordChangedSession(){
+    if (!window.supabaseClient) return;
+
+    try {
+      const { data: { session } } = await window.supabaseClient.auth.getSession();
+      if (!session || !session.access_token || !session.user) return;
+
+      // Decode JWT to get iat (issued at) timestamp
+      const token = session.access_token;
+      const parts = token.split('.');
+      if (parts.length !== 3) return;
+
+      const payload = JSON.parse(atob(parts[1]));
+      const tokenIat = payload.iat; // Unix timestamp in seconds
+
+      if (!tokenIat) return;
+
+      const tokenIssuedAt = new Date(tokenIat * 1000);
+
+      // Query client table for password_changed_at
+      const { data: clientData, error: clientError } = await window.supabaseClient
+        .from('client')
+        .select('id, password_changed_at')
+        .eq('id', session.user.id)
+        .single();
+
+      if (clientError || !clientData) return;
+
+      // If no password_changed_at, session is valid
+      if (!clientData.password_changed_at) return;
+
+      const passwordChangedAt = new Date(clientData.password_changed_at);
+
+      // Log for debugging
+      console.log('[auth] Session check:', {
+        password_changed_at: passwordChangedAt.toISOString(),
+        token_iat: tokenIssuedAt.toISOString(),
+        should_logout: tokenIssuedAt < passwordChangedAt
+      });
+
+      // If session was issued before password change, invalidate it
+      if (tokenIssuedAt < passwordChangedAt) {
+        console.log('[auth] Session invalidated: password changed after token issuance');
+        await window.supabaseClient.auth.signOut();
+
+        // Avoid redirect loops on login/reset pages
+        const currentPath = window.location.pathname.toLowerCase();
+        if (!currentPath.includes('login.html') && !currentPath.includes('reset-password.html')) {
+          window.location.href = '/login.html?session=expired';
+        }
+      }
+    } catch (err) {
+      console.error('[auth] Error checking password changed session:', err);
+    }
+  }
+
   async function refreshHeader(){
     if (!window.supabaseClient) return;
+
+    // Check if session should be invalidated before updating UI
+    await checkPasswordChangedSession();
+
     const { data: { session } } = await window.supabaseClient.auth.getSession();
     const loginLink = byId('loginLink');
     const loginLinkMobile = byId('loginLinkMobile');
@@ -101,6 +162,9 @@
       throw error;
     }
 
+    // Check for password-invalidated sessions immediately after login
+    await checkPasswordChangedSession();
+
     // logged in - redirect to portal immediately
     console.log('Login successful, user:', data.user?.email);
     const next = new URLSearchParams(window.location.search).get('next') || 'portal.html';
@@ -116,8 +180,19 @@
     signInWithMagicLink,
     signUpWithEmail,
     signInWithPassword,
-    refreshHeader
+    refreshHeader,
+    checkPasswordChangedSession  // Expose for manual checks
   };
+
+  // Set up auth state change listener for immediate session invalidation
+  if (window.supabaseClient) {
+    window.supabaseClient.auth.onAuthStateChange(async (event, session) => {
+      // Check session validity on any auth state change
+      if (session && session.user) {
+        await checkPasswordChangedSession();
+      }
+    });
+  }
 
   ready(refreshHeader);
 })();

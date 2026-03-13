@@ -98,6 +98,7 @@
             class="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:border-blue-600 transition-colors resize-none text-black placeholder:text-gray-400"
             placeholder="E.g. epilepsy, diabetes, vision impairment, etc. (or leave blank if none)"
           ></textarea>
+          <p id="medicalConditionsError" class="mt-2 text-sm text-red-600 hidden"></p>
           <p class="text-sm text-gray-500 mt-2">This helps us provide better support during your lessons</p>
         </div>
 
@@ -157,6 +158,7 @@
                 class="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:border-blue-600 transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed text-black"
                 placeholder="Please specify..."
               />
+              <p id="otherDetailsError" class="mt-2 text-sm text-red-600 hidden"></p>
             </div>
           </label>
         </div>
@@ -220,34 +222,25 @@
 
     // Session validation helper - fail-closed security
     async function ensureValidIntakeSession(skipIfAlreadyValidated = false) {
-      console.log('[intake] 🔐 Checking session validity...');
-      
       // Allow reuse of successful initial validation during page init only
       if (skipIfAlreadyValidated && intakeInitialSessionValidated) {
-        console.log('[intake] Reusing successful initial session validation');
         return true;
       }
       
-      console.log('[intake] Checking for window.AuthUI...');
       if (!window.AuthUI || !window.AuthUI.checkPasswordChangedSession) {
         console.error('[intake] ❌ Session validation unavailable - window.AuthUI not loaded');
         window.location.href = '/login.html';
         return false;
       }
-      console.log('[intake] ✓ window.AuthUI available');
 
-      console.log('[intake] Calling checkPasswordChangedSession()...');
       const isSessionValid = window.AuthUI.checkPasswordChangedSessionWithTimeout
         ? await window.AuthUI.checkPasswordChangedSessionWithTimeout(8000)
         : await window.AuthUI.checkPasswordChangedSession();
-      console.log(`[intake] Session validation result: ${isSessionValid}`);
       
       if (!isSessionValid) {
-        console.log('[intake] ❌ Invalid session detected, aborting intake flow');
         return false;
       }
 
-      console.log('[intake] ✅ Session validation passed');
       return true;
     }
 
@@ -287,7 +280,6 @@
         if (clientError || !client?.id) return null;
         
         currentClientId = client.id;
-        console.log('[intake] ✅ Client ID:', currentClientId);
         return currentClientId;
       } catch (err) {
         console.error('[intake] ❌ Error getting client ID:', err);
@@ -297,21 +289,17 @@
 
     // Fetch intake data from DB and populate form
     async function loadIntakeDataFromDb() {
-      console.log('[intake] 📥 Loading intake data from DB...');
-      
       // Check session before loading protected data (reuse initial validation during page init)
       const isSessionValid = await ensureValidIntakeSession(true);
       if (!isSessionValid) return null;
       
       const supabase = await waitForSupabaseClient();
       if (!supabase) {
-        console.log('[intake] ❌ Supabase not initialized');
         return null;
       }
       
       const clientId = await getClientId(true);
       if (!clientId) {
-        console.log('[intake] ❌ No client ID found');
         return null;
       }
       
@@ -328,8 +316,6 @@
         }
         
         if (client) {
-          console.log('[intake] ✅ DB data loaded:', client);
-          
           // Populate hidden fields
           document.getElementById('firstName').value = client.first_name || '';
           document.getElementById('lastName').value = client.last_name || '';
@@ -385,7 +371,6 @@
 
         if (!bookingError && bookings && bookings.length > 0) {
           const booking = bookings[0];
-          console.log('[intake] 📋 Latest booking:', booking);
           
           // Only update if fields are empty
           const firstNameInput = document.getElementById('firstName');
@@ -403,8 +388,6 @@
 
     // Update intake_step in DB
     async function updateStepInDb(step) {
-      console.log(`[intake] 💾 Updating step to ${step} in DB...`);
-      
       // Check session before saving protected data
       const isSessionValid = await ensureValidIntakeSession();
       if (!isSessionValid) return false;
@@ -429,7 +412,6 @@
           return false;
         }
         
-        console.log(`[intake] ✅ Step updated to ${step}`);
         return true;
       } catch (err) {
         console.error('[intake] ❌ Error updating step:', err);
@@ -439,8 +421,6 @@
 
     // Save Step 1 data to DB
     async function saveStep1ToDb() {
-      console.log('[intake] 💾 Saving Step 1 to DB...');
-      
       // Check session before saving protected data
       const isSessionValid = await ensureValidIntakeSession();
       if (!isSessionValid) return false;
@@ -457,7 +437,19 @@
         return false;
       }
       
-      const licenseNumber = document.getElementById('licenseNumber').value.trim().toUpperCase();
+      const licenseNumber = normalizeInput(document.getElementById('licenseNumber').value).toUpperCase();
+      
+      // XSS Protection - Check for HTML/script content
+      if (licenseNumber && containsBlockedContent(licenseNumber)) {
+        showFieldError('licenseNumber', 'licenseNumberError', 'HTML or script content is not allowed. Please enter plain text only.');
+        return false;
+      }
+      
+      // Length Validation - Prevent payload abuse
+      if (licenseNumber && licenseNumber.length > 30) {
+        showFieldError('licenseNumber', 'licenseNumberError', 'Licence number is too long (maximum 30 characters).');
+        return false;
+      }
       
       try {
         const { error } = await supabase
@@ -474,7 +466,6 @@
           return false;
         }
         
-        console.log('[intake] ✅ Step 1 saved successfully');
         return true;
       } catch (err) {
         console.error('[intake] ❌ Error saving Step 1:', err);
@@ -485,8 +476,6 @@
 
     // Save Step 2 data to DB
     async function saveStep2ToDb() {
-      console.log('[intake] 💾 Saving Step 2 to DB...');
-      
       // Check session before saving protected data
       const isSessionValid = await ensureValidIntakeSession();
       if (!isSessionValid) return false;
@@ -503,7 +492,22 @@
         return false;
       }
       
-      const medicalConditions = document.getElementById('medicalConditions').value.trim() || null;
+      const medicalConditions = normalizeInput(document.getElementById('medicalConditions').value) || null;
+      
+      // XSS Protection - Check for HTML/script content
+      if (medicalConditions && containsBlockedContent(medicalConditions)) {
+        showFieldError('medicalConditions', 'medicalConditionsError', 'HTML or script content is not allowed. Please enter plain text only.');
+        return false;
+      }
+      
+      // Length Validation - Prevent payload abuse
+      if (medicalConditions && medicalConditions.length > 500) {
+        showFieldError('medicalConditions', 'medicalConditionsError', 'Medical conditions text is too long (maximum 500 characters).');
+        return false;
+      }
+      
+      // Clear error if validation passed
+      clearFieldError('medicalConditions', 'medicalConditionsError');
       
       try {
         const { error } = await supabase
@@ -520,7 +524,6 @@
           return false;
         }
         
-        console.log('[intake] ✅ Step 2 saved successfully');
         return true;
       } catch (err) {
         console.error('[intake] ❌ Error saving Step 2:', err);
@@ -531,8 +534,6 @@
 
     // Save Step 3 checkbox to DB immediately
     async function saveCheckboxToDb(field, value) {
-      console.log(`[intake] 💾 Saving ${field} = ${value} to DB...`);
-      
       // Check session before saving protected data
       const isSessionValid = await ensureValidIntakeSession();
       if (!isSessionValid) return;
@@ -556,8 +557,6 @@
         
         if (error) {
           console.error(`[intake] ❌ Error saving ${field}:`, error);
-        } else {
-          console.log(`[intake] ✅ ${field} saved successfully`);
         }
       } catch (err) {
         console.error(`[intake] ❌ Error saving ${field}:`, err);
@@ -568,7 +567,23 @@
     function saveOtherDetailsToDb() {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(async () => {
-        const otherDetails = document.getElementById('otherDetails').value.trim() || null;
+        const otherDetails = normalizeInput(document.getElementById('otherDetails').value) || null;
+        
+        // XSS Protection - Check for HTML/script content
+        if (otherDetails && containsBlockedContent(otherDetails)) {
+          showFieldError('otherDetails', 'otherDetailsError', 'HTML or script content is not allowed. Please enter plain text only.');
+          return;
+        }
+        
+        // Length Validation - Prevent payload abuse
+        if (otherDetails && otherDetails.length > 500) {
+          showFieldError('otherDetails', 'otherDetailsError', 'Learning needs text is too long (maximum 500 characters).');
+          return;
+        }
+        
+        // Clear error if validation passed
+        clearFieldError('otherDetails', 'otherDetailsError');
+        
         await saveCheckboxToDb('learning_needs_other', otherDetails);
       }, 1000); // 1 second debounce
     }
@@ -586,11 +601,9 @@
       currentStep = step;
       updateProgress();
       
-      // Load fresh data from DB when showing a step
-      await loadIntakeDataFromDb();
-      
-      // Update step in DB (unless this is initial load)
+      // Load fresh data from DB when showing a step (unless this is initial load)
       if (!skipDbUpdate) {
+        await loadIntakeDataFromDb();
         await updateStepInDb(step);
       }
       
@@ -619,12 +632,49 @@
       error.classList.add('hidden');
     }
 
+    // XSS Protection Helpers
+    function containsHtmlTags(value) {
+      return /<[^>]+>/.test(value);
+    }
+
+    function containsSuspiciousScriptPattern(value) {
+      return /<script|<img|<svg|<iframe|javascript:|srcdoc\s*=|onerror\s*=|onload\s*=|onmouseover\s*=|onfocus\s*=|onpageshow\s*=|eval\s*\(|document\.cookie/i.test(value);
+    }
+
+    function containsBlockedContent(value) {
+      return value && (containsHtmlTags(value) || containsSuspiciousScriptPattern(value));
+    }
+
+    // Input normalization helper - removes invisible characters
+    function normalizeInput(value) {
+      if (!value) return value;
+      return value
+        .replace(/\u200B/g, '')   // zero-width space
+        .replace(/\u200C/g, '')
+        .replace(/\u200D/g, '')
+        .trim();
+    }
+
     function validateStep(step) {
       if (step === 1) {
-        const license = document.getElementById('licenseNumber').value.trim();
+        const license = normalizeInput(document.getElementById('licenseNumber').value);
 
         if (!license) {
           showFieldError('licenseNumber', 'licenseNumberError', 'Licence or permit number is required');
+          document.getElementById('licenseNumber').focus();
+          return false;
+        }
+
+        // XSS Protection - Check for HTML/script content
+        if (containsBlockedContent(license)) {
+          showFieldError('licenseNumber', 'licenseNumberError', 'HTML or script content is not allowed. Please enter plain text only.');
+          document.getElementById('licenseNumber').focus();
+          return false;
+        }
+
+        // Length Validation - Prevent payload abuse
+        if (license.length > 30) {
+          showFieldError('licenseNumber', 'licenseNumberError', 'Licence number is too long (maximum 30 characters).');
           document.getElementById('licenseNumber').focus();
           return false;
         }
@@ -671,7 +721,6 @@
 
     async function resetFormOnly() {
       // True reset: Wipe DB intake fields back to NULL
-      console.log('[intake] 🔄 Resetting form (wiping DB intake fields to NULL)...');
       
       // Check session before saving protected data
       const isSessionValid = await ensureValidIntakeSession();
@@ -715,8 +764,6 @@
           return;
         }
         
-        console.log('[intake] ✅ Form reset successfully, DB wiped');
-        
         // Clear all form fields
         document.getElementById('licenseNumber').value = '';
         document.getElementById('medicalConditions').value = '';
@@ -747,12 +794,17 @@
         textbox.focus();
       } else {
         textbox.value = '';
+        // Clear the error when unchecked
+        clearFieldError('otherDetails', 'otherDetailsError');
         // Clear the DB field if unchecked
         saveCheckboxToDb('learning_needs_other', null);
       }
     }
 
     async function submitForm() {
+      // Cancel any pending debounced saves
+      clearTimeout(debounceTimer);
+      
       // Check session before saving protected data
       const isSessionValid = await ensureValidIntakeSession();
       if (!isSessionValid) return;
@@ -764,16 +816,48 @@
       }
 
       // Get form data
+      const licenseNumber = normalizeInput(document.getElementById('licenseNumber').value).toUpperCase();
+      const medicalConditions = normalizeInput(document.getElementById('medicalConditions').value) || null;
+      const otherDetails = document.getElementById('isOther').checked ? normalizeInput(document.getElementById('otherDetails').value) : null;
+      
+      // XSS Protection - Check for HTML/script content
+      if (licenseNumber && containsBlockedContent(licenseNumber)) {
+        showFieldError('licenseNumber', 'licenseNumberError', 'HTML or script content is not allowed. Please enter plain text only.');
+        return;
+      }
+      if (medicalConditions && containsBlockedContent(medicalConditions)) {
+        showFieldError('medicalConditions', 'medicalConditionsError', 'HTML or script content is not allowed. Please enter plain text only.');
+        return;
+      }
+      if (otherDetails && containsBlockedContent(otherDetails)) {
+        showFieldError('otherDetails', 'otherDetailsError', 'HTML or script content is not allowed. Please enter plain text only.');
+        return;
+      }
+      
+      // Length Validation - Prevent payload abuse
+      if (licenseNumber && licenseNumber.length > 30) {
+        showFieldError('licenseNumber', 'licenseNumberError', 'Licence number is too long (maximum 30 characters).');
+        return;
+      }
+      if (medicalConditions && medicalConditions.length > 500) {
+        showFieldError('medicalConditions', 'medicalConditionsError', 'Medical conditions text is too long (maximum 500 characters).');
+        return;
+      }
+      if (otherDetails && otherDetails.length > 500) {
+        showFieldError('otherDetails', 'otherDetailsError', 'Learning needs text is too long (maximum 500 characters).');
+        return;
+      }
+      
       const formData = {
         first_name: document.getElementById('firstName').value.trim(),
         last_name: document.getElementById('lastName').value.trim(),
         mobile: document.getElementById('mobile').value.trim(),
-        learner_permit_number: document.getElementById('licenseNumber').value.trim().toUpperCase(),
-        medical_conditions: document.getElementById('medicalConditions').value.trim() || null,
+        learner_permit_number: licenseNumber,
+        medical_conditions: medicalConditions,
         is_beginner: document.getElementById('isBeginner').checked,
         is_anxious_nervous: document.getElementById('isAnxious').checked,
         is_senior: document.getElementById('isSenior').checked,
-        learning_needs_other: document.getElementById('isOther').checked ? document.getElementById('otherDetails').value.trim() : null,
+        learning_needs_other: otherDetails,
         intake_completed: true,
         updated_at: new Date().toISOString()
       };
@@ -869,27 +953,21 @@
 
     // Helper to initialise the intake page UI after session validation
     async function initialiseIntakePage() {
-      console.log('[intake] Loading intake data from DB...');
       const clientData = await loadIntakeDataFromDb();
 
       let resumeStep = 1;
       if (clientData) {
         if (clientData.intake_completed) {
           resumeStep = 1;
-          console.log('[intake] Intake already completed, starting at step 1');
         } else {
           resumeStep = Math.max(1, Math.min(3, clientData.intake_step || 1));
-          console.log(`[intake] Resuming at step ${resumeStep}`);
         }
       }
 
-      console.log(`[intake] Showing step ${resumeStep}...`);
       await showStep(resumeStep, true);
 
-      console.log('[intake] Fetching booking data if needed...');
       await fetchBookingDataIfNeeded();
 
-      console.log('[intake] Setting focus to license number field...');
       document.getElementById('licenseNumber').focus();
     }
 
@@ -900,29 +978,21 @@
     window.addEventListener('DOMContentLoaded', async () => {
       // Prevent double initialization
       if (intakeInitStarted) {
-        console.log('[intake] Init already started, skipping duplicate call');
         return;
       }
       intakeInitStarted = true;
 
       try {
-        console.log('[intake] 🚀 Page loaded, starting initialization...');
-        
         // Wait for Supabase client to be ready
-        console.log('[intake] Waiting for Supabase client...');
         const supabase = await waitForSupabaseClient();
         if (!supabase) {
           throw new Error('Supabase client not available during intake init');
         }
-        console.log('[intake] Supabase client ready');
         
         // Check session FIRST before any protected operations
-        console.log('[intake] Starting session validation...');
         const isSessionValid = await ensureValidIntakeSession(false);
-        console.log(`[intake] Session validation completed, result: ${isSessionValid}`);
         
         if (!isSessionValid) {
-          console.log('[intake] Init aborted due to invalid session');
           
           // Give auth.js time to redirect; if still on intake.html, restore visibility
           setTimeout(() => {
@@ -947,16 +1017,21 @@
         intakeInitialSessionValidated = true;
         
         // Make page visible after session validation
-        console.log('[intake] Making page visible...');
         document.body.style.visibility = 'visible';
         
         // Initialise the page UI
         await initialiseIntakePage();
         
-        console.log('[intake] ✅ Initialization completed successfully');
+        // Add input event listeners to clear errors as user types
+        document.getElementById('medicalConditions').addEventListener('input', function() {
+          clearFieldError('medicalConditions', 'medicalConditionsError');
+        });
+        
+        document.getElementById('otherDetails').addEventListener('input', function() {
+          clearFieldError('otherDetails', 'otherDetailsError');
+        });
       } catch (error) {
         console.error('[intake] ❌ Initialization failed:', error);
-        console.error('[intake] Error stack:', error.stack);
         
         // Restore visibility so user can see the error
         document.body.style.visibility = 'visible';

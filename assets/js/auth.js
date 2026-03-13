@@ -115,7 +115,7 @@
         .from('client')
         .select('id, password_changed_at')
         .eq('id', session.user.id)
-        .single();
+        .maybeSingle();
       console.log('[auth] client query resolved', {
         hasClientData: !!clientData,
         clientError: clientError?.message || null,
@@ -128,10 +128,9 @@
         return false;
       }
 
-      // Fail closed: no client row for authenticated user (suspicious)
       if (!clientData) {
-        console.error('[auth] Session check failed: no client record found');
-        return false;
+        console.warn('[auth] No client record found for user, skipping password_changed_at check');
+        return true;
       }
 
       // If no password_changed_at, session is valid (password never changed)

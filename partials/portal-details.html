@@ -85,6 +85,7 @@
             name="learner_permit_number"
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
+          <p id="learnerPermitNumberError" class="text-xs text-red-500 mt-1 hidden"></p>
         </div>
       </div>
     </div>
@@ -103,6 +104,7 @@
             name="emergency_contact_name"
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
+          <p id="emergencyContactNameError" class="text-xs text-red-500 mt-1 hidden"></p>
         </div>
 
         <div>
@@ -137,6 +139,7 @@
           placeholder="Please list any medical conditions we should be aware of (e.g., epilepsy, diabetes, anxiety)"
           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         ></textarea>
+        <p id="medicalConditionsError" class="text-xs text-red-500 mt-1 hidden"></p>
         <p class="text-xs text-gray-500 mt-1">This information helps us provide better support during lessons</p>
       </div>
 
@@ -201,6 +204,7 @@
               placeholder="Please specify..."
               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
             />
+            <p id="learningNeedsOtherError" class="text-xs text-red-500 mt-1 hidden"></p>
           </div>
         </label>
       </div>
@@ -218,6 +222,7 @@
         placeholder="Any other information you'd like to share"
         class="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
       ></textarea>
+      <p id="notesError" class="text-xs text-red-500 mt-1 hidden"></p>
     </div>
 
     <!-- Action Buttons -->
@@ -252,26 +257,25 @@
   async function loadClientDetailsIfAllowed() {
     // Prevent duplicate loads
     if (detailsLoaded) {
-      console.log('[portal-details] Already loaded, skipping');
       return;
     }
 
-    // Check password-changed session before loading protected data
+    // Check password-changed session before loading protected data (with timeout)
     if (window.AuthUI && window.AuthUI.checkPasswordChangedSession) {
-      const sessionValid = await window.AuthUI.checkPasswordChangedSession();
+      const sessionValid = window.AuthUI.checkPasswordChangedSessionWithTimeout
+        ? await window.AuthUI.checkPasswordChangedSessionWithTimeout(8000)
+        : await window.AuthUI.checkPasswordChangedSession();
       if (!sessionValid) {
-        console.log('[portal-details] Stale session detected, aborting load');
+        console.warn('[portal-details] Stale session detected, aborting load');
         return;
       }
     }
 
     // Ensure data is available
     if (!window.clientData) {
-      console.log('[portal-details] No client data available yet');
       return;
     }
 
-    console.log('[portal-details] Loading client details');
     loadClientDetails();
     detailsLoaded = true;
   }
@@ -304,7 +308,7 @@
     const v = this.value.trim();
     if (!v) {
       showError('mobile','mobileError','Mobile number is required');
-    } else if (!Validation.isValidAuMobile(v)) {
+    } else if (!window.Validation || !Validation.isValidAuMobile || !Validation.isValidAuMobile(v)) {
       showError('mobile','mobileError','Enter a valid AU mobile (e.g. 04XX XXX XXX or +61 4XX XXX XXX)');
     } else {
       clearError('mobile','mobileError');
@@ -318,7 +322,7 @@
       return; 
     }
 
-    const ok = (Validation.isValidAuPhone && Validation.isValidAuPhone(v)) || false;
+    const ok = window.Validation && Validation.isValidAuPhone && Validation.isValidAuPhone(v);
 
     if (!ok) {
       showError('emergencyContactPhone','emergencyContactPhoneError','Enter a valid Australian mobile (04XX XXX XXX) or landline (0X XXXX XXXX)');
@@ -327,6 +331,43 @@
       // Don't reformat - store what user entered
     }
   });
+
+  // Clear errors when user types (input event listeners)
+  document.getElementById('firstName').addEventListener('input', () =>
+    clearError('firstName','firstNameError')
+  );
+
+  document.getElementById('lastName').addEventListener('input', () =>
+    clearError('lastName','lastNameError')
+  );
+
+  document.getElementById('mobile').addEventListener('input', () =>
+    clearError('mobile','mobileError')
+  );
+
+  document.getElementById('emergencyContactPhone').addEventListener('input', () =>
+    clearError('emergencyContactPhone','emergencyContactPhoneError')
+  );
+
+  document.getElementById('learnerPermitNumber').addEventListener('input', () =>
+    clearError('learnerPermitNumber','learnerPermitNumberError')
+  );
+
+  document.getElementById('emergencyContactName').addEventListener('input', () =>
+    clearError('emergencyContactName','emergencyContactNameError')
+  );
+
+  document.getElementById('medicalConditions').addEventListener('input', () =>
+    clearError('medicalConditions','medicalConditionsError')
+  );
+
+  document.getElementById('learningNeedsOther').addEventListener('input', () =>
+    clearError('learningNeedsOther','learningNeedsOtherError')
+  );
+
+  document.getElementById('notes').addEventListener('input', () =>
+    clearError('notes','notesError')
+  );
 
   function loadClientDetails() {
     if (!window.clientData) return;
@@ -354,21 +395,47 @@
     document.getElementById('notes').value = data.notes || '';
   }
 
+  // XSS Protection Helpers
+  function containsHtmlTags(value) {
+    return /<[^>]+>/.test(value);
+  }
+
+  function containsSuspiciousScriptPattern(value) {
+    return /<script|<img|<svg|<iframe|javascript:|srcdoc\s*=|onerror\s*=|onload\s*=|onmouseover\s*=|onfocus\s*=|onpageshow\s*=|eval\s*\(|document\.cookie/i.test(value);
+  }
+
+  function containsBlockedContent(value) {
+    return value && (containsHtmlTags(value) || containsSuspiciousScriptPattern(value));
+  }
+
+  // Input normalization helper - removes invisible characters
+  function normalizeInput(value) {
+    if (!value) return value;
+    return value
+      .replace(/\u200B/g, '')   // zero-width space
+      .replace(/\u200C/g, '')
+      .replace(/\u200D/g, '')
+      .trim();
+  }
+
   // Validation helper functions
-  function showError(fieldId, errorId, message) {
-    console.log('Showing error for', fieldId, ':', message);
+  function showError(fieldId, errorId, message, shouldScroll = true) {
     const field = document.getElementById(fieldId);
     const error = document.getElementById(errorId);
     
     if (!field || !error) {
-      console.error('Field or error element not found:', fieldId, errorId);
+      console.error('[portal-details] Field or error element not found:', fieldId, errorId);
       return;
     }
     
     field.classList.add('border-red-400');
     error.textContent = message;
     error.classList.remove('hidden');
-    field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    
+    // Scroll to this field if requested
+    if (shouldScroll) {
+      field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   }
 
   function clearError(fieldId, errorId) {
@@ -387,31 +454,101 @@
     clearError('lastName', 'lastNameError');
     clearError('mobile', 'mobileError');
     clearError('emergencyContactPhone', 'emergencyContactPhoneError');
+    clearError('learnerPermitNumber', 'learnerPermitNumberError');
+    clearError('emergencyContactName', 'emergencyContactNameError');
+    clearError('medicalConditions', 'medicalConditionsError');
+    clearError('learningNeedsOther', 'learningNeedsOtherError');
+    clearError('notes', 'notesError');
 
     let hasError = false;
+    let firstInvalidField = null;
 
-    const first = document.getElementById('firstName').value.trim();
-    const last  = document.getElementById('lastName').value.trim();
-    const mobile= document.getElementById('mobile').value.trim();
-    const ePhone= document.getElementById('emergencyContactPhone').value.trim();
+    const first = normalizeInput(document.getElementById('firstName').value);
+    const last  = normalizeInput(document.getElementById('lastName').value);
+    const mobile= normalizeInput(document.getElementById('mobile').value);
+    const ePhone= normalizeInput(document.getElementById('emergencyContactPhone').value);
+    const learnerPermit = normalizeInput(document.getElementById('learnerPermitNumber').value);
+    const emergencyName = normalizeInput(document.getElementById('emergencyContactName').value);
+    const medicalConditions = normalizeInput(document.getElementById('medicalConditions').value);
+    const learningNeedsOther = normalizeInput(document.getElementById('learningNeedsOther').value);
+    const notes = normalizeInput(document.getElementById('notes').value);
 
-    if (!first) { showError('firstName', 'firstNameError', 'First name is required'); hasError = true; }
-    if (!last)  { showError('lastName', 'lastNameError', 'Last name is required');   hasError = true; }
+    // Required field validation
+    if (!first) { 
+      showError('firstName', 'firstNameError', 'First name is required', false); 
+      if (!firstInvalidField) firstInvalidField = 'firstName';
+      hasError = true; 
+    } else if (containsBlockedContent(first)) {
+      // XSS Protection - Only check if field has content
+      showError('firstName', 'firstNameError', 'HTML or script content is not allowed. Please enter plain text only.', false);
+      if (!firstInvalidField) firstInvalidField = 'firstName';
+      hasError = true;
+    }
+    
+    if (!last) { 
+      showError('lastName', 'lastNameError', 'Last name is required', false); 
+      if (!firstInvalidField) firstInvalidField = 'lastName';
+      hasError = true; 
+    } else if (containsBlockedContent(last)) {
+      // XSS Protection - Only check if field has content
+      showError('lastName', 'lastNameError', 'HTML or script content is not allowed. Please enter plain text only.', false);
+      if (!firstInvalidField) firstInvalidField = 'lastName';
+      hasError = true;
+    }
+    
+    // XSS Protection - Check other fields with inline errors
+    if (learnerPermit && containsBlockedContent(learnerPermit)) {
+      showError('learnerPermitNumber', 'learnerPermitNumberError', 'HTML or script content is not allowed. Please enter plain text only.', false);
+      if (!firstInvalidField) firstInvalidField = 'learnerPermitNumber';
+      hasError = true;
+    }
+    if (emergencyName && containsBlockedContent(emergencyName)) {
+      showError('emergencyContactName', 'emergencyContactNameError', 'HTML or script content is not allowed. Please enter plain text only.', false);
+      if (!firstInvalidField) firstInvalidField = 'emergencyContactName';
+      hasError = true;
+    }
+    if (medicalConditions && containsBlockedContent(medicalConditions)) {
+      showError('medicalConditions', 'medicalConditionsError', 'HTML or script content is not allowed. Please enter plain text only.', false);
+      if (!firstInvalidField) firstInvalidField = 'medicalConditions';
+      hasError = true;
+    }
+    if (learningNeedsOther && containsBlockedContent(learningNeedsOther)) {
+      showError('learningNeedsOther', 'learningNeedsOtherError', 'HTML or script content is not allowed. Please enter plain text only.', false);
+      if (!firstInvalidField) firstInvalidField = 'learningNeedsOther';
+      hasError = true;
+    }
+    if (notes && containsBlockedContent(notes)) {
+      showError('notes', 'notesError', 'HTML or script content is not allowed. Please enter plain text only.', false);
+      if (!firstInvalidField) firstInvalidField = 'notes';
+      hasError = true;
+    }
     
     // Mobile validation - must be valid
     if (!mobile) { 
-      showError('mobile', 'mobileError', 'Mobile number is required'); 
+      showError('mobile', 'mobileError', 'Mobile number is required', false); 
+      if (!firstInvalidField) firstInvalidField = 'mobile';
       hasError = true; 
-    } else if (!Validation.isValidAuMobile(mobile)) { 
-      showError('mobile', 'mobileError', 'Enter a valid AU mobile (e.g. 04XX XXX XXX or +61 4XX XXX XXX)'); 
+    } else if (!window.Validation || !Validation.isValidAuMobile || !Validation.isValidAuMobile(mobile)) { 
+      showError('mobile', 'mobileError', 'Enter a valid AU mobile (e.g. 04XX XXX XXX or +61 4XX XXX XXX)', false); 
+      if (!firstInvalidField) firstInvalidField = 'mobile';
       hasError = true; 
     }
     
     // Emergency phone validation - must be valid if provided
     if (ePhone) {
-      if (!Validation.isValidAuPhone(ePhone)) {
-        showError('emergencyContactPhone', 'emergencyContactPhoneError', 'Enter a valid Australian mobile or landline');
+      const isValid = window.Validation && Validation.isValidAuPhone && Validation.isValidAuPhone(ePhone);
+      if (!isValid) {
+        showError('emergencyContactPhone', 'emergencyContactPhoneError', 'Enter a valid Australian mobile or landline', false);
+        if (!firstInvalidField) firstInvalidField = 'emergencyContactPhone';
         hasError = true;
+      }
+    }
+
+    // Scroll to first invalid field once
+    if (firstInvalidField) {
+      const firstField = document.getElementById(firstInvalidField);
+      if (firstField) {
+        firstField.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
 
@@ -433,36 +570,36 @@
       return;
     }
 
-    // Check password-changed session before saving protected data
+    // Check password-changed session before saving protected data (with timeout)
     if (window.AuthUI && window.AuthUI.checkPasswordChangedSession) {
-      const sessionValid = await window.AuthUI.checkPasswordChangedSession();
+      const sessionValid = window.AuthUI.checkPasswordChangedSessionWithTimeout
+        ? await window.AuthUI.checkPasswordChangedSessionWithTimeout(8000)
+        : await window.AuthUI.checkPasswordChangedSession();
       if (!sessionValid) {
-        console.log('[portal-details] Stale session detected, aborting save');
+        console.warn('[portal-details] Stale session detected, aborting save');
         return;
       }
     }
 
     // Collect form data - store trimmed raw values (no normalisation for storage)
-    const mobileRaw = document.getElementById('mobile').value.trim();
-    const emergencyPhoneRaw = document.getElementById('emergencyContactPhone').value.trim();
+    const mobileRaw = normalizeInput(document.getElementById('mobile').value);
+    const emergencyPhoneRaw = normalizeInput(document.getElementById('emergencyContactPhone').value);
     
     const formData = {
-      first_name: document.getElementById('firstName').value.trim(),
-      last_name: document.getElementById('lastName').value.trim(),
+      first_name: normalizeInput(document.getElementById('firstName').value),
+      last_name: normalizeInput(document.getElementById('lastName').value),
       mobile: mobileRaw,
-      learner_permit_number: document.getElementById('learnerPermitNumber').value.trim() || null,
-      emergency_contact_name: document.getElementById('emergencyContactName').value.trim() || null,
+      learner_permit_number: normalizeInput(document.getElementById('learnerPermitNumber').value) || null,
+      emergency_contact_name: normalizeInput(document.getElementById('emergencyContactName').value) || null,
       emergency_contact_phone: emergencyPhoneRaw || null,
-      medical_conditions: document.getElementById('medicalConditions').value.trim() || null,
+      medical_conditions: normalizeInput(document.getElementById('medicalConditions').value) || null,
       is_anxious_nervous: document.getElementById('isAnxiousNervous').checked,
       is_beginner: document.getElementById('isBeginner').checked,
       is_senior: document.getElementById('isSenior').checked,
-      learning_needs_other: document.getElementById('hasOtherLearningNeeds').checked ? document.getElementById('learningNeedsOther').value.trim() : null,
-      notes: document.getElementById('notes').value.trim() || null,
+      learning_needs_other: document.getElementById('hasOtherLearningNeeds').checked ? normalizeInput(document.getElementById('learningNeedsOther').value) : null,
+      notes: normalizeInput(document.getElementById('notes').value) || null,
       updated_at: new Date().toISOString()
     };
-    
-    console.log('Validation passed, saving data...');
 
     try {
       const { data, error } = await window.supabaseClient

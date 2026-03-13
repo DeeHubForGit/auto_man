@@ -153,7 +153,6 @@
       window.currentUser = session.user; // Make available to partials
       
       // Check password-changed session BEFORE any protected queries
-      console.log('[portal] Checking password-changed session before init');
       if (!window.AuthUI || !window.AuthUI.checkPasswordChangedSession) {
         console.error('[portal] Auth validation unavailable, aborting');
         Modal.error('Authentication validation is unavailable. Please refresh the page.');
@@ -163,7 +162,6 @@
       
       const sessionValid = await window.AuthUI.checkPasswordChangedSession();
       if (!sessionValid) {
-        console.log('[portal] Stale session detected, aborting portal init');
         // Hide and clear portal content
         const mainContent = document.getElementById('portalMainContent');
         if (mainContent) {
@@ -183,7 +181,6 @@
         .single();
       
       if (client?.is_admin === true) {
-        console.log('[portal] User is admin, redirecting to admin page');
         window.location.href = 'admin.html';
         return;
       }
@@ -204,7 +201,6 @@
       // BUT only if they haven't explicitly skipped it in this session
       const hasSkippedIntake = sessionStorage.getItem('intake_skipped') === 'true';
       if (hasBookings && client?.intake_completed !== true && !hasSkippedIntake) {
-        console.log('[portal] User has bookings but intake not completed, redirecting to intake');
         window.location.href = 'intake.html';
         return;
       }
@@ -319,7 +315,6 @@
       if (window.AuthUI && window.AuthUI.checkPasswordChangedSession) {
         const sessionValid = await window.AuthUI.checkPasswordChangedSession();
         if (!sessionValid) {
-          console.log('[portal] Stale session detected, aborting navigation');
           return;
         }
       }
@@ -412,6 +407,19 @@
     const pickupDebounceTimers = {};
     let bookingsInit = false;
     let bannerUpdateTimeout = null;
+
+    // XSS Protection Helpers
+    function containsHtmlTags(value) {
+      return /<[^>]+>/.test(value);
+    }
+
+    function containsSuspiciousScriptPattern(value) {
+      return /<script|<img|<svg|<iframe|javascript:|srcdoc\s*=|onerror\s*=|onload\s*=|onmouseover\s*=|onfocus\s*=|onpageshow\s*=|eval\s*\(|document\.cookie/i.test(value);
+    }
+
+    function containsBlockedContent(value) {
+      return value && (containsHtmlTags(value) || containsSuspiciousScriptPattern(value));
+    }
 
     /**
      * Updates the top banner state and message
@@ -590,7 +598,6 @@
       bookingsInit = true;
       
       try {
-        console.log('Waiting for bookings partial to load...');
         await waitForEl('#upcoming-list');
         // Bookings partial loaded, waiting for auth
         await waitForReady();
@@ -705,7 +712,6 @@
       
       const sessionValid = await window.AuthUI.checkPasswordChangedSession();
       if (!sessionValid) {
-        console.log('[portal-bookings] Stale session detected, aborting load');
         // Clear any existing booking content
         const upcomingList = document.getElementById('upcoming-list');
         const pastList = document.getElementById('past-list');
@@ -950,7 +956,6 @@
         await window.supabaseClient.functions.invoke('update-booking-in-google', {
           body: { booking_id: bookingId, fields }
         });
-        console.log(`[portal] Google Calendar updated for fields:`, fields);
       } catch (e) {
         // Do not block the UI, DB is the source of truth here
         console.warn('[portal] Google patch failed:', e);
@@ -1023,9 +1028,18 @@
       if (window.AuthUI && window.AuthUI.checkPasswordChangedSession) {
         const sessionValid = await window.AuthUI.checkPasswordChangedSession();
         if (!sessionValid) {
-          console.log('[portal] Stale session detected, aborting savePickupLocationAndRevalidate');
           return;
         }
+      }
+
+      // XSS Protection - Check for HTML/script content in pickup location
+      if (newValue && containsBlockedContent(newValue)) {
+        if (window.Modal?.error) {
+          window.Modal.error('HTML or script content is not allowed in pickup location. Please enter plain text only.');
+        } else {
+          alert('HTML or script content is not allowed in pickup location.');
+        }
+        return;
       }
 
       // NEW: ensure mobile is saved first if the user just edited it
@@ -1065,8 +1079,6 @@
           showPortalPickupInvokeError(bookingId);
           return; // Do NOT reload bookings - keep inline error visible
         }
-
-        console.log('[portal] validate-bookings invoked for booking_id:', bookingId);
 
         await loadBookings();
       }
@@ -1152,6 +1164,20 @@
       // When user edits the address manually, also clear validation & re-run
       pickupInput.addEventListener('input', () => {
         const newValue = pickupInput.value.trim();
+
+        // Early XSS check - block script/HTML content immediately
+        if (newValue && containsBlockedContent(newValue)) {
+          pickupInput.classList.add('border-red-400', 'text-red-600');
+          pickupInput.classList.remove('border-gray-300', 'text-gray-900');
+          if (issueEl) {
+            issueEl.textContent = 'HTML or script content is not allowed. Please enter plain text only.';
+          }
+          // Clear any pending debounce timer
+          if (pickupDebounceTimers[booking.id]) {
+            clearTimeout(pickupDebounceTimers[booking.id]);
+          }
+          return; // Don't schedule backend save/validation
+        }
 
         // Capture previous value BEFORE we do optimistic updates
         const currentBefore = allBookings.find(b => b.id === booking.id);
@@ -1528,7 +1554,6 @@
 
     // Global function to handle booking cancellation from the UI
     async function handleCancelBooking(bookingId, googleEventId, buttonElement) {
-      console.log('[portal] Cancelling booking:', bookingId);
       
       // Show confirmation modal
       if (window.Modal && window.Modal.confirm) {
@@ -1555,7 +1580,6 @@
       if (window.AuthUI && window.AuthUI.checkPasswordChangedSession) {
         const sessionValid = await window.AuthUI.checkPasswordChangedSession();
         if (!sessionValid) {
-          console.log('[portal] Stale session detected, aborting performCancellation');
           if (buttonElement) {
             buttonElement.disabled = false;
             buttonElement.textContent = 'Cancel Booking';
@@ -1682,7 +1706,6 @@
       if (window.AuthUI && window.AuthUI.checkPasswordChangedSession) {
         const sessionValid = await window.AuthUI.checkPasswordChangedSession();
         if (!sessionValid) {
-          console.log('[portal] Stale session detected, aborting saveBookingField');
           return;
         }
       }
@@ -1723,6 +1746,18 @@
       
       // No change
       if (newValue === originalValue) {
+        return;
+      }
+      
+      // XSS Protection - Check for HTML/script content in text fields
+      if (fieldName === 'pickup_location' && newValue && containsBlockedContent(newValue)) {
+        if (window.Modal?.error) {
+          window.Modal.error('HTML or script content is not allowed in pickup location. Please enter plain text only.');
+        } else {
+          alert('HTML or script content is not allowed in pickup location.');
+        }
+        // Revert to original value
+        inputElement.value = originalValue;
         return;
       }
       
@@ -1806,7 +1841,6 @@
         if (fieldName === 'pickup_location' && newValue) {
           let invokeResult = null;
           try {
-            console.log('Triggering server-side validation...');
             invokeResult = await window.supabaseClient.functions.invoke('validate-bookings', {
               body: { id: bookingId, booking_id: bookingId }
             });
@@ -1878,8 +1912,6 @@
         
         // Refresh badge and banner
         refreshUpcomingValidationUI();
-
-        console.log(`✅ ${fieldName} updated for booking ${bookingId}:`, newValue || '(empty)');
       } catch (err) {
         console.error(`[portal] Error updating ${fieldName}:`, err);
         inputElement.value = originalValue; // Revert on error
@@ -1910,7 +1942,6 @@
         notes: document.getElementById('notes')?.value || ''
       };
       localStorage.setItem('portal_form_cache', JSON.stringify(formData));
-      console.log('Form data auto-saved to cache');
     }
 
     // Load form data from localStorage (on page load)
@@ -1920,7 +1951,6 @@
         if (!cached) return;
         
         const formData = JSON.parse(cached);
-        console.log('Loading cached form data');
         
         // Only populate if fields are empty (don't override DB data)
         if (document.getElementById('firstName')?.value === '') {
@@ -1943,7 +1973,6 @@
     // Clear form cache after successful save
     function clearFormCache() {
       localStorage.removeItem('portal_form_cache');
-      console.log('Form cache cleared');
     }
 
     function showDetailsSavedMessage() {
@@ -1970,8 +1999,6 @@
         console.error('Form not found in setupFormValidation');
         return;
       }
-      
-      console.log('Form validation listener attached');
 
       // Hard guard: capture submit first and block if invalid, regardless of other listeners
       document.addEventListener('submit', function(ev){
@@ -1980,7 +2007,7 @@
         // Use partial validator if present
         if (typeof window.validateClientDetailsForm === 'function') {
           const ok = window.validateClientDetailsForm();
-          if (!ok) { ev.preventDefault(); ev.stopImmediatePropagation(); console.log('Guard blocked submit (partial validator)'); }
+          if (!ok) { ev.preventDefault(); ev.stopImmediatePropagation(); }
           return;
         }
         // Fallback quick validation
@@ -1993,12 +2020,11 @@
         if (!last)  { bad = true; }
         if (!mobile || !Validation.isValidAuMobile(mobile)) { bad = true; }
         if (ePhone && !Validation.isValidAuPhone(ePhone)) { bad = true; }
-        if (bad) { ev.preventDefault(); ev.stopImmediatePropagation(); console.log('Guard blocked submit (fallback validator)'); }
+        if (bad) { ev.preventDefault(); ev.stopImmediatePropagation(); }
       }, true);
 
       // If the partial provided its own validator/submit handler, prefer that and avoid adding a second submit listener
       if (typeof window.validateClientDetailsForm === 'function') {
-        console.log('Using partial-provided validator/handler');
         // Still set up autosave listeners below, but skip our own submit handler
       }
       
@@ -2031,12 +2057,14 @@
       
       if (typeof window.validateClientDetailsForm !== 'function') form.addEventListener('submit', async function(e) {
         e.preventDefault();
-        console.log('=== FORM SUBMITTED ===');
+
+        // NOTE: portal-details.html is the source of truth for validation logic.
+        // This fallback validation must be kept minimal and in sync with the partial.
 
         // If the partial exposed a validator, use it so rules stay in one place
         if (typeof window.validateClientDetailsForm === 'function') {
           const ok = window.validateClientDetailsForm();
-          if (!ok) { console.log('Validation failed in partial validator'); return; }
+          if (!ok) { return; }
         } else {
           // Fallback minimal validation (keep in sync with partial)
           const first = document.getElementById('firstName')?.value.trim() || '';
@@ -2052,10 +2080,8 @@
           else if (!Validation.isValidAuMobile(mobile)) { showFieldError('mobile','mobileError','Enter a valid AU mobile (e.g. 04XX XXX XXX or +61 4XX XXX XXX)'); hasError = true; }
           if (ePhone && !Validation.isValidAuPhone(ePhone)) { showFieldError('emergencyContactPhone','emergencyContactPhoneError','Enter a valid AU phone number'); hasError = true; }
 
-          if (hasError) { console.log('Validation failed, stopping'); return; }
+          if (hasError) { return; }
         }
-
-        console.log('Validation passed, saving to database...');
         
         // Collect all form data
         const fullFormData = {
@@ -2109,7 +2135,6 @@
       error.textContent = message;
       error.classList.remove('hidden');
       field.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      console.log('Error shown for', fieldId);
     }
 
     function clearAllErrors() {

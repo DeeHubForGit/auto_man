@@ -245,8 +245,17 @@
 </div>
 
 <script>
-  // Load client details when data is available
-  window.addEventListener('clientDataLoaded', async function(e) {
+  // Duplicate load prevention flag
+  let detailsLoaded = false;
+
+  // Helper: Load client details with duplicate prevention and session check
+  async function loadClientDetailsIfAllowed() {
+    // Prevent duplicate loads
+    if (detailsLoaded) {
+      console.log('[portal-details] Already loaded, skipping');
+      return;
+    }
+
     // Check password-changed session before loading protected data
     if (window.AuthUI && window.AuthUI.checkPasswordChangedSession) {
       const sessionValid = await window.AuthUI.checkPasswordChangedSession();
@@ -255,9 +264,27 @@
         return;
       }
     }
-    
+
+    // Ensure data is available
+    if (!window.clientData) {
+      console.log('[portal-details] No client data available yet');
+      return;
+    }
+
+    console.log('[portal-details] Loading client details');
     loadClientDetails();
+    detailsLoaded = true;
+  }
+
+  // Load client details when data is available (event-based timing)
+  window.addEventListener('clientDataLoaded', async function(e) {
+    await loadClientDetailsIfAllowed();
   });
+
+  // Also check immediately in case data already exists (data-already-present timing)
+  if (window.clientData) {
+    loadClientDetailsIfAllowed();
+  }
 
   // Toggle other learning needs text input
   function toggleOtherLearningNeeds() {

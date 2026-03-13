@@ -152,6 +152,28 @@
       currentUser = session.user;
       window.currentUser = session.user; // Make available to partials
       
+      // Check password-changed session BEFORE any protected queries
+      console.log('[portal] Checking password-changed session before init');
+      if (!window.AuthUI || !window.AuthUI.checkPasswordChangedSession) {
+        console.error('[portal] Auth validation unavailable, aborting');
+        Modal.error('Authentication validation is unavailable. Please refresh the page.');
+        setTimeout(() => window.location.href = 'login.html', 2000);
+        return;
+      }
+      
+      const sessionValid = await window.AuthUI.checkPasswordChangedSession();
+      if (!sessionValid) {
+        console.log('[portal] Stale session detected, aborting portal init');
+        // Hide and clear portal content
+        const mainContent = document.getElementById('portalMainContent');
+        if (mainContent) {
+          mainContent.style.display = 'none';
+          mainContent.innerHTML = '';
+        }
+        return;
+      }
+      
+      // Session is valid - now safe to query protected data
       // Check if user is admin and redirect to admin page
       const email = currentUser.email;
       const { data: client, error: clientError } = await window.supabaseClient
@@ -187,6 +209,7 @@
         return;
       }
       
+      // Session already validated above - safe to show portal content
       // User has either completed intake, skipped it, or has no bookings - show the portal content
       const mainContent = document.getElementById('portalMainContent');
       if (mainContent) {
@@ -291,7 +314,16 @@
     }
 
     // Section navigation
-    function showSection(section) {
+    async function showSection(section) {
+      // Check password-changed session before navigation
+      if (window.AuthUI && window.AuthUI.checkPasswordChangedSession) {
+        const sessionValid = await window.AuthUI.checkPasswordChangedSession();
+        if (!sessionValid) {
+          console.log('[portal] Stale session detected, aborting navigation');
+          return;
+        }
+      }
+      
       // Hide all sections
       document.querySelectorAll('.section-content').forEach(sectionEl => {
         sectionEl.classList.add('hidden');
@@ -661,6 +693,29 @@
         return;
       }
       
+      // Check password-changed session before loading protected data
+      if (!window.AuthUI || !window.AuthUI.checkPasswordChangedSession) {
+        console.error('[portal-bookings] Auth validation unavailable');
+        const list = document.getElementById('upcoming-list');
+        if (list) {
+          list.innerHTML = '<div class="text-center py-8"><p class="text-red-600">Authentication validation unavailable. Please refresh the page.</p></div>';
+        }
+        return;
+      }
+      
+      const sessionValid = await window.AuthUI.checkPasswordChangedSession();
+      if (!sessionValid) {
+        console.log('[portal-bookings] Stale session detected, aborting load');
+        // Clear any existing booking content
+        const upcomingList = document.getElementById('upcoming-list');
+        const pastList = document.getElementById('past-list');
+        const cancelledList = document.getElementById('cancelled-list');
+        if (upcomingList) upcomingList.innerHTML = '';
+        if (pastList) pastList.innerHTML = '';
+        if (cancelledList) cancelledList.innerHTML = '';
+        return;
+      }
+      
       // Show validating state immediately
       setMyBookingsTopBanner('validating');
       
@@ -964,6 +1019,15 @@
     }
 
     async function savePickupLocationAndRevalidate(bookingId, newValue, suggestionPanel, issueEl) {
+      // Check password-changed session before performing protected operations
+      if (window.AuthUI && window.AuthUI.checkPasswordChangedSession) {
+        const sessionValid = await window.AuthUI.checkPasswordChangedSession();
+        if (!sessionValid) {
+          console.log('[portal] Stale session detected, aborting savePickupLocationAndRevalidate');
+          return;
+        }
+      }
+
       // NEW: ensure mobile is saved first if the user just edited it
       await flushMobileIfDirty(bookingId);
 
@@ -1487,6 +1551,20 @@
     window.handleCancelBooking = handleCancelBooking;
 
     async function performCancellation(bookingId, googleEventId, buttonElement) {
+      // Check password-changed session before performing protected operations
+      if (window.AuthUI && window.AuthUI.checkPasswordChangedSession) {
+        const sessionValid = await window.AuthUI.checkPasswordChangedSession();
+        if (!sessionValid) {
+          console.log('[portal] Stale session detected, aborting performCancellation');
+          if (buttonElement) {
+            buttonElement.disabled = false;
+            buttonElement.textContent = 'Cancel Booking';
+            buttonElement.classList.remove('opacity-50', 'cursor-not-allowed');
+          }
+          return;
+        }
+      }
+
       // Disable button and show loading
       if (buttonElement) {
         buttonElement.disabled = true;
@@ -1600,6 +1678,15 @@
 
     // Save booking field (inline editing)
     async function saveBookingField(inputElement) {
+      // Check password-changed session before performing protected operations
+      if (window.AuthUI && window.AuthUI.checkPasswordChangedSession) {
+        const sessionValid = await window.AuthUI.checkPasswordChangedSession();
+        if (!sessionValid) {
+          console.log('[portal] Stale session detected, aborting saveBookingField');
+          return;
+        }
+      }
+
       const bookingId = inputElement.dataset.bookingId;
       const fieldName = inputElement.dataset.field;
       const newValue = inputElement.value.trim();

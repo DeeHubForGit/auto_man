@@ -246,7 +246,16 @@
 
 <script>
   // Load client details when data is available
-  window.addEventListener('clientDataLoaded', function(e) {
+  window.addEventListener('clientDataLoaded', async function(e) {
+    // Check password-changed session before loading protected data
+    if (window.AuthUI && window.AuthUI.checkPasswordChangedSession) {
+      const sessionValid = await window.AuthUI.checkPasswordChangedSession();
+      if (!sessionValid) {
+        console.log('[portal-details] Stale session detected, aborting load');
+        return;
+      }
+    }
+    
     loadClientDetails();
   });
 
@@ -395,6 +404,15 @@
     if (!window.supabaseClient || !window.currentUser) {
       Modal.error('Not authenticated. Please log in again.');
       return;
+    }
+
+    // Check password-changed session before saving protected data
+    if (window.AuthUI && window.AuthUI.checkPasswordChangedSession) {
+      const sessionValid = await window.AuthUI.checkPasswordChangedSession();
+      if (!sessionValid) {
+        console.log('[portal-details] Stale session detected, aborting save');
+        return;
+      }
     }
 
     // Collect form data - store trimmed raw values (no normalisation for storage)

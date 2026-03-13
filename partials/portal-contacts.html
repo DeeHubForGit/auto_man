@@ -12,6 +12,8 @@
 
 <script>
 (function() {
+  let hasLoadedMyContactMessages = false;
+
   function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
@@ -19,6 +21,11 @@
   }
 
   async function loadMyContactMessages() {
+    // Prevent duplicate loads
+    if (hasLoadedMyContactMessages) {
+      return;
+    }
+
     const box = document.getElementById('myContactsList');
     const countEl = document.getElementById('myContactsCount');
     
@@ -26,6 +33,18 @@
       console.log('[portal-contacts] Cannot load contact messages - missing requirements');
       return;
     }
+    
+    // Check password-changed session before loading protected data
+    if (window.AuthUI && window.AuthUI.checkPasswordChangedSession) {
+      const sessionValid = await window.AuthUI.checkPasswordChangedSession();
+      if (!sessionValid) {
+        console.log('[portal-contacts] Stale session detected, aborting load');
+        return;
+      }
+    }
+    
+    // Mark as loaded to prevent duplicate calls
+    hasLoadedMyContactMessages = true;
     
     const userEmail = window.currentUser.email;
     

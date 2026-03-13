@@ -12,6 +12,7 @@
   <script src="assets/js/validation.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/js/supabaseClient.js"></script>
+  <script src="assets/js/auth.js"></script>
   <style>
     .wizard-step {
       display: none;
@@ -214,6 +215,41 @@
     const totalSteps = 3;
     let currentClientId = null; // Store client ID for DB operations
     let debounceTimer = null; // For debouncing text input
+    let intakeInitStarted = false; // Prevent double initialization
+    let intakeInitialSessionValidated = false; // Cache initial session validation
+
+    // Session validation helper - fail-closed security
+    async function ensureValidIntakeSession(skipIfAlreadyValidated = false) {
+      console.log('[intake] 🔐 Checking session validity...');
+      
+      // Allow reuse of successful initial validation during page init only
+      if (skipIfAlreadyValidated && intakeInitialSessionValidated) {
+        console.log('[intake] Reusing successful initial session validation');
+        return true;
+      }
+      
+      console.log('[intake] Checking for window.AuthUI...');
+      if (!window.AuthUI || !window.AuthUI.checkPasswordChangedSession) {
+        console.error('[intake] ❌ Session validation unavailable - window.AuthUI not loaded');
+        window.location.href = '/login.html';
+        return false;
+      }
+      console.log('[intake] ✓ window.AuthUI available');
+
+      console.log('[intake] Calling checkPasswordChangedSession()...');
+      const isSessionValid = window.AuthUI.checkPasswordChangedSessionWithTimeout
+        ? await window.AuthUI.checkPasswordChangedSessionWithTimeout(8000)
+        : await window.AuthUI.checkPasswordChangedSession();
+      console.log(`[intake] Session validation result: ${isSessionValid}`);
+      
+      if (!isSessionValid) {
+        console.log('[intake] ❌ Invalid session detected, aborting intake flow');
+        return false;
+      }
+
+      console.log('[intake] ✅ Session validation passed');
+      return true;
+    }
 
     // Wait for the SHARED Supabase client (from auth-scripts or supabaseClient.js)
     async function waitForSupabaseClient(timeoutMs = 5000) {
@@ -228,8 +264,12 @@
     }
 
     // Get current client ID
-    async function getClientId() {
+    async function getClientId(skipIfAlreadyValidated = false) {
       if (currentClientId) return currentClientId;
+      
+      // Check session before accessing protected data
+      const isSessionValid = await ensureValidIntakeSession(skipIfAlreadyValidated);
+      if (!isSessionValid) return null;
       
       const supabase = await waitForSupabaseClient();
       if (!supabase) return null;
@@ -259,13 +299,17 @@
     async function loadIntakeDataFromDb() {
       console.log('[intake] 📥 Loading intake data from DB...');
       
+      // Check session before loading protected data (reuse initial validation during page init)
+      const isSessionValid = await ensureValidIntakeSession(true);
+      if (!isSessionValid) return null;
+      
       const supabase = await waitForSupabaseClient();
       if (!supabase) {
         console.log('[intake] ❌ Supabase not initialized');
         return null;
       }
       
-      const clientId = await getClientId();
+      const clientId = await getClientId(true);
       if (!clientId) {
         console.log('[intake] ❌ No client ID found');
         return null;
@@ -320,10 +364,14 @@
 
     // Fetch booking data to pre-populate name/mobile if DB is blank
     async function fetchBookingDataIfNeeded() {
+      // Check session before loading protected data (reuse initial validation during page init)
+      const isSessionValid = await ensureValidIntakeSession(true);
+      if (!isSessionValid) return;
+      
       const supabase = await waitForSupabaseClient();
       if (!supabase) return;
       
-      const clientId = await getClientId();
+      const clientId = await getClientId(true);
       if (!clientId) return;
       
       try {
@@ -357,6 +405,10 @@
     async function updateStepInDb(step) {
       console.log(`[intake] 💾 Updating step to ${step} in DB...`);
       
+      // Check session before saving protected data
+      const isSessionValid = await ensureValidIntakeSession();
+      if (!isSessionValid) return false;
+      
       const supabase = await waitForSupabaseClient();
       if (!supabase) return false;
       
@@ -388,6 +440,10 @@
     // Save Step 1 data to DB
     async function saveStep1ToDb() {
       console.log('[intake] 💾 Saving Step 1 to DB...');
+      
+      // Check session before saving protected data
+      const isSessionValid = await ensureValidIntakeSession();
+      if (!isSessionValid) return false;
       
       const supabase = await waitForSupabaseClient();
       if (!supabase) {
@@ -431,6 +487,10 @@
     async function saveStep2ToDb() {
       console.log('[intake] 💾 Saving Step 2 to DB...');
       
+      // Check session before saving protected data
+      const isSessionValid = await ensureValidIntakeSession();
+      if (!isSessionValid) return false;
+      
       const supabase = await waitForSupabaseClient();
       if (!supabase) {
         Modal.error('Unable to connect to database. Please try again.');
@@ -472,6 +532,10 @@
     // Save Step 3 checkbox to DB immediately
     async function saveCheckboxToDb(field, value) {
       console.log(`[intake] 💾 Saving ${field} = ${value} to DB...`);
+      
+      // Check session before saving protected data
+      const isSessionValid = await ensureValidIntakeSession();
+      if (!isSessionValid) return;
       
       const supabase = await waitForSupabaseClient();
       if (!supabase) return;
@@ -609,6 +673,10 @@
       // True reset: Wipe DB intake fields back to NULL
       console.log('[intake] 🔄 Resetting form (wiping DB intake fields to NULL)...');
       
+      // Check session before saving protected data
+      const isSessionValid = await ensureValidIntakeSession();
+      if (!isSessionValid) return;
+      
       const supabase = await waitForSupabaseClient();
       if (!supabase) {
         alert('Unable to connect to database.');
@@ -685,6 +753,10 @@
     }
 
     async function submitForm() {
+      // Check session before saving protected data
+      const isSessionValid = await ensureValidIntakeSession();
+      if (!isSessionValid) return;
+      
       const supabase = await waitForSupabaseClient();
       if (!supabase) {
         Modal.error('Unable to connect to database. Please try again later.');
@@ -795,37 +867,110 @@
       }
     });
 
-    // Load intake data from DB on page load
-    window.addEventListener('DOMContentLoaded', async () => {
-      console.log('[intake] 🚀 Page loaded, starting initialization...');
-      
-      // Wait for auth to initialize
-      await new Promise(r => setTimeout(r, 500));
-      
-      // Load all intake data from DB (source of truth)
+    // Helper to initialise the intake page UI after session validation
+    async function initialiseIntakePage() {
+      console.log('[intake] Loading intake data from DB...');
       const clientData = await loadIntakeDataFromDb();
-      
-      // Determine which step to show
+
       let resumeStep = 1;
       if (clientData) {
         if (clientData.intake_completed) {
-          // If completed, start fresh at step 1
           resumeStep = 1;
-          console.log('[intake] ✅ Intake already completed, starting at step 1');
+          console.log('[intake] Intake already completed, starting at step 1');
         } else {
-          // Resume at saved step (clamped to 1-3)
           resumeStep = Math.max(1, Math.min(3, clientData.intake_step || 1));
-          console.log(`[intake] 📍 Resuming at step ${resumeStep}`);
+          console.log(`[intake] Resuming at step ${resumeStep}`);
         }
       }
-      
-      // Show the appropriate step (skip DB update on initial load)
+
+      console.log(`[intake] Showing step ${resumeStep}...`);
       await showStep(resumeStep, true);
-      
-      // If name/mobile still blank, try to get from booking
+
+      console.log('[intake] Fetching booking data if needed...');
       await fetchBookingDataIfNeeded();
-      
+
+      console.log('[intake] Setting focus to license number field...');
       document.getElementById('licenseNumber').focus();
+    }
+
+    // Load intake data from DB on page load
+    // Early visibility guard to prevent UI flicker
+    document.body.style.visibility = 'hidden';
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      // Prevent double initialization
+      if (intakeInitStarted) {
+        console.log('[intake] Init already started, skipping duplicate call');
+        return;
+      }
+      intakeInitStarted = true;
+
+      try {
+        console.log('[intake] 🚀 Page loaded, starting initialization...');
+        
+        // Wait for Supabase client to be ready
+        console.log('[intake] Waiting for Supabase client...');
+        const supabase = await waitForSupabaseClient();
+        if (!supabase) {
+          throw new Error('Supabase client not available during intake init');
+        }
+        console.log('[intake] Supabase client ready');
+        
+        // Check session FIRST before any protected operations
+        console.log('[intake] Starting session validation...');
+        const isSessionValid = await ensureValidIntakeSession(false);
+        console.log(`[intake] Session validation completed, result: ${isSessionValid}`);
+        
+        if (!isSessionValid) {
+          console.log('[intake] Init aborted due to invalid session');
+          
+          // Give auth.js time to redirect; if still on intake.html, restore visibility
+          setTimeout(() => {
+            const currentPath = window.location.pathname.toLowerCase();
+            if (currentPath.includes('intake.html')) {
+              console.warn('[intake] Session check failed but no redirect occurred, restoring visibility');
+              document.body.style.visibility = 'visible';
+              
+              if (window.Modal && window.Modal.error) {
+                window.Modal.error(
+                  'Unable to verify your session. This may be due to a startup timing issue. Please try logging in again.',
+                  'Authentication Startup Error'
+                );
+              }
+            }
+          }, 800);
+          
+          return;
+        }
+        
+        // Mark initial session as validated for reuse during this init
+        intakeInitialSessionValidated = true;
+        
+        // Make page visible after session validation
+        console.log('[intake] Making page visible...');
+        document.body.style.visibility = 'visible';
+        
+        // Initialise the page UI
+        await initialiseIntakePage();
+        
+        console.log('[intake] ✅ Initialization completed successfully');
+      } catch (error) {
+        console.error('[intake] ❌ Initialization failed:', error);
+        console.error('[intake] Error stack:', error.stack);
+        
+        // Restore visibility so user can see the error
+        document.body.style.visibility = 'visible';
+        
+        // Show user-friendly error message
+        if (window.Modal && window.Modal.error) {
+          window.Modal.error(
+            'There was an error loading the intake form. Please refresh the page or contact support if the problem persists.',
+            'Initialization Error'
+          );
+        } else {
+          alert('Initialization error: ' + (error.message || 'Unknown error. Please refresh the page.'));
+        }
+      }
     });
   </script>
   <!-- Google Analytics -->

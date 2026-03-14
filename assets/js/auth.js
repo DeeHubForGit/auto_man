@@ -233,6 +233,14 @@
   }
 
   // Auth actions
+  function isBlockedSignupDomain(email){
+    const normalized = (email || '').trim().toLowerCase();
+    const parts = normalized.split('@');
+    if (parts.length !== 2) return false;
+    const domain = parts[1];
+    return domain.includes('automandrivingschool');
+  }
+
   async function signInWithOAuth(provider){
     if (!window.supabaseClient) {
       if (window.Modal) return window.Modal.error('Authentication is not configured. Please contact support.');
@@ -261,6 +269,13 @@
     if (!window.supabaseClient) {
       if (window.Modal) return window.Modal.error('Authentication is not configured. Please contact support.');
       return alert('Auth not configured');
+    }
+
+    if (isBlockedSignupDomain(email)) {
+      const msg = 'This email domain cannot be used for public sign-up. Please contact support if you need access.';
+      if (window.Modal) window.Modal.error(msg, 'Sign-up Error');
+      else alert(msg);
+      throw new Error(msg);
     }
 
     const redirectTo = window.location.origin + '/portal.html';

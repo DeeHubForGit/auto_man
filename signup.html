@@ -98,6 +98,14 @@
       const togglePwd = document.getElementById('toggleSignupPwd');
       const genPwd = document.getElementById('genSignupPwd');
       const copyPwd = document.getElementById('copySignupPwd');
+
+      function isBlockedSignupDomain(email) {
+        const normalized = (email || '').trim().toLowerCase();
+        const parts = normalized.split('@');
+        if (parts.length !== 2) return false;
+        const domain = parts[1];
+        return domain.includes('automandrivingschool');
+      }
       const copyTop = document.getElementById('copySignupPwdTop');
       const tip = document.getElementById('signupPwdTip');
       const bar = document.getElementById('signupStrengthBar');
@@ -256,6 +264,10 @@
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
           showError(emailInput, emailError, 'Please enter a valid email address');
+          return false;
+        }
+        if (isBlockedSignupDomain(email)) {
+          showError(emailInput, emailError, 'This email domain cannot be used for public sign-up. Please contact support if you need access.');
           return false;
         }
         hideError(emailInput, emailError);

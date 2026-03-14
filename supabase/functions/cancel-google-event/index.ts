@@ -5,6 +5,7 @@
 // It's called from the frontend when an admin or client cancels a booking
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // ---------- CORS HEADERS ----------
 const corsHeaders = {
@@ -89,15 +90,96 @@ serve(async (req) => {
     
     console.log(`[cancel-google-event] Request to cancel event: ${eventId} (booking: ${bookingId})`);
     
-    if (!eventId) {
+    if (!eventId || !bookingId) {
       return new Response(
-        JSON.stringify({ error: 'Missing eventId parameter' }),
+        JSON.stringify({ error: 'Missing eventId or bookingId parameter' }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
     }
+
+    // ========== AUTHORIZATION CHECK ==========
+    // Verify that the authenticated user owns the booking
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error("Missing env: SUPABASE_URL or SUPABASE_ANON_KEY");
+    }
+
+    const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Missing Authorization header" }),
+        { 
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      console.error('[cancel-google-event] ❌ Authentication failed:', userError?.message);
+      return new Response(
+        JSON.stringify({ error: "Invalid or expired session" }),
+        { 
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    console.log(`[cancel-google-event] Authenticated user: ${user.id}`);
+
+    // Query booking with BOTH booking id AND user id to verify ownership
+    const { data: booking, error: bookingError } = await supabase
+      .from("booking")
+      .select("id, client_id, google_event_id")
+      .eq("id", bookingId)
+      .eq("client_id", user.id)
+      .single();
+
+    if (bookingError || !booking) {
+      console.error('[cancel-google-event] ❌ Unauthorized cancellation attempt:', {
+        bookingId,
+        userId: user.id,
+        error: bookingError?.message
+      });
+      return new Response(
+        JSON.stringify({ error: "Unauthorized booking cancellation attempt" }),
+        { 
+          status: 403, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    console.log(`[cancel-google-event] ✅ Ownership verified for booking ${bookingId}`);
+
+    // Verify the booking's google_event_id matches the supplied eventId
+    if (booking.google_event_id !== eventId) {
+      console.error('[cancel-google-event] ❌ Event mismatch for booking cancellation attempt:', {
+        bookingId,
+        userId: user.id,
+        suppliedEventId: eventId,
+        actualEventId: booking.google_event_id
+      });
+      return new Response(
+        JSON.stringify({ error: "Unauthorized booking cancellation attempt" }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+    // ========== END AUTHORIZATION CHECK ==========
 
     // Get the calendar ID from environment
     const calendars = (Deno.env.get("GCAL_CALENDAR_IDS") || "")

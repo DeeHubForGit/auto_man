@@ -21,45 +21,25 @@ window.GoogleCalendar = (function() {
     }
 
     try {
-      // Get Supabase URL and key from config
-      const supabaseUrl = window.SITE_CONFIG?.SUPABASE_URL || window.SUPABASE_URL;
-      const supabaseKey = window.SITE_CONFIG?.SUPABASE_ANON_KEY || window.SUPABASE_ANON_KEY;
-      
-      if (!supabaseUrl || !supabaseKey) {
-        console.error('[GoogleCalendar] Config check:', {
-          SITE_CONFIG: window.SITE_CONFIG,
-          SUPABASE_URL: window.SUPABASE_URL,
-          SUPABASE_ANON_KEY: window.SUPABASE_ANON_KEY
-        });
-        throw new Error('Supabase configuration not found');
+      // Require Supabase client
+      if (!window.supabaseClient) {
+        throw new Error('Supabase client not available');
       }
 
       // Call Supabase Edge Function to cancel the Google Calendar event
-      const functionUrl = `${supabaseUrl}/functions/v1/cancel-google-event`;
-      
-      const response = await fetch(functionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseKey}`,
-          'apikey': supabaseKey,
-        },
-        body: JSON.stringify({
+      const { data, error } = await window.supabaseClient.functions.invoke('cancel-google-event', {
+        body: {
           eventId: googleEventId,
           bookingId: bookingId
-        })
+        }
       });
 
-      // Success (200) or Not Found/Gone (404/410) => treat as success
-      // 404/410 means event is already deleted, which is our goal
-      if (response.ok || response.status === 404 || response.status === 410) {
-        console.log('[GoogleCalendar] ✅ Google Calendar event cancelled');
-        return { success: true };
+      if (error) {
+        throw new Error(error.message || 'Failed to cancel Google Calendar event');
       }
 
-      // Other errors - actually fail
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      console.log('[GoogleCalendar] ✅ Google Calendar event cancelled');
+      return { success: true };
 
     } catch (error) {
       console.error('[GoogleCalendar] ❌ Error cancelling event:', error);

@@ -28,8 +28,8 @@ serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method Not Allowed" }, 405);
 
   try {
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-    const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     if (!SUPABASE_URL || !SERVICE_KEY) {
       return json({ error: "Server not configured" }, 500);
@@ -58,7 +58,7 @@ serve(async (req) => {
 
     // Revoke all sessions for this user using admin API
     // scope: 'global' revokes all refresh tokens/sessions across all devices
-    const { error: signOutError } = await supabaseAdmin.auth.admin.signOut(user.id, 'global');
+    const { error: signOutError } = await supabaseAdmin.auth.admin.signOut(token, 'global');
 
     if (signOutError) {
       console.error("[revoke-user-sessions] Failed to revoke sessions:", signOutError);

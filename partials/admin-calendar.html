@@ -1967,6 +1967,8 @@
             forceNewModeForMissingExistingClient(missingDetailsExistingClientId, missingDetailsExistingClientEmail);
           }
         }
+        // Apply defaults based on entered email (may match existing test client)
+        applyNewClientModeDefaults();
       } else {
         existingFields.style.display = 'block';
         newFields.style.display = 'none';
@@ -2104,6 +2106,17 @@
   document.getElementById('bookingPaid')?.addEventListener('change', () => {
     updatePaidVsServicePriceWarning();
   });
+
+  // Listen for email changes in New client mode to apply test defaults if email matches existing test client
+  const newClientEmailInput = document.getElementById('newClientEmail');
+  if (newClientEmailInput) {
+    newClientEmailInput.addEventListener('blur', () => {
+      const clientMode = document.querySelector('input[name="clientMode"]:checked')?.value;
+      if (clientMode === 'new') {
+        applyNewClientModeDefaults();
+      }
+    });
+  }
 
   // Load clients from database
   async function loadClients() {
@@ -2336,6 +2349,57 @@
     clearApptError('newClientMobile');
   }
 
+  /**
+   * Find a client option in the dropdown by email (case-insensitive, trimmed).
+   * @param {string} email - The email to search for
+   * @returns {HTMLOptionElement|null} - The matching option element or null
+   */
+  function findClientOptionByEmail(email) {
+    if (!email) return null;
+    
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) return null;
+    
+    const selectEl = document.getElementById('existingClientSelect');
+    if (!selectEl) return null;
+    
+    const options = Array.from(selectEl.options);
+    return options.find(opt => {
+      const optEmail = (opt.dataset.email || '').trim().toLowerCase();
+      return optEmail && optEmail === normalizedEmail;
+    }) || null;
+  }
+
+  /**
+   * Apply booking defaults for New client mode based on entered email.
+   * If email matches an existing test client, apply test defaults.
+   * Otherwise, apply normal new client defaults.
+   */
+  function applyNewClientModeDefaults() {
+    const emailInput = document.getElementById('newClientEmail');
+    if (!emailInput) return;
+    
+    const email = emailInput.value.trim();
+    const matchingClientOption = findClientOptionByEmail(email);
+    
+    if (matchingClientOption) {
+      // Email matches an existing client - apply defaults from that client
+      applyBookingDefaultsFromClient(matchingClientOption);
+    } else {
+      // No matching client - apply normal new client defaults
+      const bookingIsTest = document.getElementById('bookingIsTest');
+      const bookingIsSmsEnabled = document.getElementById('bookingIsSmsEnabled');
+      const bookingIsEmailEnabled = document.getElementById('bookingIsEmailEnabled');
+      
+      if (bookingIsTest) bookingIsTest.checked = false;
+      if (bookingIsSmsEnabled) bookingIsSmsEnabled.checked = true;
+      if (bookingIsEmailEnabled) bookingIsEmailEnabled.checked = true;
+    }
+    
+    // Update flags visibility based on the applied defaults
+    updateBookingFlagsVisibility();
+  }
+
   function applyBookingDefaultsFromClient(clientOption) {
     if (!clientOption) return;
     
@@ -2391,6 +2455,14 @@
         showBookingFlagsSection();
         return;
       }
+    }
+
+    // If in New client mode and bookingIsTest is checked (email matched test client), show flags
+    const clientMode = document.querySelector('input[name="clientMode"]:checked')?.value;
+    const bookingIsTest = document.getElementById('bookingIsTest');
+    if (clientMode === 'new' && bookingIsTest?.checked === true) {
+      showBookingFlagsSection();
+      return;
     }
 
     // Otherwise hide for normal clients

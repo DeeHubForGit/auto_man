@@ -1020,6 +1020,16 @@
 
 <script>
 (function() {
+  // Debug flag for optional console logging
+  const DEBUG = false;
+  
+  // HTML escape helper to prevent XSS
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
   // Calendar logic
   function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
   let weekStart = new Date();
@@ -1739,7 +1749,11 @@
   function showNewBookingStatus(message) {
     const el = document.getElementById('newBookingStatus');
     if (!el) return;
-    el.innerHTML = `<span class="mini-spinner"></span>${message}`;
+    el.replaceChildren();
+    const spinner = document.createElement('span');
+    spinner.className = 'mini-spinner';
+    el.appendChild(spinner);
+    el.appendChild(document.createTextNode(message));
     el.classList.remove('hidden');
   }
 
@@ -1748,7 +1762,13 @@
     if (!el) return;
     // Keep spinner if already present
     const hasSpinner = el.querySelector('.mini-spinner');
-    el.innerHTML = `${hasSpinner ? '<span class="mini-spinner"></span>' : ''}${message}`;
+    el.replaceChildren();
+    if (hasSpinner) {
+      const spinner = document.createElement('span');
+      spinner.className = 'mini-spinner';
+      el.appendChild(spinner);
+    }
+    el.appendChild(document.createTextNode(message));
     el.classList.remove('hidden');
   }
 
@@ -1756,7 +1776,7 @@
     const el = document.getElementById('newBookingStatus');
     if (!el) return;
     el.classList.add('hidden');
-    el.innerHTML = '';
+    el.replaceChildren();
   }
 
   function updatePaidVsServicePriceWarning() {
@@ -1913,7 +1933,7 @@
         bookingServiceField.style.display = 'block';
         bookingFields.style.display = 'block';
         endTimeInput.readOnly = true;
-        endTimeLabel.innerHTML = 'End time';
+        endTimeLabel.textContent = 'End time';
         updateBookingEndTime();
         updateBusinessHoursWarnings();
       } else {
@@ -1922,7 +1942,7 @@
         bookingServiceField.style.display = 'none';
         bookingFields.style.display = 'none';
         endTimeInput.readOnly = false;
-        endTimeLabel.innerHTML = 'End time<span class="text-gray-400"></span>';
+        endTimeLabel.textContent = 'End time';
       }
     });
   });
@@ -2098,33 +2118,60 @@
 
       if (error) {
         console.error('[admin-calendar] Error loading clients:', error);
-        selectEl.innerHTML = '<option value="">Error loading clients</option>';
+        selectEl.replaceChildren();
+        const errorOption = document.createElement('option');
+        errorOption.value = '';
+        errorOption.textContent = 'Error loading clients';
+        selectEl.appendChild(errorOption);
         return;
       }
 
       if (!clients || clients.length === 0) {
-        selectEl.innerHTML = '<option value="">No clients found</option>';
+        selectEl.replaceChildren();
+        const noClientsOption = document.createElement('option');
+        noClientsOption.value = '';
+        noClientsOption.textContent = 'No clients found';
+        selectEl.appendChild(noClientsOption);
         return;
       }
 
-      // Populate select with clients
-      selectEl.innerHTML = '<option value="">Select a client...</option>' +
-        clients.map(c => {
-          const fullName = [c.first_name, c.last_name].filter(Boolean).join(' ');
-          return `<option value="${c.id}" data-first-name="${c.first_name || ''}" data-last-name="${c.last_name || ''}" data-email="${c.email || ''}" data-mobile="${c.mobile || ''}" data-is-test="${c.is_test === true}">${fullName} (${c.email || 'no email'})</option>`;
-        }).join('');
-
-      console.log(`[admin-calendar] Loaded ${clients.length} clients`);
+      // Populate select with clients using safe DOM creation
+      selectEl.replaceChildren();
+      
+      // Add default option
+      const defaultOption = document.createElement('option');
+      defaultOption.value = '';
+      defaultOption.textContent = 'Select a client...';
+      selectEl.appendChild(defaultOption);
+      
+      // Add client options
+      clients.forEach(c => {
+        const option = document.createElement('option');
+        option.value = c.id || '';
+        option.dataset.firstName = c.first_name || '';
+        option.dataset.lastName = c.last_name || '';
+        option.dataset.email = c.email || '';
+        option.dataset.mobile = c.mobile || '';
+        option.dataset.isTest = String(c.is_test === true);
+        
+        const fullName = [c.first_name, c.last_name].filter(Boolean).join(' ');
+        option.textContent = `${fullName} (${c.email || 'no email'})`;
+        
+        selectEl.appendChild(option);
+      });
     } catch (err) {
       console.error('[admin-calendar] Exception loading clients:', err);
-      selectEl.innerHTML = '<option value="">Error loading clients</option>';
+      selectEl.replaceChildren();
+      const errorOption = document.createElement('option');
+      errorOption.value = '';
+      errorOption.textContent = 'Error loading clients';
+      selectEl.appendChild(errorOption);
     }
   }
 
   // Helper function to get bookable services from config
   function getBookingServicesFromConfig() {
     if (!window.SITE_CONFIG || !Array.isArray(window.SITE_CONFIG.BOOKING_CATEGORIES)) {
-      console.warn('[admin-calendar] SITE_CONFIG.BOOKING_CATEGORIES not available');
       return [];
     }
 
@@ -2172,13 +2219,16 @@
     const serviceSelect = document.getElementById('bookingService');
     if (!serviceSelect) return;
 
-    // Clear existing options except the first (placeholder)
-    serviceSelect.innerHTML = '<option value="">Select a service...</option>';
+    // Clear existing options and add default with safe DOM creation
+    serviceSelect.replaceChildren();
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = 'Select a service...';
+    serviceSelect.appendChild(defaultOption);
 
     const services = getBookingServicesFromConfig();
     
     if (services.length === 0) {
-      console.warn('[admin-calendar] No services found in BOOKING_CATEGORIES');
       return;
     }
 
@@ -2189,9 +2239,6 @@
       opt.textContent = `${svc.name} ${svc.duration}`;
       serviceSelect.appendChild(opt);
     });
-
-    console.log(`[admin-calendar] Loaded ${services.length} services from config`);
-    console.log('[admin-calendar] Service durations:', SERVICE_DURATIONS);
   }
 
   // Load clients and services when modal opens
@@ -2785,7 +2832,6 @@
 
       if (editingPersonalAppt && editingPersonalGoogleEventId) {
         // UPDATE mode
-        console.log("[appointment] Updating personal appointment via edge function");
 
         let excludeId = null;
         if (editingPersonalAppt && editingPersonalGoogleEventId && window.supabaseClient) {
@@ -2830,8 +2876,6 @@
           throw new Error(data?.error || "Failed to update appointment");
         }
 
-        console.log("[appointment] ✅ Appointment updated successfully:", data);
-
         // Immediate DB update so calendar refresh shows the change right away
         await updatePersonalAppointmentRowInDb(editingPersonalGoogleEventId, {
           title,
@@ -2853,7 +2897,6 @@
         
       } else {
         // CREATE mode
-        console.log("[appointment] Creating personal appointment via edge function");
 
         const okToSave = await warnIfBookingClash(startIso, endIso, null);
         if (!okToSave) {
@@ -2881,8 +2924,6 @@
           console.error("[appointment] Edge function returned error:", data);
           throw new Error(data?.error || "Failed to create appointment");
         }
-
-        console.log("[appointment] ✅ Appointment created successfully:", data);
         const googleEventId = data?.googleEvent?.id;
         const bookingId = data?.bookingId;
 
@@ -2896,13 +2937,11 @@
 
         // If bookingId is returned, the DB row already exists - just refresh immediately
         if (bookingId) {
-          console.log("[appointment] ✓ Booking record created immediately, refreshing calendar...");
           renderWeek(weekStart);
           return; // Skip polling
         }
 
         // Fallback: Poll database for the new event (in case edge function didn't create the booking)
-        console.log("[appointment] No bookingId returned, waiting for gcal-sync to process...", googleEventId);
         
         let pollAttempts = 0;
         const maxPolls = 10; // Try for up to 30 seconds (10 attempts x 3 seconds)
@@ -2910,7 +2949,6 @@
         const pollForEvent = async () => {
           pollAttempts++;
           setNewBookingStatusText(`waiting for new appointment...  (${pollAttempts}/${maxPolls})`);
-          console.log(`[appointment] Checking database for new event (attempt ${pollAttempts}/${maxPolls})...`);
           
           try {
             // Query database directly for the Google event ID
@@ -2922,7 +2960,6 @@
             
             if (booking) {
               // Event found in database!
-              console.log(`[appointment] ✅ Event found in database! Refreshing calendar once.`, booking);
               hideNewBookingStatus();
               renderWeek(weekStart);
               return; // Stop polling
@@ -2935,7 +2972,6 @@
           
           // Not found yet, continue polling if we haven't hit max attempts
           if (pollAttempts < maxPolls) {
-            console.log(`[appointment] Event not yet in database, retrying in 3 seconds...`);
             setTimeout(pollForEvent, 3000);
           } else {
             console.warn(`[appointment] ⚠️ Event not found after ${maxPolls} attempts. Webhook may be delayed.`);
@@ -3170,7 +3206,6 @@
 
     try {
       // Validate address with Google Maps before saving
-      console.log("[booking-update] Validating pickup address with Google Maps...");
       const backendValidation = await validateAddressWithBackend(pickupLocation);
 
       if (backendValidation.valid) {
@@ -3201,8 +3236,6 @@
         
         // Show validation error
         showApptError("bookingPickupLocation", backendValidation.message);
-        
-        console.log("[booking-update] Address validation failed:", backendValidation.issue);
         return; // STOP HERE - do not save
       }
 
@@ -3214,9 +3247,6 @@
             "Google address validation is currently unavailable. Please manually check the address before continuing."
         );
       }
-      
-      console.log("[booking-update] Address validated successfully");
-      console.log("[booking-update] Updating booking via edge function");
 
       // Convert 24-hour time to 12-hour format for the edge function
       const startTime12 = convert24To12Hour(startTime);
@@ -3251,8 +3281,6 @@
         isTest: document.getElementById('bookingIsTest')?.checked === true,
         ...(canEditPayments ? { isPaid } : {}),
       };
-
-      console.log("[booking-update] Payload:", payload);
 
       // Check for overlaps/travel time issues - allow user to change date/time
       const startIso = new Date(`${date}T${startTime}:00`).toISOString();
@@ -3331,8 +3359,6 @@
         }
         return;
       }
-
-      console.log("[booking-update] ✅ Booking updated successfully:", data);
 
       pickupLocation = document.getElementById('bookingPickupLocation')?.value?.trim() || null;
 
@@ -3673,7 +3699,6 @@
 
     try {
       // Validate address with Google Maps before saving
-      console.log("[booking] Validating pickup address with Google Maps...");
       const backendValidation = await validateAddressWithBackend(pickupLocation);
 
       if (backendValidation.valid) {
@@ -3704,8 +3729,6 @@
         
         // Show validation error
         showApptError("bookingPickupLocation", backendValidation.message);
-        
-        console.log("[booking] Address validation failed:", backendValidation.issue);
         return; // STOP HERE - do not save
       }
 
@@ -3717,9 +3740,6 @@
             "Google address validation is currently unavailable. Please manually check the address before continuing."
         );
       }
-      
-      console.log("[booking] Address validated successfully");
-      console.log("[booking] Creating admin booking via edge function");
 
       // Convert 24-hour time to 12-hour format for the edge function
       const startTime12 = convert24To12Hour(startTime);
@@ -3760,8 +3780,6 @@
         isEmailEnabled: document.getElementById('bookingIsEmailEnabled')?.checked === true,
       };
 
-      console.log("[booking] Payload:", payload);
-
       if ((clientState.clientMode === "new" && missingDetailsExistingClientId) || clientState.isTrackedIncompleteClient) {
         const clientIdToUpdate = missingDetailsExistingClientId || clientState.effectiveClientId;
         const { error: updErr } = await window.supabaseClient
@@ -3797,8 +3815,6 @@
 
       // Clear special state now that details are saved and booking is created
       clearMissingClientDetailsState();
-
-      console.log("[booking] ✅ Booking created successfully:", data);
       const googleEventId = data?.googleEvent?.id;
       const bookingId = data?.bookingId;
 
@@ -3824,8 +3840,6 @@
             console.warn('[booking] Optional status/amount update failed:', extraErr);
           }
         }
-
-        console.log("[booking] ✓ Booking record created immediately, refreshing calendar...");
 
         if (saveBtn) {
           saveBtn.textContent = 'Saved';
@@ -3859,7 +3873,6 @@
       }, 900);
 
       // Poll database directly for the new event by Google event ID
-      console.log("[booking] Waiting for gcal-sync to process the new event...", googleEventId);
       
       let pollAttempts = 0;
       const maxPolls = 10;
@@ -3867,7 +3880,6 @@
       const pollForEvent = async () => {
         pollAttempts++;
         setNewBookingStatusText(`waiting for new appointment...  (${pollAttempts}/${maxPolls})`);
-        console.log(`[booking] Checking database for new event (attempt ${pollAttempts}/${maxPolls})...`);
         
         try {
           const { data: booking, error } = await window.supabaseClient
@@ -3877,7 +3889,6 @@
             .maybeSingle();
           
           if (booking) {
-            console.log(`[booking] ✅ Event found in database! Refreshing calendar.`, booking);
             hideNewBookingStatus();
             renderWeek(weekStart);
 
@@ -3897,7 +3908,6 @@
           }
           
           if (pollAttempts < maxPolls) {
-            console.log(`[booking] Event not yet in database, retrying in 3 seconds...`);
             setTimeout(pollForEvent, 3000);
           } else {
             console.warn(`[booking] ⚠️ Event not found after ${maxPolls} attempts.`);
@@ -3980,7 +3990,14 @@
         // For mobile: show day name on line 1, date on line 2
         const isMobile = window.matchMedia('(max-width: 768px)').matches;
         if (isMobile) {
-          cell.innerHTML = `<div style="line-height: 1.1;">${day}</div><div style="line-height: 1.1;">${date.getDate()}/${date.getMonth() + 1}</div>`;
+          const line1 = document.createElement('div');
+          line1.style.lineHeight = '1.1';
+          line1.textContent = day;
+          const line2 = document.createElement('div');
+          line2.style.lineHeight = '1.1';
+          line2.textContent = `${date.getDate()}/${date.getMonth() + 1}`;
+          cell.appendChild(line1);
+          cell.appendChild(line2);
         } else {
           cell.textContent = `${day} ${date.getDate()}/${date.getMonth() + 1}`;
         }
@@ -4099,8 +4116,6 @@
     const weekStartIso = weekStartLocal.toISOString();
     const weekEndIso = weekEndLocal.toISOString();
     
-    console.log('📅 Fetching bookings for week:', weekStartIso, 'to', weekEndIso);
-    
     // First, fetch all services to create a lookup map
     const { data: services, error: servicesError } = await window.supabaseClient
       .from('service')
@@ -4148,15 +4163,12 @@
       console.error('❌ Error fetching bookings:', error);
       const weekRange = document.getElementById('weekRange');
       if (weekRange) {
-        weekRange.innerHTML = `<span class="text-red-600">⚠️ Error loading bookings: ${error.message}</span>`;
+        weekRange.textContent = `⚠️ Error loading bookings: ${error.message}`;
       }
       return;
     }
-    
-    console.log(`✅ Found ${bookings?.length || 0} bookings for this week:`, bookings);
 
     if (!bookings || bookings.length === 0) {
-      console.log('ℹ️ No bookings found for this week');
 
       // Update week range
       const weekRange = document.getElementById('weekRange');
@@ -4197,16 +4209,6 @@
       // Calculate duration in hours for spanning multiple time slots
       const durationMs = end.getTime() - start.getTime();
       const durationHours = durationMs / (1000 * 60 * 60);
-      
-      console.log('📍 Placing booking:', { 
-        booking_id: booking.id, 
-        dayOfWeek, 
-        hour, 
-        key, 
-        hasCell: !!cell, 
-        is_booking: booking.is_booking,
-        durationHours: durationHours.toFixed(2)
-      });
       
       if (cell) {
         const bookingDiv = document.createElement('div');
@@ -4258,7 +4260,7 @@
           bookingDiv.style.top = `${minuteOffset}px`;
           
           const serviceName = serviceMap[booking.service_code] || 'Driving Lesson';
-          const clientName = [booking.first_name, booking.last_name].filter(Boolean).join(' ') || 'Unknown Client';
+          const clientName = escapeHtml([booking.first_name, booking.last_name].filter(Boolean).join(' ') || 'Unknown Client');
           const statusValue = booking.status || 'confirmed';
           const statusLabel = statusValue === 'no_show' ? 'No Show' : (statusValue.charAt(0).toUpperCase() + statusValue.slice(1));
           const paidYesNo = booking.is_paid ? 'Yes' : 'No';
@@ -4292,7 +4294,7 @@
             const transmissionLine = `${titleText}${paymentMarker}`;
             const shortTransmission = titleText.split(' - ')[0]; // Extract 'Auto' or 'Manual' for mobile
             // Duration implied by block height; omit address in desktop summary to reduce duplication.
-            const desktopAddress = booking.pickup_location ? `📍 ${booking.pickup_location}` : '';
+            const desktopAddress = booking.pickup_location ? `📍 ${escapeHtml(booking.pickup_location)}` : '';
             summaryHTML = `
               <div class="desktop-only font-semibold" style="color:#111827;">${transmissionLine}</div>
               <!-- Desktop summary shows address only; client name removed for space -->
@@ -4301,12 +4303,12 @@
               <div class="mobile-only" style="display:none;color:#374151;">${locationLabel}</div>
             `;
             // Details order (both desktop + mobile): Auto/Manual, Address, Client, Mobile, Time, Status
-            const addressInDetailsL1 = booking.pickup_location ? `<div class="text-xs mb-1 details-address-l1" style="color:#1e40af;">📍 ${booking.pickup_location}</div>` : '';
+            const addressInDetailsL1 = booking.pickup_location ? `<div class="text-xs mb-1 details-address-l1" style="color:#1e40af;">📍 ${escapeHtml(booking.pickup_location)}</div>` : '';
             detailsHTML = `
               <div class="text-sm font-semibold mb-1" style="color:#1e40af;">${transmissionLine}</div>
               ${addressInDetailsL1}
               <div class="text-sm font-semibold mb-1" style="color:#1e40af;">${clientName}</div>
-              ${booking.mobile ? `<div class="text-xs mb-1" style="color:#1e40af;">📱 ${booking.mobile}</div>` : ''}
+              ${booking.mobile ? `<div class="text-xs mb-1" style="color:#1e40af;">📱 ${escapeHtml(booking.mobile)}</div>` : ''}
               <div class="text-xs mb-1 font-medium" style="color:#1e40af;">🕐 ${time} - ${endTime}</div>
               ${typeof booking.price_cents === 'number' ? `<div class="payment-toggle ${!booking.is_paid ? 'unpaid' : ''}">
                 <span class="payment-label">Paid? ${paidYesNo} $${(booking.price_cents / 100).toFixed(0)}</span>
@@ -4320,15 +4322,15 @@
             summaryHTML = `
               <div class="font-semibold" style="color:#111827;">${transmissionLine2}</div>
               <!-- Client name removed from web summary to prioritise address -->
-              ${booking.pickup_location ? `<div class="text-xs summary-address" style="color:#374151;display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3;">📍 ${booking.pickup_location}</div>` : ''}
+              ${booking.pickup_location ? `<div class="text-xs summary-address" style="color:#374151;display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3;">📍 ${escapeHtml(booking.pickup_location)}</div>` : ''}
               <div class="text-xs mt-1 font-medium" style="color:#374151;">🕐 ${time} - ${endTime}</div>
-              ${booking.mobile ? `<div class="text-xs summary-mobile" style="color:#374151;">📱 ${booking.mobile}</div>` : ''}
+              ${booking.mobile ? `<div class="text-xs summary-mobile" style="color:#374151;">📱 ${escapeHtml(booking.mobile)}</div>` : ''}
             `;
             detailsHTML = `
               <div class="text-sm font-semibold mb-1" style="color:#111827;">${transmissionLine2}</div>
-              ${booking.pickup_location ? `<div class="text-xs mb-1" style="color:#374151;">📍 ${booking.pickup_location}</div>` : ''}
+              ${booking.pickup_location ? `<div class="text-xs mb-1" style="color:#374151;">📍 ${escapeHtml(booking.pickup_location)}</div>` : ''}
               <div class="text-sm font-semibold mb-1" style="color:#111827;">${clientName}</div>
-              ${booking.mobile ? `<div class="text-xs mb-1" style="color:#374151;">📱 ${booking.mobile}</div>` : ''}
+              ${booking.mobile ? `<div class="text-xs mb-1" style="color:#374151;">📱 ${escapeHtml(booking.mobile)}</div>` : ''}
               ${typeof booking.price_cents === 'number' ? `<div class="payment-toggle ${!booking.is_paid ? 'unpaid' : ''}">
                 <span class="payment-label">Paid? ${paidYesNo} $${(booking.price_cents / 100).toFixed(0)}</span>
               </div>` : ''}
@@ -4341,22 +4343,26 @@
             summaryHTML = `
               <div class="font-semibold" style="color:#111827;">${transmissionLine3}</div>
               <!-- Client name removed from web summary to prioritise address -->
-              ${booking.pickup_location ? `<div class="text-xs summary-address" style="color:#374151;display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3;">📍 ${booking.pickup_location}</div>` : ''}
+              ${booking.pickup_location ? `<div class="text-xs summary-address" style="color:#374151;display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3;">📍 ${escapeHtml(booking.pickup_location)}</div>` : ''}
               <div class="text-xs mt-1 font-medium" style="color:#374151;">🕐 ${time} - ${endTime}</div>
-              ${booking.mobile ? `<div class="text-xs summary-mobile" style="color:#374151;">📱 ${booking.mobile}</div>` : ''}
+              ${booking.mobile ? `<div class="text-xs summary-mobile" style="color:#374151;">📱 ${escapeHtml(booking.mobile)}</div>` : ''}
               <div class="mt-1 desktop-only">Status: ${statusLabel}</div>
             `;
             detailsHTML = `
               <div class="text-sm font-semibold mb-1" style="color:#111827;">${transmissionLine3}</div>
-              ${booking.pickup_location ? `<div class="text-xs mb-1" style="color:#374151;">📍 ${booking.pickup_location}</div>` : ''}
+              ${booking.pickup_location ? `<div class="text-xs mb-1" style="color:#374151;">📍 ${escapeHtml(booking.pickup_location)}</div>` : ''}
               <div class="text-sm font-semibold mb-1" style="color:#111827;">${clientName}</div>
-              ${booking.mobile ? `<div class="text-xs mb-1" style="color:#374151;">📱 ${booking.mobile}</div>` : ''}
+              ${booking.mobile ? `<div class="text-xs mb-1" style="color:#374151;">📱 ${escapeHtml(booking.mobile)}</div>` : ''}
               ${typeof booking.price_cents === 'number' ? `<div class="payment-toggle ${!booking.is_paid ? 'unpaid' : ''}">
                 <span class="payment-label">Paid? ${paidYesNo} $${(booking.price_cents / 100).toFixed(0)}</span>
               </div>` : ''}
               <div class="mt-1">Status: ${statusLabel}</div>
             `;
           }
+          
+          // Escape attributes for XSS protection
+          const safeBookingId = escapeHtml(String(booking.id || ''));
+          const safeGoogleEventId = escapeHtml(String(booking.google_event_id || ''));
           
           bookingDiv.innerHTML = `
             <div class="booking-card-content">
@@ -4366,7 +4372,7 @@
                 </div>
                 ${detailsHTML && !isTouchDevice ? `<div class="booking-details">${detailsHTML}</div>` : ''}
               </div>
-              <button class="booking-cancel-btn" data-booking-id="${booking.id}" data-google-event-id="${booking.google_event_id || ''}" title="Cancel booking" aria-label="Cancel booking">
+              <button class="booking-cancel-btn" data-booking-id="${safeBookingId}" data-google-event-id="${safeGoogleEventId}" title="Cancel booking" aria-label="Cancel booking">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <circle cx="12" cy="12" r="10"></circle>
                   <line x1="15" y1="9" x2="9" y2="15"></line>
@@ -4399,14 +4405,19 @@
           bookingDiv.style.top = `${minuteOffset}px`;
           
           const eventTitle = booking.event_title || 'Appointment';
+          const safeEventTitle = escapeHtml(eventTitle);
+          
+          // Escape attributes for XSS protection
+          const safeBookingId = escapeHtml(String(booking.id || ''));
+          const safeGoogleEventId = escapeHtml(String(booking.google_event_id || ''));
           
           bookingDiv.innerHTML = `
             <div class="booking-card-content">
               <div class="booking-card-text">
-                <div class="font-semibold" style="color:#374151;">${eventTitle}</div>
+                <div class="font-semibold" style="color:#374151;">${safeEventTitle}</div>
                 <div class="booking-time" style="color:#374151;">${time} - ${endTime}</div>
               </div>
-              <button class="booking-cancel-btn" data-booking-id="${booking.id}" data-google-event-id="${booking.google_event_id || ''}" data-event-title="${eventTitle}" title="Cancel event" aria-label="Cancel event">
+              <button class="booking-cancel-btn" data-booking-id="${safeBookingId}" data-google-event-id="${safeGoogleEventId}" data-event-title="${safeEventTitle}" title="Cancel event" aria-label="Cancel event">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <circle cx="12" cy="12" r="10"></circle>
                   <line x1="15" y1="9" x2="9" y2="15"></line>
@@ -4530,7 +4541,6 @@
       if (calendar) {
         // Remove old flag to allow re-adding listener
         if (calendar.dataset.mobileListenerAdded) {
-          console.log('[mobile] Calendar listener already exists, skipping');
         } else {
           calendar.dataset.mobileListenerAdded = 'true';
           calendar.addEventListener('click', (e) => {
@@ -4557,13 +4567,11 @@
       cards.forEach((card, index) => {
         // Check if this card already has the listener
         if (card.dataset.mobileListenerAdded) {
-          console.log('[mobile] Card', index, 'already has listener, skipping');
           return;
         }
 
         card.dataset.mobileListenerAdded = 'true';
         card.addEventListener('click', (e) => {
-          console.log('[mobile] Card clicked');
           // Ignore clicks on the close button or cancel button
           if (e.target.closest('.booking-close-btn')) return;
           if (e.target.closest('.booking-cancel-btn')) return;
@@ -4592,7 +4600,6 @@
           // Toggle this one
           const isOpening = !card.classList.contains('booking-active');
           card.classList.toggle('booking-active');
-          console.log('[mobile] Card toggled, isOpening:', isOpening);
 
           // Show/hide backdrop
           if (isOpening) {
@@ -4650,12 +4657,10 @@
 
           // If we just switched from mobile to desktop, refresh the calendar to recalculate heights
           if (wasMobile && !isMobile) {
-            console.log('[calendar] Switched from mobile to desktop - refreshing calendar');
             renderWeek(weekStart);
           }
         } else if (wasMobile !== isMobile) {
           // Switching to mobile: re-setup mobile interactions and clean up
-          console.log('[calendar] Switched from desktop to mobile - setting up mobile interactions');
           document.querySelectorAll('#section-calendar .booking-close-btn').forEach(btn => btn.remove());
           if (backdrop) backdrop.classList.remove('active');
 
@@ -4716,7 +4721,6 @@
           showSuccessMessage: false, // Admin calendar refresh provides visual feedback
           onSuccess: async () => {
             // Refresh the calendar after successful cancellation
-            console.log('[calendar] Refreshing calendar view...');
             setTimeout(() => renderWeek(weekStart), 500);
           },
           onCancel: () => {
@@ -4764,7 +4768,6 @@
           alert('Failed to update booking status: ' + error.message);
           selectElement.style.backgroundColor = '#fee2e2'; // red-100
         } else {
-          console.log('[calendar] ✅ Status updated successfully');
           selectElement.setAttribute('data-original-status', newStatus);
           selectElement.style.backgroundColor = '#d1fae5'; // green-100
           

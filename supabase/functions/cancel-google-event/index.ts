@@ -101,7 +101,8 @@ serve(async (req) => {
     }
 
     // ========== AUTHORIZATION CHECK ==========
-    // Verify that the authenticated user owns the booking
+    // Authorisation: allow booking owner or admin to cancel.
+    // Prevents users cancelling other users' bookings (IDOR protection).
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
 
@@ -136,21 +137,78 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[cancel-google-event] Authenticated user: ${user.id}`);
+    console.log(`[cancel-google-event] Authenticated user: ${user.id}, email: ${user.email}`);
 
-    // Query booking with BOTH booking id AND user id to verify ownership
+    // Verify user has an email
+    const userEmail = (user.email || '').trim().toLowerCase();
+    if (!userEmail) {
+      console.error('[cancel-google-event] ❌ Authenticated user email not found');
+      return new Response(
+        JSON.stringify({ error: "Authenticated user email not found" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // Step 1: Fetch the booking first (without client_id filter)
     const { data: booking, error: bookingError } = await supabase
       .from("booking")
       .select("id, client_id, google_event_id")
       .eq("id", bookingId)
-      .eq("client_id", user.id)
       .single();
 
     if (bookingError || !booking) {
+      console.error('[cancel-google-event] ❌ Booking not found:', {
+        bookingId,
+        error: bookingError?.message
+      });
+      return new Response(
+        JSON.stringify({ error: "Booking not found" }),
+        { 
+          status: 404, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // Step 2: Find the matching client record by email
+    // Authorisation: map the authenticated user to the matching client record,
+    // then allow cancellation if that client owns the booking or is an admin.
+    // Prevents users cancelling other users' bookings (IDOR protection).
+    const { data: matchedClient, error: clientError } = await supabase
+      .from("client")
+      .select("id, email, is_admin")
+      .ilike("email", userEmail)
+      .single();
+
+    if (!matchedClient) {
+      console.error('[cancel-google-event] ❌ No matching client record for authenticated user:', {
+        authUserId: user.id,
+        authEmail: user.email,
+        clientError: clientError?.message
+      });
+      return new Response(
+        JSON.stringify({ error: "No matching client record for authenticated user" }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    const isAdmin = matchedClient.is_admin === true;
+
+    // Step 3: Authorization logic - allow if user is admin OR user owns the booking
+    if (!isAdmin && booking.client_id !== matchedClient.id) {
       console.error('[cancel-google-event] ❌ Unauthorized cancellation attempt:', {
         bookingId,
-        userId: user.id,
-        error: bookingError?.message
+        authUserId: user.id,
+        authEmail: user.email,
+        matchedClientId: matchedClient.id,
+        bookingClientId: booking.client_id,
+        isAdmin
       });
       return new Response(
         JSON.stringify({ error: "Unauthorized booking cancellation attempt" }),
@@ -161,7 +219,13 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[cancel-google-event] ✅ Ownership verified for booking ${bookingId}`);
+    console.log(`[cancel-google-event] ✅ Authorization verified for booking ${bookingId}`, {
+      authUserId: user.id,
+      authEmail: user.email,
+      matchedClientId: matchedClient.id,
+      isAdmin,
+      bookingClientId: booking.client_id
+    });
 
     // Verify the booking's google_event_id matches the supplied eventId
     if (booking.google_event_id !== eventId) {
@@ -243,6 +307,16 @@ serve(async (req) => {
 
     console.log(`[cancel-google-event] ✅ Event cancelled successfully`);
     
+    // Audit log
+    console.log("[cancel-google-event] Booking cancelled", {
+      bookingId,
+      authUserId: user.id,
+      authEmail: user.email,
+      matchedClientId: matchedClient.id,
+      isAdmin,
+      eventId
+    });
+    
     return new Response(
       JSON.stringify({ 
         ok: true, 
@@ -261,7 +335,7 @@ serve(async (req) => {
     
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'Internal server error' 
+        error: error instanceof Error ? error.message : 'Internal server error' 
       }),
       { 
         status: 500, 

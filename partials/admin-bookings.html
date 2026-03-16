@@ -33,10 +33,22 @@
   }
 
   #adminBookingsList .booking-card {
-    background-color: #dbeafe !important;   /* bg-blue-100 */
-    border: 2px solid #3b82f6 !important;   /* blue-500 edge */
+    background-color: #dbeafe;   /* bg-blue-100 */
+    border: 2px solid #3b82f6;   /* blue-500 edge */
     border-radius: 0.5rem;
     color: #111827 !important;              /* default dark text */
+  }
+
+  /* TEST bookings */
+  #adminBookingsList .booking-card.booking-test {
+    background-color: #ede9fe;
+    border-color: #8b5cf6;
+  }
+
+  /* Paid bookings */
+  #adminBookingsList .booking-card.booking-paid {
+    background-color: #dbeafe;   /* same blue as normal cards */
+    border-color: #3b82f6;
   }
 
   /* Force most text dark, but allow special classes to override */
@@ -80,6 +92,13 @@
     font-weight: 700;
     margin-left: 6px;
     font-size: 1.1rem;
+  }
+
+  /* TEST booking indicator */
+  #adminBookingsList .test-prefix {
+    color: #7c3aed;        /* purple-600 */
+    font-weight: 700;
+    margin-right: 4px;
   }
 
   /* ------------------------------
@@ -269,6 +288,28 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
+  }
+
+  // XSS validation helpers
+  function containsHtmlTags(value) {
+    return /<[^>]+>/.test(value);
+  }
+
+  function containsSuspiciousScriptPattern(value) {
+    return /<script|<img|<svg|<iframe|javascript:|srcdoc\s*=|onerror\s*=|onload\s*=|onmouseover\s*=|onfocus\s*=|onpageshow\s*=|eval\s*\(|document\.cookie/i.test(value);
+  }
+
+  function containsBlockedContent(value) {
+    return value && (containsHtmlTags(value) || containsSuspiciousScriptPattern(value));
+  }
+
+  function normalizeInput(value) {
+    if (!value) return value;
+    return value
+      .replace(/\u200B/g, '')
+      .replace(/\u200C/g, '')
+      .replace(/\u200D/g, '')
+      .trim();
   }
   
   // Client filter state
@@ -545,6 +586,23 @@
     const errorElement = document.getElementById(`mobile-error-${bookingId}`);
     const checkbox = row?.querySelector('input[type="checkbox"]');
 
+    // ----- Check for blocked content first -----
+    if (containsBlockedContent(value)) {
+      inputElement.classList.add('border-red-400', 'text-red-600');
+      inputElement.classList.remove('border-gray-300', 'text-gray-900');
+      if (icon) icon.classList.remove('hidden');
+      if (errorElement) {
+        errorElement.textContent = 'HTML or script content is not allowed. Please enter plain text only.';
+        errorElement.classList.remove('hidden');
+      }
+      if (checkbox) checkbox.checked = false;
+      // Clear any pending debounce timer
+      if (mobileDebounceTimers[bookingId]) {
+        clearTimeout(mobileDebounceTimers[bookingId]);
+      }
+      return;
+    }
+
     // ----- local styling (immediate feedback) -----
     if (!value) {
       // Empty - mark invalid
@@ -610,11 +668,29 @@
   // Validate pickup with debounce (pause typing detection)
   function validateAdminPickup(inputElement, bookingId) {
     
-    const value = inputElement.value.trim();
+    const value = normalizeInput(inputElement.value);
     const row = document.getElementById(`pickup-row-${bookingId}`);
     const icon = document.getElementById(`pickup-error-icon-${bookingId}`);
     const errorText = document.getElementById(`pickup-error-text-${bookingId}`);
     const checkbox = row?.querySelector('input[type="checkbox"]');
+
+    // ----- Check for blocked content first -----
+    if (containsBlockedContent(value)) {
+      inputElement.classList.add('border-red-400', 'text-red-600');
+      inputElement.classList.remove('border-gray-300', 'text-gray-900');
+      if (icon) icon.classList.remove('hidden');
+      if (errorText) {
+        errorText.textContent = 'HTML or script content is not allowed. Please enter plain text only.';
+        errorText.classList.remove('hidden');
+      }
+      if (checkbox) checkbox.checked = false;
+      // Clear any pending debounce timer
+      if (pickupDebounceTimers[bookingId]) {
+        clearTimeout(pickupDebounceTimers[bookingId]);
+        delete pickupDebouncePlannedValues[bookingId];
+      }
+      return;
+    }
 
     // ----- local styling using validation.js -----
     if (!value) {
@@ -667,13 +743,13 @@
     pickupDebounceTimers[bookingId] = setTimeout(async () => {
       // If the user kept typing, let the newer timer handle it
       const rowInput = document.querySelector(`#pickup-row-${bookingId} input[type="text"]`);
-      const currentValue = rowInput ? rowInput.value.trim() : plannedValue;
+      const currentValue = normalizeInput(rowInput ? rowInput.value : plannedValue);
       if (currentValue !== plannedValue) return;
       if (pickupDebouncePlannedValues[bookingId] !== plannedValue) return;
 
       // Skip if unchanged from original DB value
       const booking = adminBookings.find(b => String(b.id) === String(bookingId));
-      const original = (booking?.pickup_location || '').trim();
+      const original = normalizeInput(booking?.pickup_location || '');
       if (currentValue === original) return;
 
       // Show processing state and hide suggestion panel
@@ -816,7 +892,11 @@
 
     if (error) {
       console.error('Error loading admin bookings:', error);
-      listContainer.innerHTML = `<div class="p-4 bg-red-50 text-red-800 rounded border border-red-200">Error loading bookings: ${error.message}</div>`;
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'p-4 bg-red-50 text-red-800 rounded border border-red-200';
+      errorDiv.textContent = `Error loading bookings: ${error.message}`;
+      listContainer.innerHTML = '';
+      listContainer.appendChild(errorDiv);
       return;
     }
 
@@ -1081,6 +1161,7 @@
     let serviceName = booking.service_code || 'Lesson';
     if (serviceName.includes('auto')) serviceName = 'Auto';
     else if (serviceName.includes('manual')) serviceName = 'Manual';
+    serviceName = escapeHtml(serviceName);
     
     // Duration
     const durationMinutes = Math.round((new Date(booking.end_time) - startTime) / 60000);
@@ -1097,7 +1178,8 @@
 
     const bookingNameFromBooking = `${booking.first_name || ''} ${booking.last_name || ''}`.trim();
 
-    const clientName = clientNameFromClient || bookingNameFromBooking || 'Unknown';
+    const clientName = escapeHtml(clientNameFromClient || bookingNameFromBooking || 'Unknown');
+    const bookingNameEscaped = escapeHtml(bookingNameFromBooking);
 
     const normaliseText = (s) => (s || '').trim().toLowerCase();
     const isNameMismatch =
@@ -1133,7 +1215,7 @@
       cancelButton = `
         <button
           type="button"
-          onclick="handleAdminCancelBooking('${booking.id}', '${booking.google_event_id || ''}', this)"
+          onclick="handleAdminCancelBooking('${booking.id}', '${escapeHtml(booking.google_event_id || '')}', this)"
           class="cancel-btn"
           title="Cancel Booking"
           aria-label="Cancel Booking">
@@ -1142,17 +1224,33 @@
       `;
     }
 
+    // Build test prefix if applicable
+    const testPrefix = booking.is_test === true
+      ? '<span class="test-prefix">[TEST]</span> '
+      : '';
+
+    // Build card classes based on booking state
+    let cardClasses = "booking-card p-3 sm:p-4 mb-4 transition-all duration-200 group";
+
+    if (booking.is_test) {
+      cardClasses += " booking-test";
+    }
+
+    if (booking.is_paid) {
+      cardClasses += " booking-paid";
+    }
+
     return `
-      <div class="booking-card p-3 sm:p-4 mb-4 transition-all duration-200 group" id="booking-card-${booking.id}">
+      <div class="${cardClasses}" id="booking-card-${booking.id}">
         <div class="flex flex-col">
           
           <!-- Header: Service, Duration & Client Name -->
           <div class="mb-2 flex items-start justify-between gap-2">
             <div class="min-w-0">
               <h3 class="text-sm sm:text-base font-semibold text-gray-900">
-                ${serviceName} ${durationStr} (${clientName})${!booking.is_paid ? '<span class="payment-icon">$</span>' : ''}
+                ${testPrefix}${serviceName} ${durationStr} (${clientName})${!booking.is_paid ? '<span class="payment-icon">$</span>' : ''}
               </h3>
-              ${isNameMismatch ? `<div class="text-xs text-gray-600 mt-0.5">Booking name: ${bookingNameFromBooking}</div>` : ''}
+              ${isNameMismatch ? `<div class="text-xs text-gray-600 mt-0.5">Booking name: ${bookingNameEscaped}</div>` : ''}
             </div>
             <div class="flex-shrink-0">
               ${cancelButton}
@@ -1177,7 +1275,7 @@
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2">
                   <input type="text" 
-                    value="${booking.mobile || ''}" 
+                    value="${escapeHtml(booking.mobile || '')}" 
                     class="max-w-[280px] px-2 py-1 text-sm ${isMobileInvalid ? 'border-red-400 text-red-600' : 'border-gray-300 text-gray-900'} border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     oninput="validateAdminMobile(this, '${booking.id}')"
                     onfocus="setAdminActiveField('${booking.id}', 'mobile')"
@@ -1211,7 +1309,7 @@
                 <div style="width: 320px; max-width: 100%;">
                   <div class="flex items-center gap-2">
                     <input type="text" 
-                      value="${booking.pickup_location || ''}" 
+                      value="${escapeHtml(booking.pickup_location || '')}" 
                       class="w-full px-2 py-1 text-sm ${isPickupInvalid ? 'border-red-400 text-red-600' : 'border-gray-300 text-gray-900'} border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       oninput="validateAdminPickup(this, '${booking.id}')"
                       onfocus="setAdminActiveField('${booking.id}', 'pickup')"
@@ -1313,61 +1411,99 @@
     `;
   }
 
+  // Global helpers
+  async function getAdminEmail() {
+    if (!window.supabaseClient) {
+      console.error('[admin-bookings] getAdminEmail: supabaseClient not available');
+      return null;
+    }
+    
+    try {
+      const { data: { session } } = await window.supabaseClient.auth.getSession();
+      return session?.user?.email || null;
+    } catch (error) {
+      console.error('[admin-bookings] Error getting admin email:', error);
+      return null;
+    }
+  }
+
   // Global handlers
   window.handleAdminCancelBooking = async function(bookingId, googleEventId, btnEl) {
-    try {
-      const ask = () => {
-        const msg = 'Cancel this booking?';
-        if (window.Modal && window.Modal.confirm) {
-          window.Modal.confirm(
-            msg,
-            () => doCancel(),
-            null,
-            'Cancel Booking'
-          );
-        } else {
-          if (confirm(msg)) doCancel();
-        }
-      };
-
-      const doCancel = async () => {
-        if (btnEl) btnEl.disabled = true;
-
-        // 1) Update booking status in DB
-        const { error } = await window.supabaseClient
-          .from('booking')
-          .update({
-            status: 'cancelled',
-            cancelled_at: new Date().toISOString()
-          })
-          .eq('id', bookingId);
-
-        if (error) throw error;
-
-        // 2) Optional: if there is an existing Google Calendar delete/cancel helper, call it
-        // Keep this guarded so it does not break if not available
-        if (googleEventId && window.cancelGoogleCalendarEvent) {
-          try { await window.cancelGoogleCalendarEvent(googleEventId); } catch(_) {}
-        }
-
-        // 3) Refresh list
-        if (window.loadAdminBookings) {
-          await window.loadAdminBookings();
-        } else {
-          // fallback: remove card locally
-          const card = document.getElementById(`booking-card-${bookingId}`);
-          if (card) card.remove();
-        }
-      };
-
-      ask();
-    } catch (err) {
-      if (btnEl) btnEl.disabled = false;
-      console.error('Cancel booking failed:', err);
+    // Guard: refuse to proceed if required fields are missing
+    if (!bookingId) {
+      console.error('[admin-bookings] Cannot cancel booking: bookingId is missing');
+      const msg = 'Cannot cancel booking: missing booking ID';
       if (window.Modal && window.Modal.error) {
-        window.Modal.error('Could not cancel booking. Please try again.');
+        window.Modal.error(msg, 'Invalid Request');
       } else {
-        alert('Could not cancel booking. Please try again.');
+        alert(msg);
+      }
+      return;
+    }
+
+    if (!googleEventId) {
+      console.error('[admin-bookings] Cannot cancel booking: googleEventId is missing');
+      const msg = 'Cannot cancel booking: missing Google Calendar event ID';
+      if (window.Modal && window.Modal.error) {
+        window.Modal.error(msg, 'Invalid Request');
+      } else {
+        alert(msg);
+      }
+      return;
+    }
+
+    try {
+      // Get admin email for tracking
+      const adminEmail = await getAdminEmail();
+
+      // Verify the shared helper is available
+      if (!window.GoogleCalendar || typeof window.GoogleCalendar.cancelWithConfirmation !== 'function') {
+        console.error('[admin-bookings] GoogleCalendar.cancelWithConfirmation not available');
+        const msg = 'Cancellation feature not available. Please refresh the page.';
+        if (window.Modal && window.Modal.error) {
+          window.Modal.error(msg, 'Feature Unavailable');
+        } else {
+          alert(msg);
+        }
+        return;
+      }
+
+      // Use the same secure cancel flow as admin-calendar.html.
+      // This ensures admin bookings uses the hardened Edge Function path
+      // with bookingId + googleEventId, preserves IDOR protection,
+      // and keeps DB / Google cancellation sequencing consistent.
+      await window.GoogleCalendar.cancelWithConfirmation({
+        bookingId: bookingId,
+        googleEventId: googleEventId,
+        cancelledBy: adminEmail,
+        triggerElement: btnEl,
+        confirmMessage: 'Cancel this booking?\n\nThis will cancel the lesson in Google Calendar and mark it as cancelled in the database.',
+        confirmTitle: 'Cancel Booking',
+        showSuccessMessage: true, // Show success notification to admin
+        onSuccess: async () => {
+          // Refresh the bookings list after successful cancellation
+          if (window.loadAdminBookings) {
+            await window.loadAdminBookings();
+          } else {
+            // Fallback: remove card locally
+            const card = document.getElementById(`booking-card-${bookingId}`);
+            if (card) card.remove();
+          }
+        },
+        onCancel: () => {
+          // User aborted - shared helper manages button state
+        },
+        onError: (error) => {
+          // Cancellation failed - shared helper manages button state
+        }
+      });
+    } catch (err) {
+      console.error('[admin-bookings] Cancel booking failed:', err);
+      const msg = 'Could not cancel booking. Please try again.';
+      if (window.Modal && window.Modal.error) {
+        window.Modal.error(msg, 'Cancellation Failed');
+      } else {
+        alert(msg);
       }
     }
   };
@@ -1380,6 +1516,17 @@
     // 1) Mobile: Store as entered (trim only) and validate using validation.js
     if (field === 'mobile') {
       const trimmed = (value || '').trim();
+
+      // Check for blocked content
+      if (containsBlockedContent(trimmed)) {
+        const msg = 'HTML or script content is not allowed. Please enter plain text only.';
+        if (window.Modal) {
+          window.Modal.error(msg, 'Invalid Input');
+        } else {
+          alert(msg);
+        }
+        return;
+      }
 
       valueToStore = trimmed;
       const valid = window.Validation?.isValidAuMobile?.(trimmed) ?? false;
@@ -1424,8 +1571,19 @@
     if (field === 'pickup_location') {
       const booking = allAdminBookings.find(b => String(b.id) === String(id)) ||
         adminBookings.find(b => String(b.id) === String(id));
-      const newPickup = (value || '').trim() || null;
-      const oldPickup = ((booking?.pickup_location || '').trim() || null);
+      const newPickup = normalizeInput(value) || null;
+      const oldPickup = normalizeInput(booking?.pickup_location || '') || null;
+
+      // Check for blocked content
+      if (containsBlockedContent(newPickup)) {
+        const msg = 'HTML or script content is not allowed. Please enter plain text only.';
+        if (window.Modal) {
+          window.Modal.error(msg, 'Invalid Input');
+        } else {
+          alert(msg);
+        }
+        return;
+      }
 
       // Only write pickup_location if it actually changed
       if (newPickup === oldPickup) {
@@ -1440,7 +1598,7 @@
           .eq('id', id)
           .maybeSingle();
 
-        const dbPickup = ((currentRow?.pickup_location || '').trim() || null);
+        const dbPickup = normalizeInput(currentRow?.pickup_location || '') || null;
         if (newPickup === dbPickup) {
           return;
         }
@@ -1473,7 +1631,7 @@
         const pickupInput = field === 'pickup_location'
           ? document.querySelector(`#pickup-row-${id} input[type="text"]`)
           : null;
-        const pickupFromInput = pickupInput ? pickupInput.value.trim() : null;
+        const pickupFromInput = pickupInput ? normalizeInput(pickupInput.value) : null;
 
         // For mobile, send the trimmed value (same value stored in DB)
         const mobileToSend = field === 'mobile' ? (valueToStore || '').trim() : null;

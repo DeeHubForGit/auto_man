@@ -143,7 +143,7 @@
   <!-- Filters -->
   <div class="flex items-end gap-3 mb-4">
     <div class="flex flex-col gap-1">
-      <label class="text-sm font-medium text-gray-300">Search</label>
+      <label class="text-sm font-medium text-white">Search</label>
       <input 
         id="cancellationSearch" 
         type="text" 
@@ -152,7 +152,7 @@
       />
     </div>
     <div class="flex flex-col gap-1">
-      <label class="text-sm font-medium text-gray-300">Sort</label>
+      <label class="text-sm font-medium text-white">Sort</label>
       <select 
         id="cancellationSort" 
         class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[180px]"
@@ -163,7 +163,7 @@
       </select>
     </div>
     <div class="flex flex-col gap-1">
-      <label class="text-sm font-medium text-gray-300">Date range</label>
+      <label class="text-sm font-medium text-white">Date range</label>
       <select 
         id="cancellationDateRange" 
         class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 w-[160px]"
@@ -176,7 +176,7 @@
       </select>
     </div>
     <div class="flex flex-col gap-1">
-      <label class="text-sm font-medium text-gray-300">Cancellations</label>
+      <label class="text-sm font-medium text-white">Cancellations</label>
       <select 
         id="refundEligibilityFilter" 
         class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[160px]"
@@ -187,7 +187,7 @@
       </select>
     </div>
     <div class="flex flex-col gap-1">
-      <label class="text-sm font-medium text-gray-300">Refunds</label>
+      <label class="text-sm font-medium text-white">Refunds</label>
       <select 
         id="refundStatusFilter" 
         class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px]"
@@ -198,7 +198,7 @@
       </select>
     </div>
     <div class="flex flex-col gap-1">
-      <label class="text-sm font-medium text-gray-300">Per page</label>
+      <label class="text-sm font-medium text-white">Per page</label>
       <select 
         id="cancellationsPerPage" 
         class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px]"
@@ -239,6 +239,13 @@
 
 <script>
 (function() {
+  // HTML escape helper to prevent XSS
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
   // Cancellations - Store for filtering and pagination
   let allCancellations = [];
   let currentPage = 1;
@@ -302,7 +309,11 @@
       
       if (error) {
         console.error('[admin-cancellations] Error loading cancellations:', error);
-        box.innerHTML = `<div class="p-4 text-center text-red-600">Error: ${error.message}</div>`;
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'p-4 text-center text-red-600';
+        errorDiv.textContent = `Error: ${error.message}`;
+        box.innerHTML = '';
+        box.appendChild(errorDiv);
         return;
       }
       
@@ -313,7 +324,11 @@
       console.log('[admin-cancellations] Loaded', allCancellations.length, 'cancelled bookings');
     } catch (e) {
       console.error('[admin-cancellations] Unexpected error loading cancellations:', e);
-      box.innerHTML = `<div class="p-4 text-center text-red-600">Error: ${e?.message || String(e)}</div>`;
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'p-4 text-center text-red-600';
+      errorDiv.textContent = `Error: ${e?.message || String(e)}`;
+      box.innerHTML = '';
+      box.appendChild(errorDiv);
     } finally {
       // Hide loading spinner
       if (reloadText) reloadText.classList.remove('hidden');
@@ -451,7 +466,7 @@
     
     if (filtered.length === 0) {
       const message = searchTerm
-        ? `No cancelled bookings found matching "${searchTerm}".`
+        ? `No cancelled bookings found matching "${escapeHtml(searchTerm)}".`
         : 'No cancelled bookings found.';
 
       // Hide pagination/footer strip when there are no results
@@ -474,9 +489,9 @@
       
       const firstName = row.first_name || '';
       const lastName = row.last_name || '';
-      const fullName = `${firstName} ${lastName}`.trim() || 'Unknown';
+      const fullName = escapeHtml(`${firstName} ${lastName}`.trim() || 'Unknown');
       // Remove "Driving Lesson" from service name for mobile-friendly display
-      const serviceName = (row.service?.name || row.service_code || 'Unknown service').replace(/Driving Lesson\s*—?\s*/i, '');
+      const serviceName = escapeHtml((row.service?.name || row.service_code || 'Unknown service').replace(/Driving Lesson\s*—?\s*/i, ''));
       
       // Format dates as dd/mm/yy hh:mm am/pm
       const bookingDate = new Date(row.start_time).toLocaleString('en-AU', {
@@ -565,6 +580,8 @@
       // Determine if refund checkbox should be shown
       const showRefundCheckbox = (row.is_paid === true) && (row.refund_eligible === true);
       
+      const safeBookingId = escapeHtml(String(row.id || ''));
+      
       card.innerHTML = `
         <div class="cancelled-card-header">
           <div class="cancelled-card-title">${fullName}</div>
@@ -585,7 +602,7 @@
             <label style="display: flex; align-items: center; cursor: pointer; user-select: none;">
               <input type="checkbox" ${refundedChecked} 
                      class="refund-checkbox" 
-                     data-booking-id="${row.id}"
+                     data-booking-id="${safeBookingId}"
                      style="width: 16px; height: 16px; margin-right: 8px; cursor: pointer;">
               <span style="font-weight: 500;">Refunded:</span>
               <span style="margin-left: 6px;">${refundedDisplay}</span>

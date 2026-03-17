@@ -89,13 +89,6 @@
 
 <script>
 (function() {
-  // XSS prevention helper
-  function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text || '';
-    return div.innerHTML;
-  }
-
   // Send SMS & Email logic
   let msgClientByEmail = {}; // Store client data by email for quick lookup
 
@@ -106,12 +99,20 @@
     if (!sel) return;
     
     if (!window.supabaseClient) {
-      sel.innerHTML = '<option value="">Supabase not connected</option>';
+      sel.replaceChildren();
+      const errorOption = document.createElement('option');
+      errorOption.value = '';
+      errorOption.textContent = 'Supabase not connected';
+      sel.appendChild(errorOption);
       if (msgEl) msgEl.textContent = 'Supabase client not initialized';
       return;
     }
     
-    sel.innerHTML = '<option value="">Loading…</option>';
+    sel.replaceChildren();
+    const loadingOption = document.createElement('option');
+    loadingOption.value = '';
+    loadingOption.textContent = 'Loading…';
+    sel.appendChild(loadingOption);
     if (msgEl) msgEl.textContent = 'Loading clients...';
     
     try {
@@ -123,21 +124,37 @@
       if (error) throw error;
       
       const rows = Array.isArray(data) ? data : [];
-      const opts = ['<option value="">Select a client…</option>'];
       msgClientByEmail = {}; // Reset
       
+      // Clear and rebuild with safe DOM creation
+      sel.replaceChildren();
+      
+      // Add default option
+      const defaultOption = document.createElement('option');
+      defaultOption.value = '';
+      defaultOption.textContent = 'Select a client…';
+      sel.appendChild(defaultOption);
+      
+      // Add client options
       rows.forEach(c => {
-        const safeName = [c.first_name, c.last_name].filter(Boolean).map(escapeHtml).join(' ');
-        const safeEmail = escapeHtml(c.email || '');
-        const label = safeName ? `${safeName} <${safeEmail}>` : safeEmail;
-        opts.push(`<option value="${safeEmail}">${label}</option>`);
+        const option = document.createElement('option');
+        option.value = c.email || '';
+        
+        const name = [c.first_name, c.last_name].filter(Boolean).join(' ');
+        const label = name ? `${name} <${c.email}>` : c.email;
+        option.textContent = label;
+        
+        sel.appendChild(option);
         msgClientByEmail[c.email] = c; // Store for lookup
       });
       
-      sel.innerHTML = opts.join('');
       if (msgEl) msgEl.textContent = '';
     } catch (e) {
-      sel.innerHTML = '<option value="">Failed to load clients</option>';
+      sel.replaceChildren();
+      const errorOption = document.createElement('option');
+      errorOption.value = '';
+      errorOption.textContent = 'Failed to load clients';
+      sel.appendChild(errorOption);
       if (msgEl) msgEl.textContent = 'Error: ' + (e?.message || String(e));
     }
   }

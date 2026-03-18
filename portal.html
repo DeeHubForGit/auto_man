@@ -131,33 +131,34 @@
       return !!window.supabaseClient;
     }
 
-    // Check authentication on load
-    document.addEventListener('DOMContentLoaded', async function() {
+    /**
+     * Enforce authentication and return user or null
+     * Redirects to login if not authenticated
+     */
+    async function enforceAuth() {
       const ready = await waitForSupabaseClient(6000);
       if (!ready) {
         Modal.error('Authentication is not configured. Please contact support.');
         setTimeout(() => window.location.href = 'index.html', 2000);
-        return;
+        return null;
       }
 
-      // Check if user is logged in
-      const { data: { session } } = await window.supabaseClient.auth.getSession();
+      // Get current session
+      const { data: { session }, error: sessionError } = await window.supabaseClient.auth.getSession();
       
-      if (!session || !session.user) {
-        // Not logged in, redirect to login
-        window.location.href = 'login.html?next=portal.html';
-        return;
+      if (sessionError || !session || !session.user) {
+        // Not logged in, redirect to login (preserve return destination)
+        const returnUrl = encodeURIComponent(window.location.pathname + window.location.search + window.location.hash);
+        window.location.href = `login.html?next=${returnUrl}`;
+        return null;
       }
 
-      currentUser = session.user;
-      window.currentUser = session.user; // Make available to partials
-      
       // Check password-changed session BEFORE any protected queries
       if (!window.AuthUI || !window.AuthUI.checkPasswordChangedSession) {
         console.error('[portal] Auth validation unavailable, aborting');
         Modal.error('Authentication validation is unavailable. Please refresh the page.');
         setTimeout(() => window.location.href = 'login.html', 2000);
-        return;
+        return null;
       }
       
       const sessionValid = await window.AuthUI.checkPasswordChangedSession();
@@ -168,8 +169,18 @@
           mainContent.style.display = 'none';
           mainContent.innerHTML = '';
         }
-        return;
+        return null;
       }
+
+      return session.user;
+    }
+
+    /**
+     * Initialize portal with authenticated user
+     */
+    async function initPortal(user) {
+      currentUser = user;
+      window.currentUser = user; // Make available to partials
       
       // Session is valid - now safe to query protected data
       // Check if user is admin and redirect to admin page
@@ -269,10 +280,46 @@
       // Load client data
       await loadClientData();
 
+      // Handle payment return from Stripe (if applicable)
+      handlePaymentReturn();
+
       // Show default section (bookings is now the default)
       const hash = window.location.hash.slice(1) || 'bookings';
       showSection(hash);
+    }
+
+    // Main initialization with error handling
+    document.addEventListener('DOMContentLoaded', async function() {
+      try {
+        // Enforce authentication
+        const user = await enforceAuth();
+        if (!user) return;
+
+        // Set up session monitoring after auth is confirmed
+        setupSessionMonitoring();
+
+        // Initialize portal with authenticated user
+        await initPortal(user);
+      } catch (err) {
+        console.error('[portal] Initialization failed:', err);
+        Modal.error('Failed to load portal. Please refresh the page or contact support.');
+      }
     });
+
+    /**
+     * Monitor auth state changes - auto logout on session expiry
+     */
+    function setupSessionMonitoring() {
+      if (!window.supabaseClient) return;
+
+      window.supabaseClient.auth.onAuthStateChange((event, session) => {
+        // Only redirect if we're on the portal and session is gone
+        if (!session && window.location.pathname.includes('portal.html')) {
+          console.error('[portal] Session expired, redirecting to login');
+          window.location.href = 'login.html?next=portal.html';
+        }
+      });
+    }
 
     // Load client data from database
     async function loadClientData() {
@@ -1045,6 +1092,12 @@
       // NEW: ensure mobile is saved first if the user just edited it
       await flushMobileIfDirty(bookingId);
 
+      // Verify client ownership before update (defense in depth)
+      if (!window.clientData?.id) {
+        console.error('[portal] Client data not available for update');
+        return;
+      }
+
       const { error } = await window.supabaseClient
         .from('booking')
         .update({
@@ -1054,7 +1107,8 @@
           pickup_location_suggestion: null,
           validation_checked_at: null,
         })
-        .eq('id', bookingId);
+        .eq('id', bookingId)
+        .eq('client_id', window.clientData.id);
 
       if (!error) {
         if (suggestionPanel) suggestionPanel.classList.add('hidden');
@@ -1361,20 +1415,38 @@
         </button>`;
       }
 
+      // Pay button for unpaid bookings
+      // Show Pay if: confirmed, unpaid, future booking
+      let payButton = '';
+      const isFutureBooking = startTime > now;
+      
+      if (isConfirmed && isFutureBooking && booking.is_paid !== true) {
+        const safeBookingId = escapeHtml(String(booking.id || ''));
+        payButton = `
+        <button 
+          class="pay-btn ml-2" 
+          data-booking-id="${safeBookingId}"
+          onclick="handlePayBooking('${safeBookingId}', this)"
+          title="Pay for this booking" 
+          aria-label="Pay for booking">
+          Pay
+        </button>`;
+      }
+
       // Service name
       const serviceName = getServiceName(booking.service_code);
       const safeServiceName = escapeHtml(serviceName);
 
       return `
         <div id="booking-card-${booking.id}" class="booking-card bg-gray-100 border border-gray-300 rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow">
-          <!-- Header with title, status, and cancel -->
+          <!-- Header with title, status, and buttons -->
           <div class="flex items-start justify-between gap-2 mb-2">
             <div class="flex items-center gap-2 flex-1 min-w-0">
               <h3 class="text-sm sm:text-base font-semibold text-gray-900">${safeServiceName}</h3>
               ${statusBadge}
             </div>
             <div class="flex-shrink-0">
-              ${cancelButton}
+              ${payButton}${cancelButton}
             </div>
           </div>
           
@@ -1606,6 +1678,12 @@
         } else {
           // Fallback: Update DB directly if GoogleCalendar not available
           console.warn('[portal] GoogleCalendar not available, updating database directly');
+          
+          // Verify client ownership before update (defense in depth)
+          if (!window.clientData?.id) {
+            throw new Error('Client data not available');
+          }
+          
           const { error: dbErr } = await window.supabaseClient
             .from('booking')
             .update({ 
@@ -1613,7 +1691,8 @@
               cancelled_at: new Date().toISOString(),
               cancelled_by: cancelledBy
             })
-            .eq('id', bookingId);
+            .eq('id', bookingId)
+            .eq('client_id', window.clientData.id);
           if (dbErr) throw dbErr;
         }
 
@@ -1654,6 +1733,139 @@
       }
     }
     // ===== END BOOKINGS MANAGEMENT =====
+
+    // ===== PAYMENT HANDLING =====
+    /**
+     * Handle payment button click
+     * Creates a Stripe Checkout session and redirects to payment
+     */
+    async function handlePayBooking(bookingId, buttonElement) {
+      // Check password-changed session before performing protected operations
+      if (window.AuthUI && window.AuthUI.checkPasswordChangedSession) {
+        const sessionValid = await window.AuthUI.checkPasswordChangedSession();
+        if (!sessionValid) {
+          return;
+        }
+      }
+
+      // Disable button and show loading
+      if (buttonElement) {
+        buttonElement.disabled = true;
+        buttonElement.textContent = 'Loading...';
+        buttonElement.classList.add('opacity-50', 'cursor-not-allowed');
+      }
+
+      try {
+        // Get auth token and verify session is valid
+        const { data: { session }, error: sessionError } = await window.supabaseClient.auth.getSession();
+        if (sessionError || !session?.access_token) {
+          console.error('[portal] Session error:', sessionError);
+          throw new Error('Authentication session expired. Please refresh the page and try again.');
+        }
+
+        // Debug log (without exposing token)
+        console.log('[portal] Starting payment', {
+          hasSession: !!session,
+          hasAccessToken: !!session?.access_token,
+          bookingId
+        });
+
+        // Get Supabase URL and anon key
+        const supabaseUrl = window.SITE_CONFIG?.SUPABASE_URL || window.SUPABASE_URL;
+        const supabaseKey = window.SITE_CONFIG?.SUPABASE_ANON_KEY || window.SUPABASE_ANON_KEY;
+
+        if (!supabaseUrl || !supabaseKey) {
+          throw new Error('Supabase configuration not available');
+        }
+
+        // Call Edge Function with explicit Authorization header
+        const functionUrl = `${supabaseUrl}/functions/v1/create-stripe-checkout-session`;
+        
+        const response = await fetch(functionUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': supabaseKey
+          },
+          body: JSON.stringify({ bookingId })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data?.error || `Edge Function returned ${response.status}`);
+        }
+
+        // Redirect to Stripe Checkout
+        if (data?.sessionUrl) {
+          window.location.href = data.sessionUrl;
+        } else {
+          throw new Error('No checkout URL returned');
+        }
+      } catch (err) {
+        console.error('[portal] Error initiating payment:', err);
+        if (window.Modal?.error) {
+          window.Modal.error('Could not initiate payment. Please try again or contact us.', 'Payment Error');
+        } else {
+          alert('Could not initiate payment: ' + (err.message || String(err)));
+        }
+        // Re-enable button
+        if (buttonElement) {
+          buttonElement.disabled = false;
+          buttonElement.textContent = 'Pay';
+          buttonElement.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+      }
+    }
+    window.handlePayBooking = handlePayBooking;
+
+    /**
+     * Handle payment return from Stripe
+     * Check URL parameters for payment success/cancelled status
+     */
+    function handlePaymentReturn() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const paymentStatus = urlParams.get('payment');
+
+      if (paymentStatus === 'success') {
+        // Ensure we're on the bookings section
+        if (window.location.hash !== '#bookings') {
+          window.location.hash = 'bookings';
+        }
+        
+        // Show neutral message while refreshing
+        if (window.Modal?.success) {
+          window.Modal.success('Payment completed. Refreshing your booking status...', 'Payment Completed');
+        } else {
+          alert('Payment completed. Refreshing your booking status...');
+        }
+        
+        // Reload bookings to show updated payment status from webhook
+        if (typeof loadBookings === 'function') {
+          setTimeout(() => loadBookings(), 500);
+        }
+        
+        // Clean URL (keep hash)
+        window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+      } else if (paymentStatus === 'cancelled') {
+        // Ensure we're on the bookings section
+        if (window.location.hash !== '#bookings') {
+          window.location.hash = 'bookings';
+        }
+        
+        // Show neutral message
+        if (window.Modal?.warning) {
+          window.Modal.warning('Payment was not completed. You can try again at any time.', 'Payment Cancelled');
+        } else {
+          alert('Payment was not completed. You can try again at any time.');
+        }
+        
+        // Clean URL
+        window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+      }
+    }
+    // ===== END PAYMENT HANDLING =====
 
     // Using centralized validation from assets/js/validation.js
 

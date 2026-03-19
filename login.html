@@ -93,9 +93,18 @@
         if (form) form.prepend(msg);
       }
 
-      // Remove query params from URL after using them
+      // Clean up email/verify query params but preserve 'next' for login redirect
       if (window.history && window.history.replaceState) {
-        window.history.replaceState({}, document.title, window.location.pathname);
+        const newParams = new URLSearchParams();
+        const next = params.get('next');
+        if (next) newParams.set('next', next);
+
+        const newQuery = newParams.toString();
+        window.history.replaceState(
+          {},
+          document.title,
+          newQuery ? `${window.location.pathname}?${newQuery}` : window.location.pathname
+        );
       }
 
       // Toggle password visibility

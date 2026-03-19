@@ -5,19 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>My Account - Auto-Man Driving School</title>
   <meta name="description" content="Manage your driving lessons and account details" />
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link href="assets/theme.css" rel="stylesheet">
-  <script src="assets/config.js"></script>
-  <script src="assets/js/validation.js"></script>
-  <script src="assets/render-helpers.js" defer></script>
-  <script src="assets/include.js" defer></script>
-  <script src="assets/js/modal.js"></script>
-  <script src="assets/js/googleCalendar.js"></script>
-  <script src="assets/js/auth.js" defer></script>
+  <link href="assets/theme.css?v=2026-03-19-portal-fix" rel="stylesheet">
+  <script src="assets/config.js?v=2026-03-19-portal-fix"></script>
+  <script src="assets/js/validation.js?v=2026-03-19-portal-fix"></script>
+  <script src="assets/render-helpers.js?v=2026-03-19-portal-fix" defer></script>
+  <script src="assets/include.js?v=2026-03-19-portal-fix" defer></script>
+  <script src="assets/js/modal.js?v=2026-03-19-portal-fix"></script>
+  <script src="assets/js/googleCalendar.js?v=2026-03-19-portal-fix"></script>
+  <script src="assets/js/auth.js?v=2026-03-19-portal-fix" defer></script>
 </head>
 <body class="bg-gray-50 text-gray-900">
   <!-- Auth scripts (global Supabase client) MUST load before header -->
@@ -1367,10 +1364,6 @@
     }
 
     function renderBookingCard(booking, isUpcoming) {
-      // === PAID TEST 123 - VERIFICATION MARKER ===
-      // If you see this log, the correct updated renderBookingCard is loaded
-      console.log('[PAID TEST 123] renderBookingCard version: 2026-03-19-v2');
-      
       // Safety check: ensure booking exists and has required fields
       if (!booking || !booking.id || !booking.start_time || !booking.end_time) {
         console.error('Invalid booking data:', booking);
@@ -1436,11 +1429,9 @@
       // PAID badge (only show if booking is paid)
       let paidBadge = '';
       if (booking.is_paid === true) {
-        // PAID TEST 123 - This confirms the correct badge logic is active
-        console.log(`[PAID TEST 123] Generating PAID badge for booking ${booking.id}`);
         paidBadge = `<span class="inline-flex items-center gap-1.5 ml-2">
           <i class="fa-solid fa-circle-check" style="color: #16a34a !important; font-size: 16px !important;" aria-hidden="true"></i>
-          <span style="font-family: ui-sans-serif, system-ui, sans-serif !important; color: #16a34a !important; font-size: 11px !important; font-weight: 600 !important; letter-spacing: 0.025em !important;">PAID<!-- TEST123 --></span>
+          <span style="font-family: ui-sans-serif, system-ui, sans-serif !important; color: #16a34a !important; font-size: 11px !important; font-weight: 600 !important; letter-spacing: 0.025em !important;">PAID</span>
         </span>`;
       }
       

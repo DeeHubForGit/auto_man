@@ -164,6 +164,7 @@ function extractFieldsFromEvent(e: any) {
   let mobile = (typeof shared.mobile === "string" ? shared.mobile.trim() : null) || null;
   let pickup = (typeof shared.pickup_location === "string" ? shared.pickup_location.trim() : null) || null;
   let client_id = (typeof shared.client_id === "string" ? shared.client_id.trim() : null) || null;
+  let created_by = (typeof shared.created_by === "string" ? shared.created_by.trim() : null) || null;
   
   // Parse description fields (will be overridden by extendedProperties if present)
   const fromDesc = parseDescriptionFields(e.description);
@@ -222,7 +223,7 @@ function extractFieldsFromEvent(e: any) {
   // Only treat it as null if it is completely blank/whitespace.
   if (mobile && mobile.trim().length === 0) mobile = null;
   
-  return { first_name, last_name, email, mobile, pickup_location: pickup, client_id };
+  return { first_name, last_name, email, mobile, pickup_location: pickup, client_id, created_by };
 }
 
 function isNonEmpty(value: any): boolean {
@@ -381,6 +382,12 @@ Deno.serve(async () => {
       const parsed = parseGcalEvent(e);
       const fields = extractFieldsFromEvent(e);
       const isBooking = isBookingEvent(e, fields);
+      const isAdminBooking = fields.created_by === 'admin';
+      
+      // Debug log for admin booking classification
+      if (fields.created_by || isAdminBooking) {
+        console.log(`[gcal-sync] Admin booking check: event=${e.id}, created_by="${fields.created_by}", isAdminBooking=${isAdminBooking}`);
+      }
       
       // Convert Google Calendar ISO strings to UTC for PostgreSQL
       // Google sends: "2025-11-23T15:00:00+11:00" (3 PM Melbourne)
@@ -435,7 +442,8 @@ Deno.serve(async () => {
         p_extended: e,  // Store full event object for debugging/audit
         p_is_booking: isBooking,  // Simple booking detection
         p_title: e.summary ?? null,
-        p_client_id: fields.client_id ?? null  // Pass client_id if available from extendedProperties
+        p_client_id: fields.client_id ?? null,  // Pass client_id if available from extendedProperties
+        p_is_admin_booking: isAdminBooking  // Pass admin booking flag from extendedProperties
       };
       
       const up = await fetch(`${supa}/rest/v1/rpc/upsert_booking_from_google`, {

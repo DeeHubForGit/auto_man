@@ -7,7 +7,8 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
-import Stripe from 'https://esm.sh/stripe@14.11.0?target=deno';
+// Using npm:stripe for better Supabase Edge Function / Deno compatibility
+import Stripe from "npm:stripe@14.11.0";
 
 const corsHeaders = {
   "access-control-allow-origin": "*",
@@ -47,7 +48,6 @@ serve(async (req) => {
     // Initialize Stripe
     const stripe = new Stripe(STRIPE_SECRET_KEY, {
       apiVersion: '2023-10-16',
-      httpClient: Stripe.createFetchHttpClient(),
     });
 
     // Get Stripe signature

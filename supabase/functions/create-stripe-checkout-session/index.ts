@@ -134,6 +134,7 @@ serve(async (req) => {
         is_paid,
         status,
         start_time,
+        timezone,
         stripe_checkout_session_id,
         service:service (
           name,
@@ -261,6 +262,18 @@ serve(async (req) => {
       booking.service_code ||
       'Driving Lesson';
 
+    // Format lesson time in the booking's timezone
+    const bookingTimezone = booking.timezone || 'Australia/Melbourne';
+    const lessonDateTimeText = new Date(booking.start_time).toLocaleString('en-AU', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: bookingTimezone,
+    });
+
     console.log("[create-stripe-checkout-session] Creating new checkout session");
 
     let session: Stripe.Checkout.Session;
@@ -275,14 +288,7 @@ serve(async (req) => {
               currency: 'aud',
               product_data: {
                 name: serviceName,
-                description: `Lesson on ${new Date(booking.start_time).toLocaleDateString('en-AU', { 
-                  weekday: 'short', 
-                  year: 'numeric', 
-                  month: 'short', 
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}`,
+                description: `Lesson on ${lessonDateTimeText}`,
               },
               unit_amount: booking.price_cents,
             },

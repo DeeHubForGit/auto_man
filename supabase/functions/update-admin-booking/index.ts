@@ -371,7 +371,7 @@ ${pickupLocation || 'N/A'}
     // Read existing booking to check if payment can be edited
     const { data: existingBooking, error: existingErr } = await supabase
       .from('booking')
-      .select('is_admin_booking')
+      .select('is_admin_booking, stripe_payment_status, stripe_payment_intent_id, paid_at')
       .eq('id', bookingId)
       .maybeSingle();
 
@@ -379,7 +379,29 @@ ${pickupLocation || 'N/A'}
       console.warn('[update-admin-booking] Failed to read existing booking for payment guard:', existingErr);
     }
 
-    const canEditPayments = existingBooking?.is_admin_booking === true;
+    // Check if booking is Stripe-paid (hard server-side block)
+    const isStripePaid =
+      existingBooking?.stripe_payment_status === 'paid' ||
+      !!existingBooking?.stripe_payment_intent_id ||
+      !!existingBooking?.paid_at;
+
+    // Block payment changes if Stripe-paid
+    const attemptedPaymentChange =
+      payload?.isPaid !== undefined ||
+      payload?.is_paid !== undefined;
+
+    if (isStripePaid && attemptedPaymentChange) {
+      console.warn('[update-admin-booking] Blocked payment change on Stripe-paid booking:', bookingId);
+      return new Response(
+        JSON.stringify({ ok: false, error: 'Cannot modify payment after Stripe payment' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
+    }
+
+    const canEditPayments = existingBooking?.is_admin_booking === true && !isStripePaid;
 
     // Build ISO timestamps for database using Google’s returned dateTime (includes correct offset/DST)
     const startIso = updatedEvent?.start?.dateTime

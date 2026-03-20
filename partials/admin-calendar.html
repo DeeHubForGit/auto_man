@@ -1519,7 +1519,11 @@
 
     // Fill amount paid (stored in booking.price_cents)
     const amountInput = document.getElementById('bookingAmountPaid');
-    const canEditPayments = booking.is_admin_booking === true;
+    const isStripePaid =
+      booking.stripe_payment_status === 'paid' ||
+      !!booking.stripe_payment_intent_id ||
+      !!booking.paid_at;
+    const canEditPayments = booking.is_admin_booking === true && !isStripePaid;
     const canEditClient = booking.is_admin_booking === true;
     
     // If unpaid and payments are editable, default to service price
@@ -1544,14 +1548,14 @@
       paidCheckbox.disabled = !canEditPayments;
       paidCheckbox.title = canEditPayments
         ? 'Mark paid/unpaid'
-        : 'Payment can only be edited for admin-created bookings';
+        : 'Payment can only be edited for admin-created bookings that have not been paid through Stripe';
     }
 
     if (amountInput) {
       amountInput.disabled = !canEditPayments;
       amountInput.title = canEditPayments
         ? 'Amount (editable)'
-        : 'Amount can only be edited for admin-created bookings';
+        : 'Amount can only be edited for admin-created bookings that have not been paid through Stripe';
     }
 
     // Fill status
@@ -3118,7 +3122,11 @@
     // Modal checkbox is Paid? (checked = paid). Persist as is_paid.
     const isPaid = document.getElementById("bookingPaid").checked;
 
-    const canEditPayments = editingBookingData?.is_admin_booking === true;
+    const isStripePaid =
+      editingBookingData?.stripe_payment_status === 'paid' ||
+      !!editingBookingData?.stripe_payment_intent_id ||
+      !!editingBookingData?.paid_at;
+    const canEditPayments = editingBookingData?.is_admin_booking === true && !isStripePaid;
 
     const status = document.getElementById('bookingStatus')?.value || 'confirmed';
     const amountPaidRaw = document.getElementById('bookingAmountPaid')?.value;

@@ -1208,7 +1208,11 @@
       pickupErrorText = 'Please tap the suggested address to use the correct spelling.';
     }
 
-    const canEditPayments = booking.is_admin_booking === true;
+    const isStripePaid =
+      booking.stripe_payment_status === 'paid' ||
+      !!booking.stripe_payment_intent_id ||
+      !!booking.paid_at;
+    const canEditPayments = booking.is_admin_booking === true && !isStripePaid;
     
     // Build cancel button if applicable
     if (isConfirmed && isUpcoming) {
@@ -1360,7 +1364,7 @@
                   class="payment-toggle-checkbox w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
                   ${booking.is_paid ? 'checked' : ''}
                   ${canEditPayments ? '' : 'disabled'}
-                  title="${canEditPayments ? 'Mark paid/unpaid' : 'Payment can only be edited for admin-created bookings'}"
+                  title="${canEditPayments ? 'Mark paid/unpaid' : 'Payment can only be edited for admin-created bookings that have not been paid through Stripe'}"
                   onchange="togglePaymentStatus('${booking.id}', this.checked)"
                 >
                 <span class="payment-label text-sm ${!booking.is_paid ? 'payment-owing' : 'payment-paid'}">
@@ -1378,7 +1382,7 @@
                 ${canEditPayments ? '' : 'disabled'}
                 onblur="updateBookingPrice('${booking.id}', this.value)"
                 placeholder="0.00"
-                title="${canEditPayments ? 'Price (editable)' : 'Price can only be edited for admin-created bookings'}"
+                title="${canEditPayments ? 'Price (editable)' : 'Price can only be edited for admin-created bookings that have not been paid through Stripe'}"
                 maxlength="13"
                 pattern="^\\d{0,10}(\\.\\d{0,2})?$"
               >
@@ -1801,8 +1805,20 @@
       allAdminBookings.find(b => String(b.id) === String(id)) ||
       adminBookings.find(b => String(b.id) === String(id));
 
-    if (booking && booking.is_admin_booking !== true) {
+    if (booking?.is_admin_booking !== true) {
       alert('Price can only be edited for admin-created bookings.');
+      await loadAdminBookings();
+      window.restoreScrollPosition();
+      return;
+    }
+
+    const isStripePaid =
+      booking.stripe_payment_status === 'paid' ||
+      !!booking.stripe_payment_intent_id ||
+      !!booking.paid_at;
+
+    if (isStripePaid) {
+      alert('Price cannot be edited after payment has been processed through Stripe.');
       await loadAdminBookings();
       window.restoreScrollPosition();
       return;
@@ -1850,8 +1866,28 @@
       await loadAdminBookings();
       return;
     }
+
+    const isStripePaid =
+      booking.stripe_payment_status === 'paid' ||
+      !!booking.stripe_payment_intent_id ||
+      !!booking.paid_at;
+
+    if (isStripePaid) {
+      alert('Paid cannot be changed after payment has been processed through Stripe.');
+      await loadAdminBookings();
+      return;
+    }
     
     const previous = booking.is_paid;
+
+    // Show confirmation before manually marking as paid
+    if (!isStripePaid && previous !== true && isPaid === true) {
+      const confirmed = confirm('Mark this booking as paid?');
+      if (!confirmed) {
+        await loadAdminBookings();
+        return;
+      }
+    }
     
     // Update UI optimistically
     booking.is_paid = isPaid;

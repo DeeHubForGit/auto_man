@@ -51,6 +51,12 @@
     border-color: #3b82f6;
   }
 
+  /* Test bookings that are paid should stay purple */
+  #adminBookingsList .booking-card.booking-test.booking-paid {
+    background-color: #ede9fe;
+    border-color: #8b5cf6;
+  }
+
   /* Force most text dark, but allow special classes to override */
   #adminBookingsList .booking-card *:not(.text-red-600):not(.text-red-600 *):not(button):not(.payment-label):not(.payment-icon) {
     color: #111827 !important;

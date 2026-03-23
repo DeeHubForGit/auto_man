@@ -28,11 +28,11 @@
   <!-- Client selector -->
   <div class="mb-4">
     <label class="block text-sm font-medium mb-2 text-gray-900">Select Client</label>
-    <div class="flex gap-2">
-      <select id="cpClient" class="flex-1 bg-white border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+    <div class="flex items-center gap-2">
+      <select id="cpClient" class="flex-1 min-w-0 bg-white border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
         <option value="">Select a client…</option>
       </select>
-      <button id="cpRefresh" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:brightness-110 transition-all focus:outline-none focus:ring-2 focus:ring-gray-500">
+      <button id="cpRefresh" class="shrink-0 px-3 py-2 bg-gray-600 text-white rounded-lg hover:brightness-110 transition-all focus:outline-none focus:ring-2 focus:ring-gray-500">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
         </svg>
@@ -373,9 +373,6 @@
   async function loadClientOptions(){
     const sel = document.getElementById('cpClient');
     
-    console.log('[admin-progress] loadClientOptions called');
-    console.log('[admin-progress] supabaseClient exists:', !!window.supabaseClient);
-    
     if (!sel) {
       console.error('[admin-progress] cpClient element not found');
       return;
@@ -383,44 +380,65 @@
     
     if (!window.supabaseClient) {
       console.error('[admin-progress] supabaseClient not available');
-      sel.innerHTML = '<option value="">Supabase not connected</option>';
+      sel.replaceChildren();
+      const errorOption = document.createElement('option');
+      errorOption.value = '';
+      errorOption.textContent = 'Supabase not connected';
+      sel.appendChild(errorOption);
       cpSetMsg('Supabase client not initialized', 'text-red-600');
       return;
     }
     
-    sel.innerHTML = '<option value="">Loading…</option>';
+    sel.replaceChildren();
+    const loadingOption = document.createElement('option');
+    loadingOption.value = '';
+    loadingOption.textContent = 'Loading…';
+    sel.appendChild(loadingOption);
     cpSetMsg('Loading clients...', 'text-gray-400');
     
     try {
-      console.log('[admin-progress] Querying client table...');
-      const { data, error, status, statusText } = await window.supabaseClient
+      const { data, error } = await window.supabaseClient
         .from('client')
         .select('*')
         .order('first_name', { ascending: true });
       
-      console.log('[admin-progress] Query response:', { status, statusText, error, rowCount: data?.length });
-      
       if (error) throw error;
       
       const rows = Array.isArray(data) ? data : [];
-      const opts = ['<option value="">Select a client…</option>'];
+      
+      // Clear and rebuild with safe DOM creation
+      sel.replaceChildren();
+      
+      // Add default option
+      const defaultOption = document.createElement('option');
+      defaultOption.value = '';
+      defaultOption.textContent = 'Select a client…';
+      sel.appendChild(defaultOption);
+      
+      // Add client options
       rows.forEach(c => {
+        const option = document.createElement('option');
+        option.value = c.email || '';
+        
         const name = [c.first_name, c.last_name].filter(Boolean).join(' ');
         const label = name ? `${name} <${c.email}>` : c.email;
-        opts.push(`<option value="${c.email}">${label}</option>`);
+        option.textContent = label;
+        
+        sel.appendChild(option);
       });
-      sel.innerHTML = opts.join('');
       
       if (rows.length === 0) {
         console.warn('[admin-progress] Zero clients returned. Check: 1) Table has data, 2) SELECT grant exists, 3) RLS policies if enabled');
-      } else {
-        console.log('[admin-progress] Successfully loaded', rows.length, 'clients');
       }
       
       // Clear transient status; static note remains
       cpSetMsg('', '');
     } catch (e) {
-      sel.innerHTML = '<option value="">Failed to load clients</option>';
+      sel.replaceChildren();
+      const errorOption = document.createElement('option');
+      errorOption.value = '';
+      errorOption.textContent = 'Failed to load clients';
+      sel.appendChild(errorOption);
       cpSetMsg('Error: ' + (e?.message || String(e)), 'text-red-600');
       console.error('[admin-progress] loadClientOptions error:', e);
     }

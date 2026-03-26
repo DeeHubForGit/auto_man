@@ -141,8 +141,8 @@
   </div>
   
   <!-- Filters -->
-  <div class="flex flex-wrap items-end gap-3 mb-4">
-    <div class="flex flex-col gap-1">
+  <div class="grid grid-cols-6 sm:flex sm:flex-wrap items-end gap-3 mb-4">
+    <div class="flex flex-col gap-1 col-span-4">
       <label class="text-sm font-medium text-white">Search</label>
       <input 
         id="cancellationSearch" 
@@ -151,7 +151,7 @@
         class="w-full sm:w-[260px] bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
       />
     </div>
-    <div class="flex flex-col gap-1">
+    <div class="flex flex-col gap-1 col-span-2">
       <label class="text-sm font-medium text-white">Sort</label>
       <select 
         id="cancellationSort" 
@@ -162,7 +162,7 @@
         <option value="booking-date">By booking date</option>
       </select>
     </div>
-    <div class="flex flex-col gap-1">
+    <div class="flex flex-col gap-1 col-span-3">
       <label class="text-sm font-medium text-white">Date range</label>
       <select 
         id="cancellationDateRange" 
@@ -175,7 +175,7 @@
         <option value="all">All time</option>
       </select>
     </div>
-    <div class="flex flex-col gap-1">
+    <div class="flex flex-col gap-1 col-span-3">
       <label class="text-sm font-medium text-white">Cancellations</label>
       <select 
         id="refundEligibilityFilter" 
@@ -186,7 +186,7 @@
         <option value="not-eligible">Refund not eligible</option>
       </select>
     </div>
-    <div class="flex flex-col gap-1">
+    <div class="flex flex-col gap-1 col-span-3">
       <label class="text-sm font-medium text-white">Refunds</label>
       <select 
         id="refundStatusFilter" 
@@ -197,7 +197,7 @@
         <option value="not-refunded">Not refunded</option>
       </select>
     </div>
-    <div class="flex flex-col gap-1">
+    <div class="flex flex-col gap-1 col-span-3">
       <label class="text-sm font-medium text-white">Per page</label>
       <select 
         id="cancellationsPerPage" 

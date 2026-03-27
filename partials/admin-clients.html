@@ -186,31 +186,31 @@
     </div>
   </div>
 
-  <div class="flex flex-wrap items-end gap-3 mb-4">
-    <div class="flex flex-col gap-1">
+  <div class="grid grid-cols-2 gap-3 mb-4 sm:flex sm:flex-wrap sm:items-end">
+    <div class="flex flex-col gap-1 col-span-1">
       <label class="text-sm font-medium text-gray-300">Intake</label>
-      <select id="clientIntakeFilter" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[160px]">
+      <select id="clientIntakeFilter" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:min-w-[160px]">
         <option value="all" selected>All</option>
         <option value="incomplete">Incomplete</option>
         <option value="completed">Completed</option>
       </select>
     </div>
 
-    <div class="flex flex-col gap-1">
+    <div class="flex flex-col gap-1 col-span-1">
       <label class="text-sm font-medium text-gray-300">Validation</label>
-      <select id="clientValidationFilter" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[160px]">
+      <select id="clientValidationFilter" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:min-w-[160px]">
         <option value="all" selected>All</option>
         <option value="valid">Valid mobile</option>
         <option value="invalid">Invalid mobile</option>
       </select>
     </div>
 
-    <div class="flex flex-col gap-1 flex-1 min-w-[260px]">
+    <div class="flex flex-col gap-1 col-span-2 sm:flex-1 sm:min-w-[260px]">
       <label class="text-sm font-medium text-gray-300">Search</label>
-      <input id="clientSearch" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Search name, email, or mobile…" />
+      <input id="clientSearch" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Search name, email or mobile" />
     </div>
 
-    <div class="text-sm text-gray-500 ml-auto">
+    <div class="text-sm text-gray-500 col-span-2 text-right sm:ml-auto sm:col-auto">
       <span id="clientsCount">0</span>
       <span class="text-gray-400">results</span>
     </div>
@@ -348,6 +348,20 @@
       day: '2-digit',
       month: 'short',
       year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    });
+  }
+
+  function formatDateTimeCompact(timestamp) {
+    if (!timestamp) return '';
+
+    const date = new Date(timestamp);
+
+    return date.toLocaleString('en-AU', {
+      day: 'numeric',
+      month: 'numeric',
+      year: '2-digit',
       hour: 'numeric',
       minute: '2-digit'
     });
@@ -616,7 +630,8 @@
               </div>
 
               <div class="client-created">
-                Created ${formatDaysAgo(c.created_at)} (${formatDateTimeFull(c.created_at)})
+                <span class="sm:hidden">Created ${formatDaysAgo(c.created_at)}</span>
+                <span class="hidden sm:inline">Created ${formatDaysAgo(c.created_at)} (${formatDateTimeCompact(c.created_at)})</span>
               </div>
 
               <div class="mt-1 flex flex-wrap items-start gap-x-4 gap-y-1 text-sm text-gray-900">

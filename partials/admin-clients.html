@@ -545,8 +545,12 @@
       if (exceptId && cardId === exceptId) return;
       const details = card.querySelector('[data-role="client-details"]');
       const chevron = card.querySelector('[data-role="client-chevron"]');
+      const label = card.querySelector('[data-role="client-toggle-label"]');
+      const button = card.querySelector('button[aria-label]');
       if (details) details.classList.add('hidden');
       if (chevron) chevron.classList.remove('is-open');
+      if (label) label.textContent = 'Edit';
+      if (button) button.setAttribute('aria-label', 'Edit client details');
     });
   }
 
@@ -560,8 +564,12 @@
     collapseAllClientCards(expandedClientId);
     const details = card.querySelector('[data-role="client-details"]');
     const chevron = card.querySelector('[data-role="client-chevron"]');
+    const label = card.querySelector('[data-role="client-toggle-label"]');
+    const button = card.querySelector('button[aria-label]');
     if (details) details.classList.remove('hidden');
     if (chevron) chevron.classList.add('is-open');
+    if (label) label.textContent = 'Close';
+    if (button) button.setAttribute('aria-label', 'Close client details');
     updateOtherUIForCard(card);
     updateMobileUIForCard(card);
     updateEmergencyPhoneUIForCard(card);
@@ -671,8 +679,8 @@
             </div>
 
             <div class="shrink-0 flex items-center gap-2">
-              <button type="button" class="btn btn-primary px-2 sm:px-4" onclick="event.stopPropagation(); window.toggleClientCard('${escapeHtml(c.id)}')">
-                <span class="hidden sm:inline">Edit</span>
+              <button type="button" class="btn btn-primary px-2 sm:px-4" onclick="event.stopPropagation(); window.toggleClientCard('${escapeHtml(c.id)}')" aria-label="Edit client details">
+                <span class="hidden sm:inline" data-role="client-toggle-label">Edit</span>
                 <svg class="w-5 h-5 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
@@ -1035,6 +1043,8 @@
 
     const details = card.querySelector('[data-role="client-details"]');
     const chevron = card.querySelector('[data-role="client-chevron"]');
+    const label = card.querySelector('[data-role="client-toggle-label"]');
+    const button = card.querySelector('button[aria-label]');
     if (!details) return;
 
     const isOpen = !details.classList.contains('hidden');
@@ -1042,6 +1052,8 @@
     if (isOpen) {
       details.classList.add('hidden');
       if (chevron) chevron.classList.remove('is-open');
+      if (label) label.textContent = 'Edit';
+      if (button) button.setAttribute('aria-label', 'Edit client details');
       expandedClientId = null;
       
       // Reset form by re-rendering
@@ -1053,6 +1065,8 @@
     collapseAllClientCards(clientId);
     details.classList.remove('hidden');
     if (chevron) chevron.classList.add('is-open');
+    if (label) label.textContent = 'Close';
+    if (button) button.setAttribute('aria-label', 'Close client details');
     updateOtherUIForCard(card);
     updateMobileUIForCard(card);
     updateEmergencyPhoneUIForCard(card);

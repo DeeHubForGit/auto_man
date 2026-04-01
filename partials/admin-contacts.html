@@ -274,6 +274,7 @@
     const pageNumbers = document.getElementById('pageNumbers');
     const prevBtn = document.getElementById('prevPage');
     const nextBtn = document.getElementById('nextPage');
+    const paginationContainer = document.getElementById('contactsPagination');
     
     if (!box) return;
     
@@ -351,16 +352,22 @@
     box.innerHTML = '';
     
     if (filtered.length === 0) {
-      const emptyDiv = document.createElement('div');
-      emptyDiv.className = 'p-8 text-center text-gray-500';
-      if (searchTerm) {
-        emptyDiv.textContent = `No messages match "${searchTerm}"`;
-      } else {
-        emptyDiv.textContent = '📭 No contact messages yet';
-      }
-      box.appendChild(emptyDiv);
+      box.innerHTML = `
+        <div class="text-center py-12">
+          <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          <p class="mt-4 text-base font-medium text-white">
+            ${searchTerm ? `No messages match "${searchTerm}"` : 'No contact messages yet'}
+          </p>
+        </div>`;
+      if (paginationContainer) paginationContainer.classList.add('hidden');
       return;
     }
+    
+    // Show pagination when there are results
+    if (paginationContainer) paginationContainer.classList.remove('hidden');
     
     paginatedMessages.forEach(row => {
       const card = document.createElement('div');

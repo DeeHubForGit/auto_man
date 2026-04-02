@@ -2261,20 +2261,27 @@
       localStorage.removeItem('portal_form_cache');
     }
 
+    window.clearFormCache = clearFormCache;
+    
     function showDetailsSavedMessage() {
-      const top = document.getElementById('detailsSaveStatusTop');
-      const bottom = document.getElementById('detailsSaveStatusBottom');
+      const buttons = [
+        document.getElementById('detailsSaveButtonTop'),
+        document.getElementById('detailsSaveButtonBottom')
+      ];
 
-      [top, bottom].forEach(el => {
-        if (el) el.classList.remove('hidden');
+      buttons.forEach(btn => {
+        if (!btn) return;
+
+        const originalText = btn.textContent;
+
+        btn.textContent = 'Saved';
+        btn.disabled = true;
+
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.disabled = false;
+        }, 2000);
       });
-
-      clearTimeout(window.__detailsSavedTimer);
-      window.__detailsSavedTimer = setTimeout(() => {
-        [top, bottom].forEach(el => {
-          if (el) el.classList.add('hidden');
-        });
-      }, 2000);
     }
     window.showDetailsSavedMessage = showDetailsSavedMessage;
 

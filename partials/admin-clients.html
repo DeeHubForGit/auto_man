@@ -586,7 +586,20 @@
     if (countEl) countEl.textContent = String(filtered.length);
 
     if (filtered.length === 0) {
-      list.innerHTML = '<div class="text-gray-500">No clients found.</div>';
+      const searchTerm = (document.getElementById('clientSearch')?.value || document.getElementById('clientSearchInput')?.value || '').trim();
+      
+      const message = searchTerm
+        ? `No clients found matching "${escapeHtml(searchTerm)}".`
+        : 'No clients found for the selected filters.';
+
+      list.innerHTML = `
+        <div class="p-8 text-center">
+          <div class="mb-2 text-gray-300 text-2xl">👤</div>
+          <div class="text-gray-300 font-medium">
+            ${message}
+          </div>
+        </div>
+      `;
       return;
     }
 
@@ -831,9 +844,8 @@
                 ` : '')}
 
               <div class="flex items-center gap-3">
-                <button type="button" class="btn btn-primary" onclick="window.saveClient('${escapeHtml(c.id)}')">Save</button>
+                <button type="button" class="btn btn-primary" data-role="save-btn" onclick="window.saveClient('${escapeHtml(c.id)}')">Save</button>
                 <button type="button" class="btn btn-outline-blue" onclick="window.toggleClientCard('${escapeHtml(c.id)}')">Cancel</button>
-                <div class="text-sm text-blue-600" data-role="save-msg"></div>
               </div>
             </div>
           </div>
@@ -1085,7 +1097,7 @@
     const card = document.querySelector(`#adminClientsList .client-card[data-client-id="${clientId}"]`);
     if (!card) return;
 
-    const msgEl = card.querySelector('[data-role="save-msg"]');
+    const saveBtn = card.querySelector('[data-role="save-btn"]');
     const getEl = (field) => card.querySelector(`[data-field="${field}"]`);
     const getValue = (field) => (getEl(field)?.value || '').toString();
     const getChecked = (field) => (getEl(field)?.checked === true);
@@ -1094,9 +1106,9 @@
 
     if (emergencyPhoneRaw.trim() && !isValidAuPhone(emergencyPhoneRaw)) {
       updateEmergencyPhoneUIForCard(card);
-      if (msgEl) {
-        msgEl.textContent = 'Fix emergency contact phone before saving.';
-        msgEl.className = 'text-sm text-red-600';
+      if (saveBtn) {
+        saveBtn.textContent = 'Save';
+        saveBtn.disabled = false;
       }
       const phoneInput = getEl('emergency_contact_phone');
       if (phoneInput) phoneInput.focus();
@@ -1107,9 +1119,9 @@
     const mobileDigits = stripPhoneFormatting(mobileRaw);
     if (mobileDigits && !isValidMobile(mobileDigits)) {
       updateMobileUIForCard(card);
-      if (msgEl) {
-        msgEl.textContent = 'Fix mobile number before saving.';
-        msgEl.className = 'text-sm text-red-600';
+      if (saveBtn) {
+        saveBtn.textContent = 'Save';
+        saveBtn.disabled = false;
       }
       const mobileInput = getEl('mobile');
       if (mobileInput) mobileInput.focus();
@@ -1137,9 +1149,8 @@
     };
 
     try {
-      if (msgEl) {
-        msgEl.textContent = 'Saving…';
-        msgEl.className = 'text-sm text-blue-600';
+      if (saveBtn) {
+        saveBtn.disabled = true;
       }
 
       const { error } = await window.supabaseClient
@@ -1159,19 +1170,19 @@
         };
       }
 
-      if (msgEl) {
-        msgEl.textContent = 'Saved';
-        msgEl.className = 'text-sm text-blue-600';
-
-        setTimeout(() => {
-          window.toggleClientCard(clientId);
-        }, 3000);
+      if (saveBtn) {
+        saveBtn.textContent = 'Saved';
+        saveBtn.disabled = true;
       }
+
+      setTimeout(() => {
+        window.toggleClientCard(clientId);
+      }, 3000);
     } catch (e) {
       console.error('[admin-clients] save failed:', e);
-      if (msgEl) {
-        msgEl.textContent = 'Error saving';
-        msgEl.className = 'text-sm text-red-600';
+      if (saveBtn) {
+        saveBtn.textContent = 'Save';
+        saveBtn.disabled = false;
       }
     }
   };

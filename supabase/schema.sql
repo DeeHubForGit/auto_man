@@ -58,6 +58,8 @@ CREATE TABLE public.client (
     intake_step integer DEFAULT 1 NOT NULL,
     is_test boolean DEFAULT false NOT NULL,
     password_changed_at timestamp with time zone,
+    stripe_customer_id text,
+    stripe_default_payment_method_id text,
     CONSTRAINT intake_step_range CHECK ((intake_step >= 1) AND (intake_step <= 3))
 );
 
@@ -65,6 +67,8 @@ COMMENT ON COLUMN public.client.intake_completed IS 'Tracks whether client has c
 COMMENT ON COLUMN public.client.intake_step IS 'Current step in intake form (1-3). Allows resuming intake across devices.';
 COMMENT ON COLUMN public.client.is_test IS 'Marks this client as a test client for testing purposes. Test bookings will not trigger SMS/email notifications.';
 COMMENT ON COLUMN public.client.password_changed_at IS 'Timestamp of last password change. Used to invalidate sessions issued before password change.';
+COMMENT ON COLUMN public.client.stripe_customer_id IS 'Stripe customer ID for this client';
+COMMENT ON COLUMN public.client.stripe_default_payment_method_id IS 'Default saved Stripe payment method ID for this client';
 
 -- Service table: defines available driving lesson services
 CREATE TABLE public.service (
@@ -141,12 +145,17 @@ CREATE TABLE public.booking (
     pickup_location_issue text,
     pickup_location_suggestion text,
     is_admin_checked boolean DEFAULT false NOT NULL,
-    is_payment_required boolean DEFAULT false NOT NULL,
-    is_paid boolean DEFAULT false,
+    is_paid boolean DEFAULT true,
+    is_admin_booking boolean DEFAULT false,
     is_test boolean DEFAULT false NOT NULL,
     is_sms_enabled boolean DEFAULT true NOT NULL,
     is_email_enabled boolean DEFAULT true NOT NULL,
     sms_new_booking_sent_at timestamp with time zone,
+    stripe_checkout_session_id text,
+    stripe_payment_intent_id text,
+    stripe_payment_status text,
+    paid_at timestamp with time zone,
+    payment_method_summary text,
     CONSTRAINT booking_price_nonneg CHECK (((price_cents IS NULL) OR (price_cents >= 0))),
     CONSTRAINT booking_time_valid CHECK ((end_time > start_time))
 );
@@ -161,11 +170,16 @@ COMMENT ON COLUMN public.booking.validation_checked_at IS 'Timestamp when valida
 COMMENT ON COLUMN public.booking.pickup_location_issue IS 'Short code describing the validation issue (e.g. not_found, street_number, suburb_mismatch).';
 COMMENT ON COLUMN public.booking.pickup_location_suggestion IS 'Best-guess validated address string from Google Maps API, if available.';
 COMMENT ON COLUMN public.booking.is_admin_checked IS 'TRUE when admin has reviewed this booking manually. Automatically reset to FALSE after auto-validation.';
-COMMENT ON COLUMN public.booking.is_payment_required IS 'Whether the booking still requires payment. Default false. True only for admin-created bookings where payment is handled outside the system.';
+COMMENT ON COLUMN public.booking.is_admin_booking IS 'TRUE when booking was created by admin via create-admin-booking. Identified by extendedProperties.shared.created_by = "admin" during Google Calendar sync.';
 COMMENT ON COLUMN public.booking.is_test IS 'Marks this booking as a test booking. Inherited from client.is_test when created via webhook. Test bookings will not trigger SMS/email notifications.';
 COMMENT ON COLUMN public.booking.is_sms_enabled IS 'Controls whether SMS notifications are enabled for this booking. Test bookings default to false, real bookings default to true.';
 COMMENT ON COLUMN public.booking.is_email_enabled IS 'Controls whether email notifications are enabled for this booking. Test bookings default to false, real bookings default to true.';
 COMMENT ON COLUMN public.booking.sms_new_booking_sent_at IS 'Timestamp when the owner notification SMS for a new booking was sent. Used to prevent duplicate alerts.';
+COMMENT ON COLUMN public.booking.stripe_checkout_session_id IS 'Stripe Checkout Session ID created for this booking payment. Used to track payment flow and prevent duplicates.';
+COMMENT ON COLUMN public.booking.stripe_payment_intent_id IS 'Stripe Payment Intent ID created during checkout. Used for refunds and payment tracking.';
+COMMENT ON COLUMN public.booking.stripe_payment_status IS 'Payment status from Stripe: pending, paid, cancelled, failed. Updated by webhook.';
+COMMENT ON COLUMN public.booking.paid_at IS 'Timestamp when payment was completed. Set by webhook on successful payment.';
+COMMENT ON COLUMN public.booking.payment_method_summary IS 'Safe card summary from Stripe (e.g. "Visa ending 6913 exp 03/2029"). Never stores full card details.';
 
 -- Client credit table: tracks lesson package credits
 CREATE TABLE public.client_credit (
@@ -573,7 +587,8 @@ CREATE FUNCTION public.upsert_booking_from_google(
     p_extended jsonb,
     p_is_booking boolean,
     p_title text,
-    p_client_id uuid DEFAULT NULL  -- NEW: optional client_id
+    p_client_id uuid DEFAULT NULL,  -- optional client_id
+    p_is_admin_booking boolean DEFAULT false  -- optional admin booking flag
 )
 RETURNS TABLE(
   booking_id uuid,
@@ -642,7 +657,8 @@ BEGIN
     mobile,
     is_test,
     is_sms_enabled,
-    is_email_enabled
+    is_email_enabled,
+    is_admin_booking
   )
   VALUES (
     v_client_id,
@@ -663,7 +679,8 @@ BEGIN
     p_mobile,
     v_booking_is_test,
     v_sms_enabled,
-    v_email_enabled
+    v_email_enabled,
+    p_is_admin_booking
   )
   ON CONFLICT (google_event_id) DO UPDATE
   SET
@@ -682,6 +699,9 @@ BEGIN
 
     -- Title can change in Google
     event_title        = COALESCE(EXCLUDED.event_title, public.booking.event_title),
+
+    -- Preserve or set admin booking flag (once true, always true)
+    is_admin_booking   = public.booking.is_admin_booking OR EXCLUDED.is_admin_booking,
 
     -- IMPORTANT: Do NOT update test/notification flags on existing bookings
     -- They are set once at creation and preserved thereafter
@@ -845,6 +865,7 @@ ALTER TABLE ONLY public.availability_slot_old
 CREATE INDEX idx_client_email ON public.client USING btree (email);
 CREATE INDEX idx_client_intake_completed ON public.client USING btree (intake_completed) WHERE (intake_completed = false);
 CREATE INDEX idx_client_is_test ON public.client USING btree (is_test);
+CREATE INDEX idx_client_stripe_customer_id ON public.client USING btree (stripe_customer_id) WHERE (stripe_customer_id IS NOT NULL);
 
 -- Service indexes
 CREATE INDEX idx_service_sort_order ON public.service USING btree (sort_order);
@@ -864,6 +885,9 @@ CREATE INDEX idx_booking_refund_eligible ON public.booking USING btree (refund_e
 CREATE INDEX idx_booking_validation_pending ON public.booking USING btree (validation_checked_at) WHERE ((validation_checked_at IS NULL) OR (is_mobile_valid IS NULL) OR (is_pickup_location_valid IS NULL));
 CREATE INDEX booking_reminder_scan_idx ON public.booking USING btree (start_time) WHERE ((is_booking IS TRUE) AND ((status IS NULL) OR (status = 'confirmed'::public.booking_status)) AND (sms_reminder_sent_at IS NULL));
 CREATE INDEX idx_booking_is_test ON public.booking USING btree (is_test);
+CREATE INDEX idx_booking_stripe_checkout_session_id ON public.booking USING btree (stripe_checkout_session_id) WHERE (stripe_checkout_session_id IS NOT NULL);
+CREATE INDEX idx_booking_stripe_payment_intent_id ON public.booking USING btree (stripe_payment_intent_id) WHERE (stripe_payment_intent_id IS NOT NULL);
+CREATE INDEX idx_booking_unpaid_confirmed ON public.booking USING btree (client_id, is_paid, status, is_test) WHERE ((is_paid = false) AND (status = 'confirmed'::public.booking_status) AND (is_test = false));
 
 -- Unique constraint indexes
 CREATE UNIQUE INDEX ux_booking_client_start_min ON public.booking USING btree (client_id, start_minute) WHERE ((source = 'portal'::text) AND (is_deleted = false));

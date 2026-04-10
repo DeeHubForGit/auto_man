@@ -808,14 +808,13 @@
         <span id="newBookingStatus" class="ml-0 sm:ml-3 text-sm text-gray-500 hidden w-full sm:w-auto break-words" aria-live="polite"></span>
       </div>
     </div>
-  </div>
-  
-  <!-- No bookings message - displayed below navigation -->
-  <div id="noBookingsMsg" class="text-blue-500 font-semibold text-center mb-3 hidden">
-    No bookings found for this week
+
+    <div id="noBookingsMsg" class="text-blue-500 font-semibold hidden w-full text-center md:w-auto md:text-right md:ml-auto md:pl-4">
+      No bookings found for this week
+    </div>
   </div>
 
-  <div id="calendar" class="overflow-auto max-h-[600px] relative">
+  <div id="calendar" class="overflow-auto max-h-[600px] lg:max-h-[80vh] relative">
     <div id="weekGrid" class="grid grid-cols-8 text-sm" style="grid-template-columns: 80px repeat(7, minmax(120px, 1fr));"></div>
   </div>
 

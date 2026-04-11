@@ -16,7 +16,7 @@
   <script src="assets/js/googleCalendar.js?v=2026-03-19-portal-fix"></script>
   <script src="assets/js/auth.js?v=2026-03-19-portal-fix" defer></script>
 </head>
-<body class="bg-gray-50 text-gray-900">
+<body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col">
   <!-- Auth scripts (global Supabase client) MUST load before header -->
   <div data-include="partials/auth-scripts.html"></div>
   <!-- Shared Header - permanent container prevents layout shift -->
@@ -24,7 +24,7 @@
     <div data-include="partials/header.html"></div>
   </div>
 
-  <div class="container mx-auto px-4 py-8">
+  <div class="container mx-auto px-4 py-8 flex-1">
     <div class="flex flex-col lg:flex-row gap-6">
       
       <!-- Sidebar Navigation -->
@@ -515,6 +515,7 @@
     const pickupDebounceTimers = {};
     let bookingsInit = false;
     let bannerUpdateTimeout = null;
+    let portalActiveField = null;
 
     // XSS Protection Helpers
     function containsHtmlTags(value) {
@@ -527,6 +528,55 @@
 
     function containsBlockedContent(value) {
       return value && (containsHtmlTags(value) || containsSuspiciousScriptPattern(value));
+    }
+
+    // Focus management helpers
+    function setPortalActiveField(bookingId, fieldName, inputElement) {
+      if (!inputElement) return;
+
+      portalActiveField = {
+        bookingId,
+        fieldName,
+        selectionStart: inputElement.selectionStart,
+        selectionEnd: inputElement.selectionEnd
+      };
+    }
+
+    function restorePortalActiveField() {
+      if (!portalActiveField) return;
+
+      requestAnimationFrame(() => {
+        let selector = '';
+
+        if (portalActiveField.fieldName === 'pickup_location') {
+          selector = `#booking-card-${portalActiveField.bookingId} .pickup-address-input`;
+        } else if (portalActiveField.fieldName === 'mobile') {
+          selector = `#mobile-input-${portalActiveField.bookingId}`;
+        }
+
+        if (!selector) return;
+
+        const input = document.querySelector(selector);
+        if (!input) return;
+
+        input.focus();
+
+        if (typeof input.setSelectionRange === 'function') {
+          const endPos = input.value.length;
+
+          if (portalActiveField.fieldName === 'pickup_location') {
+            input.setSelectionRange(endPos, endPos);
+          } else if (
+            typeof portalActiveField.selectionStart === 'number' &&
+            typeof portalActiveField.selectionEnd === 'number'
+          ) {
+            input.setSelectionRange(
+              portalActiveField.selectionStart,
+              portalActiveField.selectionEnd
+            );
+          }
+        }
+      });
     }
 
     /**
@@ -909,6 +959,7 @@
         allBookings = data || [];
         refreshUpcomingValidationUI();
         renderBookings();
+        restorePortalActiveField();
       } catch (err) {
         console.error('Error loading bookings:', err);
         const list = document.getElementById('upcoming-list');
@@ -1216,6 +1267,8 @@
       pickupInput.addEventListener('focus', () => {
         const mobileEl = document.getElementById(`mobile-input-${booking.id}`);
         if (mobileEl && document.activeElement === mobileEl) mobileEl.blur();
+
+        setPortalActiveField(booking.id, 'pickup_location', pickupInput);
       });
 
       // ----- issue message -----
@@ -1283,6 +1336,8 @@
       pickupInput.addEventListener('input', () => {
         const newValue = pickupInput.value.trim();
 
+        setPortalActiveField(booking.id, 'pickup_location', pickupInput);
+
         // Early XSS check - block script/HTML content immediately
         if (newValue && containsBlockedContent(newValue)) {
           pickupInput.classList.add('border-red-400', 'text-red-600');
@@ -1317,19 +1372,20 @@
           ? window.Validation.isProbablyValidAuAddress(newValue)
           : true;
 
-        // Basic local validation while typing (optional but nice)
+        // Do not show invalid styling while the user is actively typing.
+        // Keep the field neutral unless it is completely empty.
         if (!newValue) {
-          // Empty – show "required" styling but DO NOT call backend.
           pickupInput.classList.add('border-red-400', 'text-red-600');
-          pickupInput.classList.remove('border-gray-300', 'text-gray-900');
-        } else if (!isValid) {
-          // Looks dodgy – keep red border, still no backend call yet.
-          pickupInput.classList.add('border-red-400', 'text-red-600');
-          pickupInput.classList.remove('border-gray-300', 'text-gray-900');
+          pickupInput.classList.remove('border-gray-300', 'text-gray-900', 'border-blue-400', 'text-blue-600');
+          if (issueEl) {
+            issueEl.textContent = 'Pickup address is required';
+          }
         } else {
-          // Looks OK locally – remove red border.
-          pickupInput.classList.remove('border-red-400', 'text-red-600');
+          pickupInput.classList.remove('border-red-400', 'text-red-600', 'border-blue-400', 'text-blue-600');
           pickupInput.classList.add('border-gray-300', 'text-gray-900');
+          if (issueEl) {
+            issueEl.textContent = '';
+          }
         }
 
         // Clear any existing timer for this booking
@@ -1337,29 +1393,30 @@
           clearTimeout(pickupDebounceTimers[booking.id]);
         }
 
-        // If the field is empty, don't schedule a backend save at all
         if (!newValue) {
           return;
         }
 
-        // Debounce backend update + Google validation
+        // Validate after user stops typing for 1.5 seconds
         pickupDebounceTimers[booking.id] = setTimeout(async () => {
-          // Read latest value from input (not stale closure)
           const latestValue = pickupInput.value.trim();
+          const originalValue = (booking.pickup_location || '').trim();
 
-          // Compare against the value BEFORE we started typing this change
-          if (latestValue !== prevBeforeTyping) {
-            // Show processing spinner
-            if (spinner) spinner.classList.remove('hidden');
-            if (spinnerText) spinnerText.textContent = 'Validating address...';
+          // Do nothing if unchanged or empty
+          if (!latestValue || latestValue === originalValue) {
+            return;
+          }
 
+          if (spinner) spinner.classList.remove('hidden');
+          if (spinnerText) spinnerText.textContent = 'Validating address...';
+
+          try {
             await savePickupLocationAndRevalidate(booking.id, latestValue, suggestionPanel, issueEl);
-
-            // Hide spinner
+          } finally {
             if (spinner) spinner.classList.add('hidden');
             if (spinnerText) spinnerText.textContent = 'Validating address...';
           }
-        }, 600); // 600ms of no typing
+        }, 1500);
       });
     }
 
@@ -2262,7 +2319,7 @@
     }
 
     window.clearFormCache = clearFormCache;
-    
+
     function showDetailsSavedMessage() {
       const buttons = [
         document.getElementById('detailsSaveButtonTop'),

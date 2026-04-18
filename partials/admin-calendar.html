@@ -172,11 +172,6 @@
     display: none;
   }
   
-  /* Tighter row height for mobile */
-  #section-calendar #weekGrid > div > div {
-    min-height: 56px; /* down from 80px */
-  }
-  
   /* Fix for header time cell */
   #section-calendar .calendar-header:first-child {
     position: sticky;
@@ -729,6 +724,24 @@
     }
   }
 
+  /* Mobile calendar controls - compact layout */
+  @media (max-width: 640px) {
+    /* Reduce button padding on mobile to fit everything on one row */
+    #section-calendar #btn-new-appointment {
+      padding-left: 0.375rem !important;
+      padding-right: 0.375rem !important;
+      margin-left: 0.25rem !important;
+    }
+
+    /* Compact toggle label on mobile */
+    #section-calendar .calendar-hours-toggle {
+      margin-left: 0.375rem !important;
+      gap: 0.25rem !important;
+      font-size: 0.75rem !important;
+      line-height: 1.1 !important;
+    }
+  }
+
 </style>
 <section id="section-calendar" class="section-content bg-white border rounded-2xl shadow-sm p-5" style="background-color: white !important; color: #111827 !important;">
   <!-- Week range + navigation -->
@@ -805,6 +818,11 @@
           </svg>
           <span class="hidden sm:inline ml-1">New appointment</span>
         </button>
+        <label class="flex items-center gap-1 cursor-pointer text-sm text-gray-700 ml-3 calendar-hours-toggle">
+          <input type="checkbox" id="toggleCalendarHours" class="cursor-pointer" />
+          <span class="sm:hidden">Ext hrs</span>
+          <span class="hidden sm:inline">Extended hours</span>
+        </label>
         <span id="newBookingStatus" class="ml-0 sm:ml-3 text-sm text-gray-500 hidden w-full sm:w-auto break-words" aria-live="polite"></span>
       </div>
     </div>
@@ -1033,6 +1051,15 @@
   function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
   let weekStart = new Date();
 
+  // Calendar hour range constants
+  const BUSINESS_START_HOUR = 10;
+  const BUSINESS_END_HOUR = 18;
+  const EXTENDED_START_HOUR = 7;
+  const EXTENDED_END_HOUR = 22;
+
+  // Calendar hours toggle state
+  let showExtendedHours = false;
+
   // Edit state for personal appointments
   let editingPersonalAppt = false;
   let editingPersonalGoogleEventId = null;
@@ -1077,6 +1104,14 @@
     const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
     const dd = String(dateObj.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
+  }
+
+  // Helper: Update calendar hours toggle checkbox state
+  function updateCalendarHoursToggleState() {
+    const toggleCheckbox = document.getElementById('toggleCalendarHours');
+    if (toggleCheckbox) {
+      toggleCheckbox.checked = showExtendedHours;
+    }
   }
 
   // Helper: Add minutes to a time string (HH:MM format)
@@ -4087,9 +4122,11 @@
     });
     grid.appendChild(headerRow);
 
-    // Time slots (8am-6pm)
+    // Time slots - dynamic based on toggle state
     const dayCells = {};
-    for (let h = 8; h < 18; h++) {
+    const startHour = showExtendedHours ? EXTENDED_START_HOUR : BUSINESS_START_HOUR;
+    const endHour = showExtendedHours ? EXTENDED_END_HOUR : BUSINESS_END_HOUR;
+    for (let h = startHour; h < endHour; h++) {
       const row = document.createElement('div');
       row.className = 'contents';
       const timeCell = document.createElement('div');
@@ -4148,11 +4185,18 @@
       todayText.textContent = todayNum;
     }
 
+    // Update calendar hours toggle checkbox state
+    updateCalendarHoursToggleState();
+
     // Controls
     todayBtn.onclick = () => renderWeek(new Date());
     document.getElementById('prevWeek').onclick = () => { const d = addDays(weekStart,-7); renderWeek(d); };
     document.getElementById('nextWeek').onclick = () => { const d = addDays(weekStart,7); renderWeek(d); };
     document.getElementById('refreshBtn').onclick = () => renderWeek(weekStart); // Refresh current week
+    document.getElementById('toggleCalendarHours').onchange = (e) => {
+      showExtendedHours = e.target.checked;
+      renderWeek(weekStart);
+    };
   }
 
   async function refreshAdminCalendar() {
@@ -4308,14 +4352,8 @@
             cellHeight = sampleCell.getBoundingClientRect().height || cellHeight;
           }
         } catch (e) { /* ignore measurement errors */ }
-        // Desktop-only: subtract vertical padding to use the content height so 1h equals exactly one grid rectangle
-        let effectiveCellHeight = cellHeight;
-        if (!isMobile) {
-          const cs = getComputedStyle(cell);
-          const py = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
-          effectiveCellHeight = Math.max(cellHeight - py, 0);
-        }
-        const heightPx = durationHours * effectiveCellHeight;
+        // Use full cell height for booking blocks - they're absolutely positioned within the full row
+        const heightPx = durationHours * cellHeight;
         
         // Decide detail level by visual height (works for 1h/1.5h/2h)
         let detailLevel = 1;                    // ~1h
@@ -4324,7 +4362,7 @@
         
         // Calculate minutes offset from the hour for precise positioning
         const minutes = start.getMinutes();
-        const minuteOffset = (minutes / 60) * effectiveCellHeight;
+        const minuteOffset = (minutes / 60) * cellHeight;
         
         // Use is_booking flag to determine display type
         if (booking.is_booking) {
@@ -4334,7 +4372,8 @@
             : 'booking-card text-xs border-l-2 border-blue-600 p-1 rounded absolute left-0 right-0 z-10';
           bookingDiv.style.backgroundColor = '#bfdbfe';
           bookingDiv.style.color = '#111827';
-          const padAdjust = isMobile ? 4 : 8; // subtract internal card padding so the block visually fits one rectangle
+          // No padding adjustment needed on desktop - full cell height used
+          const padAdjust = isMobile ? 4 : 0;
           bookingDiv.style.height = `${Math.max(heightPx - padAdjust, 4)}px`;
           bookingDiv.style.top = `${minuteOffset}px`;
           
@@ -4479,7 +4518,8 @@
           bookingDiv.className = 'booking-card text-xs border-l-2 border-gray-400 p-1 rounded absolute left-0 right-0 z-10';
           bookingDiv.style.backgroundColor = '#f3f4f6';
           bookingDiv.style.color = '#374151';
-          const padAdjust2 = isMobile ? 4 : 8;
+          // No padding adjustment needed on desktop - full cell height used
+          const padAdjust2 = isMobile ? 4 : 0;
           bookingDiv.style.height = `${Math.max(heightPx - padAdjust2, 4)}px`;
           bookingDiv.style.top = `${minuteOffset}px`;
           

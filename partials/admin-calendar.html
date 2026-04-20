@@ -4368,8 +4368,8 @@
         if (booking.is_booking) {
           // This is a booking with client information - show service name
           bookingDiv.className = booking.is_test === true
-            ? 'booking-card calendar-event-test text-xs border-l-2 border-blue-600 p-1 rounded absolute left-0 right-0 z-10'
-            : 'booking-card text-xs border-l-2 border-blue-600 p-1 rounded absolute left-0 right-0 z-10';
+            ? 'booking-card calendar-event-test text-xs border-l-2 border-blue-600 p-1 rounded absolute left-0 right-0 z-[1]'
+            : 'booking-card text-xs border-l-2 border-blue-600 p-1 rounded absolute left-0 right-0 z-[1]';
           bookingDiv.style.backgroundColor = '#bfdbfe';
           bookingDiv.style.color = '#111827';
           // No padding adjustment needed on desktop - full cell height used
@@ -4515,7 +4515,7 @@
           }
         } else {
           // This is a regular calendar appointment - show title and times
-          bookingDiv.className = 'booking-card text-xs border-l-2 border-gray-400 p-1 rounded absolute left-0 right-0 z-10';
+          bookingDiv.className = 'booking-card text-xs border-l-2 border-gray-400 p-1 rounded absolute left-0 right-0 z-[1]';
           bookingDiv.style.backgroundColor = '#f3f4f6';
           bookingDiv.style.color = '#374151';
           // No padding adjustment needed on desktop - full cell height used

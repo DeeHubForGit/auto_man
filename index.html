@@ -148,15 +148,29 @@
     <div class="container mx-auto px-4">
       <h2 class="text-2xl font-bold">Contact Us</h2>
       <div class="mt-6">
-        <div data-include="partials/contact-details.html"></div>
-      </div>
+        <!-- Contact Methods -->
+        <div class="grid md:grid-cols-3 gap-6">
+          <!-- Call -->
+          <div class="contact-card-public">
+            <span class="emoji">📱</span>
+            <div class="contact-card-public-title">Call</div>
+            <a href="tel:{{PHONE_LINK}}">{{PHONE}}</a>
+          </div>
 
-      <!-- CTA to Contact Page -->
-      <div class="mt-12 text-center">
-        <p class="text-lg mb-4">Have a question or ready to book?</p>
-        <a href="contact.html" class="btn btn-primary btn-cta-lg">
-          Send Us a Message
-        </a>
+          <!-- Email -->
+          <div class="contact-card-public">
+            <span class="emoji">📧</span>
+            <div class="contact-card-public-title">Email</div>
+            <a href="mailto:{{EMAIL}}">{{EMAIL}}</a>
+          </div>
+
+          <!-- Message -->
+          <div class="contact-card-public">
+            <span class="emoji">❓</span>
+            <div class="contact-card-public-title">Send Message</div>
+            <a href="contact.html">Ask a question or get help booking</a>
+          </div>
+        </div>
       </div>
     </div>
   </section>

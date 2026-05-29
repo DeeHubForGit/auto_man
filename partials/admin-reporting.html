@@ -464,8 +464,9 @@
 
       let query = window.supabaseClient
         .from('booking')
-        .select('start_time,end_time,service_code,price_cents,is_paid,first_name,last_name,client:client_id(first_name,last_name),service:service_code(name)')
+        .select('start_time,end_time,service_code,price_cents,is_paid,first_name,last_name,status,client:client_id(first_name,last_name),service:service_code(name)')
         .eq('is_booking', true)
+        .neq('status', 'cancelled')
         .order('start_time', { ascending: true })
         .limit(1000);
 

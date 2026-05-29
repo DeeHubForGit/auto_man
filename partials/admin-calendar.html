@@ -425,10 +425,7 @@
     margin-right: 8px;
   }
 
-  #section-calendar #appt-end[readonly] {
-    opacity: 1;
-    cursor: not-allowed;
-  }
+
 
   @keyframes spin {
     to { transform: rotate(360deg); }
@@ -866,7 +863,7 @@
           <label for="bookingService">Service<span class="text-red-500">*</span></label>
           <select id="bookingService" class="form-input">
             <option value="">Select a service...</option>
-            <!-- Options populated dynamically from SITE_CONFIG.BOOKING_CATEGORIES -->
+            <!-- Options populated dynamically from the service table -->
           </select>
           <p id="bookingService-error" class="text-xs text-red-500 mt-1 hidden"></p>
         </div>
@@ -899,6 +896,7 @@
           <div class="form-group">
             <label for="appt-end" id="appt-end-label">End</label>
             <input id="appt-end" name="endTime" type="time" class="form-input" />
+            <p id="appt-end-error" class="text-xs text-red-500 mt-1 hidden"></p>
             <p id="appt-end-warning" class="text-xs mt-1 hidden booking-time-warning"></p>
           </div>
         </div>
@@ -967,7 +965,7 @@
 
           <!-- Pickup -->
           <div class="form-group">
-            <label for="bookingPickupLocation">Pickup address<span class="text-red-500">*</span></label>
+            <label for="bookingPickupLocation">Pickup address</label>
             <input id="bookingPickupLocation" type="text" class="form-input" placeholder="e.g. 123 Main St, Melbourne VIC 3000">
             <p id="bookingPickupLocation-error" class="text-xs text-red-500 mt-1 hidden"></p>
             
@@ -1111,6 +1109,31 @@
     const toggleCheckbox = document.getElementById('toggleCalendarHours');
     if (toggleCheckbox) {
       toggleCheckbox.checked = showExtendedHours;
+    }
+  }
+
+  // Helper: Enable extended hours if booking time is outside current visible hours
+  function ensureExtendedHoursForTime(startTime, endTime) {
+    if (!startTime) return;
+    
+    // Parse start time hour (HH:MM format)
+    const startHour = parseInt(startTime.split(':')[0], 10);
+    
+    // Parse end time hour if available
+    let endHour = startHour;
+    if (endTime) {
+      endHour = parseInt(endTime.split(':')[0], 10);
+    }
+    
+    // Check if times are outside current visible hours
+    const currentStartHour = showExtendedHours ? EXTENDED_START_HOUR : BUSINESS_START_HOUR;
+    const currentEndHour = showExtendedHours ? EXTENDED_END_HOUR : BUSINESS_END_HOUR;
+    
+    const isOutsideVisibleHours = startHour < currentStartHour || endHour >= currentEndHour;
+    
+    if (isOutsideVisibleHours && !showExtendedHours) {
+      showExtendedHours = true;
+      updateCalendarHoursToggleState();
     }
   }
 
@@ -1347,11 +1370,6 @@
     // Enable appointment type radios for new appointments
     setAppointmentTypeRadiosDisabled(false);
     
-    // Set end time field to readonly for bookings
-    const endTimeInput = document.getElementById('appt-end');
-    endTimeInput.readOnly = true;
-    document.getElementById('appt-end-label').innerHTML = 'End time';
-    
     // Default date to today if not provided
     const today = new Date();
     const dateStr = defaults.date || formatDateForInputLocal(today);
@@ -1511,7 +1529,7 @@
     bookingAmountManuallyEdited = false;
 
     // Ensure dropdowns are populated before selecting values
-    loadServices();
+    await loadServices();
     await loadClients();
     
     // Extract date and time from ISO timestamp strings
@@ -1970,7 +1988,6 @@
         personalLocation.style.display = 'none';
         bookingServiceField.style.display = 'block';
         bookingFields.style.display = 'block';
-        endTimeInput.readOnly = true;
         endTimeLabel.textContent = 'End time';
         updateBookingEndTime();
         updateBusinessHoursWarnings();
@@ -1979,7 +1996,6 @@
         personalLocation.style.display = 'block';
         bookingServiceField.style.display = 'none';
         bookingFields.style.display = 'none';
-        endTimeInput.readOnly = false;
         endTimeLabel.textContent = 'End time';
       }
     });
@@ -2221,52 +2237,45 @@
   }
 
   // Helper function to get bookable services from config
-  function getBookingServicesFromConfig() {
-    if (!window.SITE_CONFIG || !Array.isArray(window.SITE_CONFIG.BOOKING_CATEGORIES)) {
+  // Fetch active services from Supabase service table
+  async function getServicesFromDatabase() {
+    try {
+      const { data, error } = await window.supabaseClient
+        .from('service')
+        .select('code, name, description, duration_minutes, price_cents, sort_order, short_name, google_booking_url, is_active')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.error('[admin-calendar] Error fetching services:', error);
+        return [];
+      }
+
+      if (!data || data.length === 0) {
+        console.warn('[admin-calendar] No active services found in database');
+        return [];
+      }
+
+      // Populate SERVICE_DURATIONS and SERVICE_PRICE_CENTS maps
+      data.forEach(service => {
+        if (typeof service.duration_minutes === 'number') {
+          SERVICE_DURATIONS[service.code] = service.duration_minutes;
+        }
+        if (typeof service.price_cents === 'number') {
+          SERVICE_PRICE_CENTS[service.code] = service.price_cents;
+        }
+      });
+
+      return data;
+    } catch (err) {
+      console.error('[admin-calendar] Exception fetching services:', err);
       return [];
     }
-
-    return window.SITE_CONFIG.BOOKING_CATEGORIES
-      .filter(cat => !cat.comingSoon)          // skip manual "coming soon"
-      .flatMap(cat => (cat.services || []).map(svc => {
-        // Require durationMinutes as a number - no parsing, no fallbacks
-        if (typeof svc.durationMinutes !== 'number') {
-          throw new Error(`Missing durationMinutes for service: ${svc.id}`);
-        }
-
-        // Populate SERVICE_DURATIONS map with service id as key
-        SERVICE_DURATIONS[svc.id] = svc.durationMinutes;
-
-        // Populate SERVICE_PRICE_CENTS map with service id as key
-        // Supports prices like 110, "110", "$110", "110.00", "$110.00"
-        let priceRaw = svc.price;
-
-        if (typeof priceRaw === 'string') {
-          priceRaw = priceRaw.trim().replace(/[$,\s]/g, '');
-        }
-
-        const priceNum = Number(priceRaw);
-
-        if (Number.isFinite(priceNum) && priceNum >= 0) {
-          SERVICE_PRICE_CENTS[svc.id] = Math.round(priceNum * 100);
-        } else {
-          // If price is missing or invalid, do NOT set a value (leave undefined)
-        }
-
-        return {
-          id: svc.id,              // used as <option> value
-          name: svc.name,
-          duration: svc.duration,  // e.g. "1 hour"
-          durationMinutes: svc.durationMinutes,
-          price: svc.price,
-          categoryId: cat.id,
-          categoryName: cat.name
-        };
-      }));
   }
 
-  // Populate service dropdown from config
-  function loadServices() {
+  // Populate service dropdown from database
+  async function loadServices() {
     const serviceSelect = document.getElementById('bookingService');
     if (!serviceSelect) return;
 
@@ -2277,7 +2286,7 @@
     defaultOption.textContent = 'Select a service...';
     serviceSelect.appendChild(defaultOption);
 
-    const services = getBookingServicesFromConfig();
+    const services = await getServicesFromDatabase();
     
     if (services.length === 0) {
       return;
@@ -2285,19 +2294,18 @@
 
     services.forEach(svc => {
       const opt = document.createElement('option');
-      opt.value = svc.id;                       // must match SERVICE_DURATIONS key
-      // Label e.g. "Automatic Driving Lesson 1 hour" or "Senior Automatic Driving Lesson 1 hour"
-      opt.textContent = `${svc.name} ${svc.duration}`;
+      opt.value = svc.code;                     // must match SERVICE_DURATIONS key
+      opt.textContent = svc.name;
       serviceSelect.appendChild(opt);
     });
   }
 
   // Load clients and services when modal opens
   const originalOpenModal = openAppointmentModal;
-  openAppointmentModal = function(defaults = {}) {
+  openAppointmentModal = async function(defaults = {}) {
     originalOpenModal(defaults);
     loadClients();
-    loadServices();
+    await loadServices();
   };
 
   btnNewAppointment.addEventListener("click", () => {
@@ -2628,9 +2636,9 @@
   function validatePickupAddressForBooking(addr) {
     const trimmed = (addr || '').trim();
 
-    // Treat "None" as missing (seen in some saved bookings)
+    // Allow blank addresses (optional field)
     if (!trimmed || trimmed.toLowerCase() === 'none') {
-      return { valid: false, message: 'Pickup address is required' };
+      return { valid: true, message: null, isEmpty: true };
     }
 
     const isValid = window.Validation?.isProbablyValidAuAddress?.(trimmed) ?? false;
@@ -2638,7 +2646,7 @@
       return { valid: false, message: 'Please provide a valid pickup address.' };
     }
 
-    return { valid: true, message: null };
+    return { valid: true, message: null, isEmpty: false };
   }
 
   // Validate address with Google Maps via Edge Function (delegates to validation.js)
@@ -2902,6 +2910,7 @@
     clearApptError("appt-title");
     clearApptError("appt-date");
     clearApptError("appt-start");
+    clearApptError("appt-end");
     clearApptError("appt-location");
 
     // Validate required fields
@@ -2918,6 +2927,13 @@
       showApptError("appt-start", "Start time is required");
       hasError = true;
     }
+    
+    // Validate end time is after start time
+    if (endTime && startTime && endTime <= startTime) {
+      showApptError("appt-end", "End time must be after start time");
+      hasError = true;
+    }
+    
     // Location is optional free text, e.g. home, work, etc.  NO VALIDATION.
 
     if (hasError) {
@@ -3002,6 +3018,9 @@
           closeAppointmentModal(true);
         }, 900);
 
+        // Ensure extended hours enabled if appointment is outside visible range
+        ensureExtendedHoursForTime(startTime, endTime);
+        
         // Refresh calendar to show updated appointment
         renderWeek(weekStart);
         
@@ -3047,6 +3066,7 @@
 
         // If bookingId is returned, the DB row already exists - just refresh immediately
         if (bookingId) {
+          ensureExtendedHoursForTime(startTime, endTime);
           renderWeek(weekStart);
           return; // Skip polling
         }
@@ -3071,6 +3091,7 @@
             if (booking) {
               // Event found in database!
               hideNewBookingStatus();
+              ensureExtendedHoursForTime(startTime, endTime);
               renderWeek(weekStart);
               return; // Stop polling
             }
@@ -3087,6 +3108,7 @@
             console.warn(`[appointment] ⚠️ Event not found after ${maxPolls} attempts. Webhook may be delayed.`);
             hideNewBookingStatus();
             // Do one final refresh anyway
+            ensureExtendedHoursForTime(startTime, endTime);
             renderWeek(weekStart);
           }
         } catch (err) {
@@ -3171,6 +3193,7 @@
     // Clear all errors first
     clearApptError("appt-date");
     clearApptError("appt-start");
+    clearApptError("appt-end");
     clearApptError("bookingService");
     clearApptError("existingClientSelect");
     clearApptError("newClientFirstName");
@@ -3190,6 +3213,13 @@
       showApptError("appt-start", "Start time is required");
       hasError = true;
     }
+    
+    // Validate end time is after start time
+    if (endTime && startTime && endTime <= startTime) {
+      showApptError("appt-end", "End time must be after start time");
+      hasError = true;
+    }
+    
     if (!serviceCode) {
       showApptError("bookingService", "Please select a service");
       hasError = true;
@@ -3319,47 +3349,60 @@
     let shouldAutoClose = false;
 
     try {
-      // Validate address with Google Maps before saving
-      const backendValidation = await validateAddressWithBackend(pickupLocation);
+      // Skip Google validation if pickup address is blank
+      let pickupValidToStore = null;
+      let pickupIssueToStore = null;
+      let pickupSuggestionToStore = null;
+      let checkedAtToStore = null;
 
-      if (backendValidation.valid) {
+      if (pickupValidation.isEmpty) {
+        // Blank address: save as "TBC", skip validation, clear all metadata
+        pickupLocation = "TBC";
         clearApptError("bookingPickupLocation");
-      }
-
-      // Show suggestion whenever available (even if address is valid)
-      if (backendValidation.suggestion) {
-        showPickupSuggestion(backendValidation.suggestion);
-      } else {
         hidePickupSuggestion();
-      }
+      } else {
+        // Validate address with Google Maps before saving
+        const backendValidation = await validateAddressWithBackend(pickupLocation);
 
-      const isGoogleUnavailable =
-        window.Validation?.isGoogleValidationUnavailable?.(backendValidation.meta) === true;
-
-      const pickupValidToStore = isGoogleUnavailable ? null : !!backendValidation.valid;
-      const pickupIssueToStore = (!backendValidation.valid && !isGoogleUnavailable) ? (backendValidation.issue || 'invalid') : null;
-      const pickupSuggestionToStore = null;
-      const checkedAtToStore = isGoogleUnavailable ? null : new Date().toISOString();
-
-      if (!backendValidation.valid && !isGoogleUnavailable) {
-        // Re-enable save button
-        if (saveBtn) {
-          saveBtn.disabled = false;
-          saveBtn.textContent = originalBtnText;
+        if (backendValidation.valid) {
+          clearApptError("bookingPickupLocation");
         }
-        
-        // Show validation error
-        showApptError("bookingPickupLocation", backendValidation.message);
-        return; // STOP HERE - do not save
-      }
 
-      if (!backendValidation.valid && isGoogleUnavailable) {
-        // Show warning, but DO NOT block saving
-        showApptError(
-          "bookingPickupLocation",
-          backendValidation.message ||
-            "Google address validation is currently unavailable. Please manually check the address before continuing."
-        );
+        // Show suggestion whenever available (even if address is valid)
+        if (backendValidation.suggestion) {
+          showPickupSuggestion(backendValidation.suggestion);
+        } else {
+          hidePickupSuggestion();
+        }
+
+        const isGoogleUnavailable =
+          window.Validation?.isGoogleValidationUnavailable?.(backendValidation.meta) === true;
+
+        pickupValidToStore = isGoogleUnavailable ? null : !!backendValidation.valid;
+        pickupIssueToStore = (!backendValidation.valid && !isGoogleUnavailable) ? (backendValidation.issue || 'invalid') : null;
+        pickupSuggestionToStore = null;
+        checkedAtToStore = isGoogleUnavailable ? null : new Date().toISOString();
+
+        if (!backendValidation.valid && !isGoogleUnavailable) {
+          // Re-enable save button
+          if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = originalBtnText;
+          }
+          
+          // Show validation error
+          showApptError("bookingPickupLocation", backendValidation.message);
+          return; // STOP HERE - do not save
+        }
+
+        if (!backendValidation.valid && isGoogleUnavailable) {
+          // Show warning, but DO NOT block saving
+          showApptError(
+            "bookingPickupLocation",
+            backendValidation.message ||
+              "Google address validation is currently unavailable. Please manually check the address before continuing."
+          );
+        }
       }
 
       // Convert 24-hour time to 12-hour format for the edge function
@@ -3374,8 +3417,6 @@
       if (!googleEventId) {
         throw new Error("Missing Google Event ID for booking update");
       }
-
-      pickupLocation = document.getElementById('bookingPickupLocation')?.value?.trim() || null;
 
       const payload = {
         type: "booking",
@@ -3473,8 +3514,6 @@
         }
         return;
       }
-
-      pickupLocation = document.getElementById('bookingPickupLocation')?.value?.trim() || null;
 
       // Immediate DB update so calendar refresh shows the change right away
       await updateBookingRowInDb(editingBookingId, {
@@ -3665,6 +3704,7 @@
     // Clear all errors first
     clearApptError("appt-date");
     clearApptError("appt-start");
+    clearApptError("appt-end");
     clearApptError("bookingService");
     clearApptError("existingClientSelect");
     clearApptError("newClientFirstName");
@@ -3684,6 +3724,13 @@
       showApptError("appt-start", "Start time is required");
       hasError = true;
     }
+    
+    // Validate end time is after start time
+    if (endTime && startTime && endTime <= startTime) {
+      showApptError("appt-end", "End time must be after start time");
+      hasError = true;
+    }
+    
     if (!serviceCode) {
       showApptError("bookingService", "Please select a service");
       hasError = true;
@@ -3812,54 +3859,65 @@
     let shouldAutoClose = false;
 
     try {
-      // Validate address with Google Maps before saving
-      const backendValidation = await validateAddressWithBackend(pickupLocation);
+      // Skip Google validation if pickup address is blank
+      let pickupValidToStore = null;
+      let pickupIssueToStore = null;
+      let pickupSuggestionToStore = null;
+      let checkedAtToStore = null;
 
-      if (backendValidation.valid) {
+      if (pickupValidation.isEmpty) {
+        // Blank address: save as "TBC", skip validation, clear all metadata
+        pickupLocation = "TBC";
         clearApptError("bookingPickupLocation");
-      }
-
-      // Show suggestion whenever available (even if address is valid)
-      if (backendValidation.suggestion) {
-        showPickupSuggestion(backendValidation.suggestion);
-      } else {
         hidePickupSuggestion();
-      }
+      } else {
+        // Validate address with Google Maps before saving
+        const backendValidation = await validateAddressWithBackend(pickupLocation);
 
-      const isGoogleUnavailable =
-        window.Validation?.isGoogleValidationUnavailable?.(backendValidation.meta) === true;
-
-      const pickupValidToStore = isGoogleUnavailable ? null : !!backendValidation.valid;
-      const pickupIssueToStore = (!backendValidation.valid && !isGoogleUnavailable) ? (backendValidation.issue || 'invalid') : null;
-      const pickupSuggestionToStore = null;
-      const checkedAtToStore = isGoogleUnavailable ? null : new Date().toISOString();
-
-      if (!backendValidation.valid && !isGoogleUnavailable) {
-        // Re-enable save button
-        if (saveBtn) {
-          saveBtn.disabled = false;
-          saveBtn.textContent = originalBtnText;
+        if (backendValidation.valid) {
+          clearApptError("bookingPickupLocation");
         }
-        
-        // Show validation error
-        showApptError("bookingPickupLocation", backendValidation.message);
-        return; // STOP HERE - do not save
-      }
 
-      if (!backendValidation.valid && isGoogleUnavailable) {
-        // Show warning, but DO NOT block saving
-        showApptError(
-          "bookingPickupLocation",
-          backendValidation.message ||
-            "Google address validation is currently unavailable. Please manually check the address before continuing."
-        );
+        // Show suggestion whenever available (even if address is valid)
+        if (backendValidation.suggestion) {
+          showPickupSuggestion(backendValidation.suggestion);
+        } else {
+          hidePickupSuggestion();
+        }
+
+        const isGoogleUnavailable =
+          window.Validation?.isGoogleValidationUnavailable?.(backendValidation.meta) === true;
+
+        pickupValidToStore = isGoogleUnavailable ? null : !!backendValidation.valid;
+        pickupIssueToStore = (!backendValidation.valid && !isGoogleUnavailable) ? (backendValidation.issue || 'invalid') : null;
+        pickupSuggestionToStore = null;
+        checkedAtToStore = isGoogleUnavailable ? null : new Date().toISOString();
+
+        if (!backendValidation.valid && !isGoogleUnavailable) {
+          // Re-enable save button
+          if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = originalBtnText;
+          }
+          
+          // Show validation error
+          showApptError("bookingPickupLocation", backendValidation.message);
+          return; // STOP HERE - do not save
+        }
+
+        if (!backendValidation.valid && isGoogleUnavailable) {
+          // Show warning, but DO NOT block saving
+          showApptError(
+            "bookingPickupLocation",
+            backendValidation.message ||
+              "Google address validation is currently unavailable. Please manually check the address before continuing."
+          );
+        }
       }
 
       // Convert 24-hour time to 12-hour format for the edge function
       const startTime12 = convert24To12Hour(startTime);
       const endTime12 = endTime ? convert24To12Hour(endTime) : null;
-
-      pickupLocation = document.getElementById('bookingPickupLocation')?.value?.trim() || null;
 
       // Check for overlaps/travel time issues - allow user to change date/time
       const startIso = new Date(`${date}T${startTime}:00`).toISOString();
@@ -3964,6 +4022,7 @@
           closeAppointmentModal(true);
         }, 900);
 
+        ensureExtendedHoursForTime(startTime, endTime);
         renderWeek(weekStart);
 
         // If the bookings list is present on the page, refresh it so price/status changes show immediately
@@ -4004,6 +4063,7 @@
           
           if (booking) {
             hideNewBookingStatus();
+            ensureExtendedHoursForTime(startTime, endTime);
             renderWeek(weekStart);
 
             // If the bookings list is present on the page, refresh it so price/status changes show immediately
@@ -4026,6 +4086,7 @@
           } else {
             console.warn(`[booking] ⚠️ Event not found after ${maxPolls} attempts.`);
             hideNewBookingStatus();
+            ensureExtendedHoursForTime(startTime, endTime);
             renderWeek(weekStart);
 
             // If the bookings list is present on the page, refresh it so price/status changes show immediately
@@ -4242,30 +4303,22 @@
     // First, fetch all services to create a lookup map
     const { data: services, error: servicesError } = await window.supabaseClient
       .from('service')
-      .select('code, name, price_cents');
+      .select('code, name, short_name, price_cents');
     
     const serviceMap = {};
+    const serviceShortMap = {};
     const servicePriceMap = {};
     if (services && !servicesError) {
       services.forEach(svc => {
         serviceMap[svc.code] = svc.name;
+        serviceShortMap[svc.code] = svc.short_name || svc.name;
         servicePriceMap[svc.code] = svc.price_cents;
       });
     }
     
-    // Helper: Get short service label
+    // Helper: Get short service label from database
     const getServiceShortLabel = (serviceCode) => {
-      switch (serviceCode) {
-        case 'auto_60': return 'Auto - 1h';
-        case 'auto_90': return 'Auto - 1.5h';
-        case 'auto_120': return 'Auto - 2h';
-        case 'manual_60': return 'Manual - 1h';
-        case 'manual_90': return 'Manual - 1.5h';
-        case 'manual_120': return 'Manual - 2h';
-        case 'senior_auto_60': return 'Snr Auto - 1h';
-        case 'senior_manual_60': return 'Snr Manual - 1h';
-        default: return 'Lesson';
-      }
+      return serviceShortMap[serviceCode] || serviceMap[serviceCode] || 'Lesson';
     };
     
     // Helper: Generate red $ marker if unpaid

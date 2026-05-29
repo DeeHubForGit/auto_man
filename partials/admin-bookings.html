@@ -857,7 +857,7 @@
     // Base query
     let query = window.supabaseClient
       .from('booking')
-      .select('*, pickup_location_issue, client:client_id(first_name,last_name)') // Fetch client name and issue code
+      .select('*, pickup_location_issue, client:client_id(first_name,last_name), service:service_code(name,short_name)') // Fetch client name, service details and issue code
       .eq('is_booking', true)
       .neq('status', 'cancelled')
       .order('start_time', { ascending: true })
@@ -1071,9 +1071,7 @@
       });
 
       // Service Name
-      let serviceName = booking.service_code || 'Lesson';
-      if (serviceName.includes('auto')) serviceName = 'Auto';
-      else if (serviceName.includes('manual')) serviceName = 'Manual';
+      let serviceName = booking.service?.short_name || booking.service?.name || booking.service_code || 'Lesson';
       
       // Sanitize Unicode dashes for Excel compatibility
       serviceName = serviceName.replace(/—/g, ' - ').replace(/–/g, ' - ');
@@ -1170,18 +1168,19 @@
     let cancelButton = '';
     
     // Service Name Formatting
-    let serviceName = booking.service_code || 'Lesson';
-    if (serviceName.includes('auto')) serviceName = 'Auto';
-    else if (serviceName.includes('manual')) serviceName = 'Manual';
+    const hasShortName = !!booking.service?.short_name;
+    let serviceName = booking.service?.short_name || booking.service?.name || booking.service_code || 'Lesson';
     serviceName = escapeHtml(serviceName);
     
-    // Duration
+    // Duration - only calculate if short_name is not used (short_name already includes duration)
     const durationMinutes = Math.round((new Date(booking.end_time) - startTime) / 60000);
     let durationStr = '';
-    if (durationMinutes === 60) durationStr = '1 hr'; 
-    else if (durationMinutes === 90) durationStr = '1.5 hrs';
-    else if (durationMinutes === 120) durationStr = '2 hrs';
-    else durationStr = `${durationMinutes} mins`;
+    if (!hasShortName) {
+      if (durationMinutes === 60) durationStr = '1 hr'; 
+      else if (durationMinutes === 90) durationStr = '1.5 hrs';
+      else if (durationMinutes === 120) durationStr = '2 hrs';
+      else durationStr = `${durationMinutes} mins`;
+    }
     
     // Client name - use client table as source of truth, fallback to booking table
     const clientFirst = booking.client?.first_name || '';
@@ -1264,7 +1263,7 @@
           <div class="mb-2 flex items-start justify-between gap-2">
             <div class="min-w-0">
               <h3 class="text-sm sm:text-base font-semibold text-gray-900">
-                ${testPrefix}${serviceName} ${durationStr} (${clientName})${!booking.is_paid ? '<span class="payment-icon">$</span>' : ''}
+                ${testPrefix}${serviceName}${durationStr ? ' ' + durationStr : ''} (${clientName})${!booking.is_paid ? '<span class="payment-icon">$</span>' : ''}
               </h3>
               ${isNameMismatch ? `<div class="text-xs text-gray-600 mt-0.5">Booking name: ${bookingNameEscaped}</div>` : ''}
             </div>

@@ -1,0 +1,1156 @@
+<!-- Admin Services Section -->
+<style>
+  :root {
+    --danger-red: #dc2626; /* Tailwind red-600 */
+    --danger-red-rgb: 220, 38, 38; /* RGB values for rgba() usage */
+  }
+
+  /* Match Clients/Bookings list look & spacing */
+  #adminServicesList .service-card {
+    width: 100%;
+    background-color: #dbeafe !important;   /* bg-blue-100 like bookings */
+    border: 2px solid #3b82f6 !important;   /* blue-500 edge */
+    border-radius: 0.5rem;
+    color: #111827 !important;
+  }
+
+  #adminServicesList .service-card:hover {
+    border-color: #2563eb !important;       /* blue-600 */
+  }
+
+  #adminServicesList .service-card.inactive-service {
+    background-color: #f1f5f9 !important;   /* softer grey-blue */
+    border-color: #94a3b8 !important;       /* slate-400 */
+  }
+
+  #adminServicesList .service-card.inactive-service:hover {
+    border-color: #64748b !important;       /* slate-500 */
+  }
+
+  /* Inputs in cards must stay white (theme override safety) */
+  #adminServicesList .service-card input,
+  #adminServicesList .service-card textarea,
+  #adminServicesList .service-card select {
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  #adminServicesList .service-card input:disabled,
+  #adminServicesList .service-card textarea:disabled,
+  #adminServicesList .service-card select:disabled {
+    background: #e5e7eb !important;
+    color: #6b7280 !important;
+  }
+
+  /* Labels/headings must be readable (override global theme) */
+  #adminServicesList .service-card label,
+  #adminServicesList .service-card .service-section-title {
+    color: #111827 !important;
+  }
+
+  #section-services .service-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 10px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
+    color: #111827;
+  }
+
+  #section-services .service-pill.active {
+    border-color: #93c5fd;     /* blue-300 */
+    background: #dbeafe;       /* blue-100 */
+    color: #1d4ed8 !important; /* blue-700 */
+  }
+
+  #section-services .service-pill.inactive {
+    border-color: #94a3b8;
+    background: #f8fafc;
+    color: #475569 !important;
+  }
+
+  #section-services .service-header {
+    cursor: pointer;
+  }
+
+  #section-services .service-chevron {
+    transition: transform 0.15s ease;
+  }
+
+  #section-services .service-chevron.is-open {
+    transform: rotate(180deg);
+  }
+
+  /* Ensure summary text stays readable under global theme overrides */
+  #adminServicesList .service-summary,
+  #adminServicesList .service-summary * {
+    color: #111827 !important;
+  }
+
+  /* Exception: allow red text for errors */
+  #adminServicesList .service-summary .text-red-600 {
+    color: var(--danger-red) !important;
+  }
+
+  #adminServicesList .service-summary svg {
+    color: #374151 !important;
+  }
+
+  /* Force black color for Created/Updated timestamps */
+  #adminServicesList .service-card [data-role="service-details"] .text-xs:not(.text-red-600) {
+    color: #111827 !important;
+  }
+
+  /* Ensure validation help text stays red (theme override safety) */
+  #adminServicesList .service-card [data-role="service-details"] .text-red-600 {
+    color: var(--danger-red) !important;
+  }
+
+/* Services filter/search must stay white */
+#section-services select#serviceStatusFilter,
+#section-services input#serviceSearch,
+#section-services #serviceStatusFilter,
+#section-services #serviceSearch {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #d1d5db !important;
+  box-shadow: none !important;
+  color-scheme: light !important;
+}
+
+/* Placeholder text */
+#section-services input#serviceSearch::placeholder {
+  color: #6b7280 !important;
+  opacity: 1 !important;
+}
+
+/* Select dropdown options */
+#section-services select#serviceStatusFilter option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+/* Keep white on focus/hover too */
+#section-services select#serviceStatusFilter:hover,
+#section-services select#serviceStatusFilter:focus,
+#section-services input#serviceSearch:hover,
+#section-services input#serviceSearch:focus {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border-color: #93c5fd !important;
+  outline: none !important;
+}
+
+  /* Red outline button for Delete */
+  #section-services .btn-outline-red {
+    background: transparent !important;
+    border: 1px solid var(--danger-red) !important;
+    color: var(--danger-red) !important;
+  }
+
+  #section-services .btn-outline-red:hover {
+    background: rgba(var(--danger-red-rgb), 0.08) !important;
+    border-color: var(--danger-red) !important;
+    color: var(--danger-red) !important;
+  }
+</style>
+
+<section id="section-services" class="section-content bg-white border rounded-2xl shadow-sm p-5 hidden">
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <h2 class="text-xl font-semibold">Services</h2>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button id="servicesAddBtn" class="btn btn-primary" type="button">
+        Add Service
+      </button>
+      <button id="servicesRefreshBtn" class="btn btn-primary-light" type="button">
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 gap-3 mb-4 sm:flex sm:flex-wrap sm:items-end">
+    <div class="flex flex-col gap-1 col-span-1">
+      <label class="text-sm font-medium text-gray-300">Status</label>
+      <select id="serviceStatusFilter" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:min-w-[160px]">
+        <option value="active" selected>Active</option>
+        <option value="inactive">Inactive</option>
+        <option value="all">All</option>
+      </select>
+    </div>
+
+    <div class="flex flex-col gap-1 col-span-2 sm:flex-1 sm:min-w-[260px]">
+      <label class="text-sm font-medium text-gray-300">Search</label>
+      <input id="serviceSearch" class="bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Search name, code or description" />
+    </div>
+
+    <div class="text-sm text-gray-500 col-span-2 text-right sm:ml-auto sm:col-auto">
+      <span id="servicesCount">0</span>
+      <span class="text-gray-400">results</span>
+    </div>
+  </div>
+
+  <div id="servicesMsg" class="text-sm mb-3"></div>
+  <div id="adminServicesList" class="flex flex-col gap-4"></div>
+</section>
+
+<script>
+(function() {
+  let allAdminServices = [];
+  let allServiceCategories = [];
+  let servicesSearchDebounce = null;
+  let expandedServiceId = null;
+
+  function setServicesMsg(text, cls) {
+    const el = document.getElementById('servicesMsg');
+    if (!el) return;
+    el.textContent = text || '';
+    el.className = 'text-sm mb-3 ' + (cls || '');
+  }
+
+  function safeText(value) {
+    return (value === null || value === undefined) ? '' : String(value);
+  }
+
+  function escapeHtml(str) {
+    return safeText(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function formatDateTime(value) {
+    if (!value) return '';
+    try {
+      const d = new Date(value);
+      if (isNaN(d.getTime())) return '';
+      const pad2 = (n) => String(n).padStart(2, '0');
+      const dd = pad2(d.getDate());
+      const mm = pad2(d.getMonth() + 1);
+      const yy = pad2(d.getFullYear() % 100);
+      const minutes = pad2(d.getMinutes());
+      const h24 = d.getHours();
+      const ampm = h24 >= 12 ? 'PM' : 'AM';
+      const h12 = (h24 % 12) || 12;
+      return `${dd}/${mm}/${yy} ${h12}:${minutes} ${ampm}`;
+    } catch {
+      return '';
+    }
+  }
+
+  function formatPrice(priceCents) {
+    if (!priceCents && priceCents !== 0) return '$0.00';
+    const dollars = (priceCents / 100).toFixed(2);
+    return `$${dollars}`;
+  }
+
+  function formatDuration(minutes) {
+    if (!minutes && minutes !== 0) return '0 min';
+    if (minutes < 60) return `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (mins === 0) return `${hours} hr`;
+    return `${hours} hr ${mins} min`;
+  }
+
+  function applyServiceFilters() {
+    const status = (document.getElementById('serviceStatusFilter')?.value || 'active');
+    const qRaw = (document.getElementById('serviceSearch')?.value || '');
+    const q = qRaw.trim().toLowerCase();
+
+    let filtered = Array.isArray(allAdminServices) ? allAdminServices.slice() : [];
+
+    // Search first
+    if (q) {
+      filtered = filtered.filter(s => {
+        const code = safeText(s.code).toLowerCase();
+        const name = safeText(s.name).toLowerCase();
+        const shortName = safeText(s.short_name).toLowerCase();
+        const description = safeText(s.description).toLowerCase();
+
+        return (
+          code.includes(q) ||
+          name.includes(q) ||
+          shortName.includes(q) ||
+          description.includes(q)
+        );
+      });
+    }
+
+    // Apply status filter
+    if (status === 'active') {
+      filtered = filtered.filter(s => s.is_active === true);
+    } else if (status === 'inactive') {
+      filtered = filtered.filter(s => s.is_active !== true);
+    }
+
+    return filtered;
+  }
+
+  function getCategoryNameById(categoryId) {
+    if (!categoryId) return '';
+    const category = allServiceCategories.find(c => c.id === categoryId);
+    return category ? safeText(category.name) : '';
+  }
+
+  function collapseAllServiceCards(exceptId = null) {
+    document.querySelectorAll('#adminServicesList .service-card').forEach(card => {
+      const cardId = card.getAttribute('data-service-id');
+      if (exceptId && cardId === exceptId) return;
+      const details = card.querySelector('[data-role="service-details"]');
+      const chevron = card.querySelector('[data-role="service-chevron"]');
+      const label = card.querySelector('[data-role="service-toggle-label"]');
+      const button = card.querySelector('button[aria-label]');
+      if (details) details.classList.add('hidden');
+      if (chevron) chevron.classList.remove('is-open');
+      if (label) label.textContent = 'Edit';
+      if (button) button.setAttribute('aria-label', 'Edit service details');
+    });
+  }
+
+  function restoreExpandedCard() {
+    if (!expandedServiceId) return;
+    const card = document.querySelector(`#adminServicesList .service-card[data-service-id="${expandedServiceId}"]`);
+    if (!card) {
+      expandedServiceId = null;
+      return;
+    }
+    collapseAllServiceCards(expandedServiceId);
+    const details = card.querySelector('[data-role="service-details"]');
+    const chevron = card.querySelector('[data-role="service-chevron"]');
+    const label = card.querySelector('[data-role="service-toggle-label"]');
+    const button = card.querySelector('button[aria-label]');
+    if (details) details.classList.remove('hidden');
+    if (chevron) chevron.classList.add('is-open');
+    if (label) label.textContent = 'Close';
+    if (button) button.setAttribute('aria-label', 'Close service details');
+  }
+
+  function renderServiceCard(s, options = {}) {
+    const isNew = options.isNew === true;
+    
+    const code = safeText(s.code);
+    const name = safeText(s.name);
+    const shortName = safeText(s.short_name || '');
+    const description = safeText(s.description);
+    const durationMinutes = s.duration_minutes || 0;
+    const priceCents = s.price_cents || 0;
+    const priceDollars = priceCents ? (priceCents / 100).toFixed(2) : '';
+    const sortOrder = s.sort_order || 0;
+    const isActive = s.is_active !== false;
+    const bookingTimeMode = safeText(s.booking_time_mode || 'offered_start_times');
+    const serviceCategoryId = safeText(s.service_category_id || '');
+
+    const displayName = isNew ? 'New Service' : (name || '(No name)');
+    const categoryName = getCategoryNameById(s.service_category_id);
+
+    const inputCls = 'w-full bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent';
+    const labelCls = 'block text-sm font-medium mb-1 text-gray-900';
+
+    const requiredMarker = isNew ? ' <span class="text-red-600">*</span>' : '';
+    const cardClasses = isNew
+      ? 'service-card p-4 border-2 border-blue-500 bg-blue-50'
+      : `service-card p-4 ${isActive ? '' : 'inactive-service'}`;
+    const saveButtonText = isNew ? 'Create Service' : 'Save';
+    const cancelOnClick = isNew ? 'window.cancelNewService()' : `window.toggleServiceCard('${escapeHtml(s.id)}')`;
+
+    const statusPillHtml = isNew ? '' : (
+      isActive
+        ? '<span class="service-pill active" data-role="summary-status-pill">✓ Active</span>'
+        : '<span class="service-pill inactive" data-role="summary-status-pill">✗ Inactive</span>'
+    );
+
+    const summarySection = isNew
+      ? `<div class="text-sm text-gray-600">Fill in the required fields to create a new service</div>`
+      : `<div class="service-summary">
+            <div class="flex items-center gap-2">
+              <div class="font-semibold text-base sm:text-lg leading-tight text-gray-900">${escapeHtml(displayName)}</div>
+              ${statusPillHtml}
+            </div>
+
+            <div class="mt-1 flex flex-wrap items-start gap-x-4 gap-y-1 text-sm text-gray-900">
+              <div class="flex items-start gap-2 min-w-0">
+                <span class="font-medium">Code:</span>
+                <span>${escapeHtml(code || '—')}</span>
+              </div>
+              <div class="flex items-start gap-2 min-w-0">
+                <span class="font-medium">Duration:</span>
+                <span>${formatDuration(durationMinutes)}</span>
+              </div>
+              <div class="flex items-start gap-2 min-w-0">
+                <span class="font-medium">Price:</span>
+                <span>${formatPrice(priceCents)}</span>
+              </div>
+            </div>
+
+            ${description ? `
+            <div class="mt-1 text-sm text-gray-700 line-clamp-2">
+              ${escapeHtml(description)}
+            </div>
+            ` : ''}
+          </div>`;
+
+    const headerButtons = isNew
+      ? ''
+      : `<div class="shrink-0 flex items-center gap-2">
+            <button type="button" class="btn btn-primary px-2 sm:px-4" onclick="event.stopPropagation(); window.toggleServiceCard('${escapeHtml(s.id)}')" aria-label="Edit service details">
+              <span class="hidden sm:inline" data-role="service-toggle-label">Edit</span>
+              <svg class="w-5 h-5 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              <span class="service-chevron" data-role="service-chevron">▾</span>
+            </button>
+
+            <button type="button" class="btn btn-outline-red px-2 sm:px-4" onclick="event.stopPropagation(); window.deleteService('${escapeHtml(s.id)}')" aria-label="Delete service">
+              Delete
+            </button>
+          </div>`;
+
+    const headerOnClick = isNew ? '' : `onclick="window.toggleServiceCard('${escapeHtml(s.id)}')"`;
+
+    const detailsClasses = isNew ? 'mt-4 pt-4 border-t border-gray-400' : 'hidden mt-4 pt-4 border-t border-gray-400';
+
+    // Build category options
+    const categoryOptions = allServiceCategories.map(cat => {
+      const selected = cat.id === serviceCategoryId ? 'selected' : '';
+      return `<option value="${escapeHtml(cat.id)}" ${selected}>${escapeHtml(cat.name)}</option>`;
+    }).join('');
+
+    return `
+      <div class="${cardClasses}" data-service-id="${escapeHtml(s.id)}">
+        <div class="service-header flex items-start justify-between gap-3" ${headerOnClick}>
+          <div class="min-w-0 flex-1">
+            ${summarySection}
+          </div>
+          ${headerButtons}
+        </div>
+
+        <div class="${detailsClasses}" data-role="service-details" onclick="event.stopPropagation()">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div class="service-section-title text-sm font-semibold text-gray-900 mb-2">Basic Information</div>
+
+              <div class="grid grid-cols-1 gap-3">
+                <div>
+                  <label class="${labelCls}">Code${requiredMarker}</label>
+                  <input class="${inputCls}" data-field="code" value="${escapeHtml(code)}" placeholder="e.g. AUTO-1HR" />
+                  <div class="text-xs text-red-600 mt-1 hidden" data-role="code-help">Code is required and must be unique</div>
+                </div>
+
+                <div>
+                  <label class="${labelCls}">Name${requiredMarker}</label>
+                  <input class="${inputCls}" data-field="name" value="${escapeHtml(name)}" placeholder="e.g. Automatic Driving Lesson – 1 hour" />
+                  <div class="text-xs text-red-600 mt-1 hidden" data-role="name-help">Name is required</div>
+                </div>
+
+                <div>
+                  <label class="${labelCls}">Short Name</label>
+                  <input class="${inputCls}" data-field="short_name" value="${escapeHtml(shortName)}" placeholder="e.g. Auto Lesson 1hr" />
+                </div>
+
+                <div>
+                  <label class="${labelCls}">Service Category</label>
+                  <select class="${inputCls}" data-field="service_category_id">
+                    <option value="">None</option>
+                    ${categoryOptions}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div class="service-section-title text-sm font-semibold text-gray-900 mb-2">Details</div>
+              
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="${labelCls}">Duration (minutes)${requiredMarker}</label>
+                  <input type="number" class="${inputCls}" data-field="duration_minutes" value="${durationMinutes}" min="0" placeholder="60" />
+                  <div class="text-xs text-red-600 mt-1 hidden" data-role="duration-help">Duration is required</div>
+                </div>
+
+                <div>
+                  <label class="${labelCls}">Price ($)${requiredMarker}</label>
+                  <input type="number" class="${inputCls}" data-field="price_cents" value="${priceDollars}" step="0.01" min="0" placeholder="85.00" />
+                  <div class="text-xs text-red-600 mt-1 hidden" data-role="price-help">Price is required</div>
+                </div>
+              </div>
+
+              <div class="mt-3">
+                <label class="${labelCls}">Booking Time Mode${requiredMarker}</label>
+                <select class="${inputCls}" data-field="booking_time_mode">
+                  <option value="offered_start_times" ${bookingTimeMode === 'offered_start_times' ? 'selected' : ''}>Offered Start Times</option>
+                  <option value="entered_start_time" ${bookingTimeMode === 'entered_start_time' ? 'selected' : ''}>Entered Start Time</option>
+                </select>
+              </div>
+
+              <div class="mt-3">
+                <label class="${labelCls}">Sort Order</label>
+                <input type="number" class="${inputCls}" data-field="sort_order" value="${sortOrder}" min="0" placeholder="0" />
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4">
+            <label class="${labelCls}">Description</label>
+            <textarea class="${inputCls}" data-field="description" rows="3" placeholder="Service description…">${escapeHtml(description)}</textarea>
+          </div>
+
+          <div class="mt-4">
+            <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-900">
+              <input type="checkbox" data-field="is_active" ${isActive ? 'checked' : ''} />
+              Active
+            </label>
+          </div>
+
+          <div class="mt-4">
+            <div class="flex items-center gap-3">
+              <button type="button" class="btn btn-primary" data-role="save-btn" onclick="window.saveService('${escapeHtml(s.id)}')">${saveButtonText}</button>
+              <button type="button" class="btn btn-outline-blue" onclick="${cancelOnClick}">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderAdminServices() {
+    const list = document.getElementById('adminServicesList');
+    const countEl = document.getElementById('servicesCount');
+    if (!list) return;
+
+    console.log('[admin-services] Rendering services, total:', allAdminServices.length);
+
+    const filtered = applyServiceFilters();
+    console.log('[admin-services] Filtered services:', filtered.length);
+    
+    if (countEl) countEl.textContent = String(filtered.length);
+
+    // If showing new service card, prepend it
+    let newServiceCardHtml = '';
+    if (expandedServiceId === 'new') {
+      const blankService = {
+        id: 'new',
+        code: '',
+        name: '',
+        short_name: '',
+        description: '',
+        duration_minutes: 60,
+        price_cents: 0,
+        is_active: true,
+        sort_order: 0,
+        booking_time_mode: 'offered_start_times',
+        service_category_id: null
+      };
+      newServiceCardHtml = renderServiceCard(blankService, { isNew: true });
+    }
+
+    if (filtered.length === 0 && !newServiceCardHtml) {
+      const searchTerm = (document.getElementById('serviceSearch')?.value || '').trim();
+      
+      const message = searchTerm
+        ? `No services found matching "${escapeHtml(searchTerm)}".`
+        : 'No services found for the selected filters.';
+
+      list.innerHTML = newServiceCardHtml + `
+        <div class="p-8 text-center">
+          <div class="text-gray-300 font-medium">
+            ${message}
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    const html = filtered.map(s => renderServiceCard(s, { isNew: false })).join('');
+
+    list.innerHTML = newServiceCardHtml + html;
+    restoreExpandedCard();
+  }
+
+  async function loadServiceCategories() {
+    if (!window.supabaseClient) return;
+
+    try {
+      const { data, error } = await window.supabaseClient
+        .from('service_category')
+        .select('id,name')
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.warn('[admin-services] Service category table not found or error loading categories:', error.message);
+        allServiceCategories = [];
+        return;
+      }
+
+      allServiceCategories = Array.isArray(data) ? data : [];
+    } catch (e) {
+      console.warn('[admin-services] Failed to load service categories:', e);
+      allServiceCategories = [];
+    }
+  }
+
+  async function loadAdminServices() {
+    if (!window.supabaseClient) {
+      setServicesMsg('Supabase client not ready.', 'text-red-600');
+      return;
+    }
+
+    const list = document.getElementById('adminServicesList');
+    if (list) list.innerHTML = '<div class="text-gray-500">Loading…</div>';
+    setServicesMsg('', '');
+
+    // Load categories first (optional, may not exist yet)
+    await loadServiceCategories();
+
+    try {
+      console.log('[admin-services] Loading services from database...');
+      
+      const { data, error } = await window.supabaseClient
+        .from('service')
+        .select('*')
+        .order('name', { ascending: true });
+
+      console.log('[admin-services] Query result:', { data, error });
+
+      if (error) throw error;
+
+      allAdminServices = Array.isArray(data) ? data : [];
+      window.allAdminServices = allAdminServices;
+
+      console.log('[admin-services] Loaded services:', allAdminServices.length);
+
+      renderAdminServices();
+    } catch (e) {
+      console.error('[admin-services] load failed:', e);
+      setServicesMsg('Failed to load services: ' + e.message, 'text-red-600');
+      if (list) list.innerHTML = '<div class="text-gray-500">No data.</div>';
+    }
+  }
+
+  function wireServicesEvents() {
+    const status = document.getElementById('serviceStatusFilter');
+    const search = document.getElementById('serviceSearch');
+    const refresh = document.getElementById('servicesRefreshBtn');
+
+    if (status) {
+      status.addEventListener('change', () => {
+        renderAdminServices();
+      });
+    }
+
+    if (search) {
+      search.addEventListener('input', () => {
+        clearTimeout(servicesSearchDebounce);
+        servicesSearchDebounce = setTimeout(() => {
+          renderAdminServices();
+        }, 200);
+      });
+    }
+
+    if (refresh) {
+      refresh.addEventListener('click', async () => {
+        await loadAdminServices();
+      });
+    }
+
+    const addBtn = document.getElementById('servicesAddBtn');
+    if (addBtn) {
+      addBtn.addEventListener('click', () => {
+        window.addNewService();
+      });
+    }
+
+    const list = document.getElementById('adminServicesList');
+    if (list && !list.dataset.bound) {
+      list.dataset.bound = '1';
+      list.addEventListener('input', (e) => {
+        const target = e.target;
+        if (!target) return;
+        const card = target.closest('.service-card');
+        if (!card) return;
+
+        const field = target.getAttribute('data-field');
+        if (field === 'code') {
+          const codeHelp = card.querySelector('[data-role="code-help"]');
+          if (codeHelp) codeHelp.classList.add('hidden');
+        }
+        if (field === 'name') {
+          const nameHelp = card.querySelector('[data-role="name-help"]');
+          if (nameHelp) nameHelp.classList.add('hidden');
+        }
+        if (field === 'duration_minutes') {
+          const durationHelp = card.querySelector('[data-role="duration-help"]');
+          if (durationHelp) durationHelp.classList.add('hidden');
+        }
+        if (field === 'price_cents') {
+          const priceHelp = card.querySelector('[data-role="price-help"]');
+          if (priceHelp) priceHelp.classList.add('hidden');
+        }
+      });
+    }
+  }
+
+  window.toggleServiceCard = function(serviceId) {
+    if (!serviceId) return;
+    const card = document.querySelector(`#adminServicesList .service-card[data-service-id="${serviceId}"]`);
+    if (!card) return;
+
+    const details = card.querySelector('[data-role="service-details"]');
+    const chevron = card.querySelector('[data-role="service-chevron"]');
+    const label = card.querySelector('[data-role="service-toggle-label"]');
+    const button = card.querySelector('button[aria-label]');
+    if (!details) return;
+
+    const isOpen = !details.classList.contains('hidden');
+
+    if (isOpen) {
+      details.classList.add('hidden');
+      if (chevron) chevron.classList.remove('is-open');
+      if (label) label.textContent = 'Edit';
+      if (button) button.setAttribute('aria-label', 'Edit service details');
+      expandedServiceId = null;
+      
+      // Reset form by re-rendering
+      renderAdminServices();
+      return;
+    }
+
+    expandedServiceId = serviceId;
+    collapseAllServiceCards(serviceId);
+    details.classList.remove('hidden');
+    if (chevron) chevron.classList.add('is-open');
+    if (label) label.textContent = 'Close';
+    if (button) button.setAttribute('aria-label', 'Close service details');
+  };
+
+  window.addNewService = function() {
+    expandedServiceId = 'new';
+    renderAdminServices();
+    const newCard = document.querySelector('#adminServicesList .service-card[data-service-id="new"]');
+    if (newCard) {
+      newCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  };
+
+  window.cancelNewService = function() {
+    expandedServiceId = null;
+    renderAdminServices();
+  };
+
+  window.saveService = async function(serviceId) {
+    if (!serviceId) return;
+    if (!window.supabaseClient) {
+      setServicesMsg('Supabase client not ready.', 'text-red-600');
+      return;
+    }
+
+    const card = document.querySelector(`#adminServicesList .service-card[data-service-id="${serviceId}"]`);
+    if (!card) return;
+
+    const saveBtn = card.querySelector('[data-role="save-btn"]');
+    const getEl = (field) => card.querySelector(`[data-field="${field}"]`);
+    const getValue = (field) => (getEl(field)?.value || '').toString();
+    const getChecked = (field) => (getEl(field)?.checked === true);
+
+    const isNewService = serviceId === 'new';
+
+    // Validate required fields
+    const code = getValue('code').trim();
+    const name = getValue('name').trim();
+    const durationMinutes = parseInt(getValue('duration_minutes'), 10);
+    const priceDollars = parseFloat(getValue('price_cents'));
+    const priceCents = Math.round(priceDollars * 100);
+
+    let hasError = false;
+
+    // Code validation
+    if (!code) {
+      const codeHelp = card.querySelector('[data-role="code-help"]');
+      if (codeHelp) {
+        codeHelp.textContent = 'Code is required';
+        codeHelp.classList.remove('hidden');
+      }
+      if (!hasError) {
+        const codeInput = getEl('code');
+        if (codeInput) codeInput.focus();
+      }
+      hasError = true;
+    }
+
+    // Name validation
+    if (!name) {
+      const nameHelp = card.querySelector('[data-role="name-help"]');
+      if (nameHelp) {
+        nameHelp.textContent = 'Name is required';
+        nameHelp.classList.remove('hidden');
+      }
+      if (!hasError) {
+        const nameInput = getEl('name');
+        if (nameInput) nameInput.focus();
+      }
+      hasError = true;
+    }
+
+    // Duration validation
+    if (isNaN(durationMinutes) || durationMinutes <= 0) {
+      const durationHelp = card.querySelector('[data-role="duration-help"]');
+      if (durationHelp) {
+        durationHelp.textContent = 'Duration must be greater than 0';
+        durationHelp.classList.remove('hidden');
+      }
+      if (!hasError) {
+        const durationInput = getEl('duration_minutes');
+        if (durationInput) durationInput.focus();
+      }
+      hasError = true;
+    }
+
+    // Price validation
+    if (isNaN(priceCents) || priceCents < 0) {
+      const priceHelp = card.querySelector('[data-role="price-help"]');
+      if (priceHelp) {
+        priceHelp.textContent = 'Price must be 0 or greater';
+        priceHelp.classList.remove('hidden');
+      }
+      if (!hasError) {
+        const priceInput = getEl('price_cents');
+        if (priceInput) priceInput.focus();
+      }
+      hasError = true;
+    }
+
+    if (hasError) return;
+
+    // Check for duplicate code
+    if (isNewService) {
+      const { data: existingServices, error: checkError } = await window.supabaseClient
+        .from('service')
+        .select('id')
+        .eq('code', code)
+        .limit(1);
+
+      if (checkError) {
+        console.error('[admin-services] duplicate check failed:', checkError);
+        setServicesMsg('Failed to check for duplicate code.', 'text-red-600');
+        return;
+      }
+
+      if (existingServices && existingServices.length > 0) {
+        const codeHelp = card.querySelector('[data-role="code-help"]');
+        if (codeHelp) {
+          codeHelp.textContent = 'A service with this code already exists';
+          codeHelp.classList.remove('hidden');
+        }
+        const codeInput = getEl('code');
+        if (codeInput) codeInput.focus();
+        return;
+      }
+    }
+
+    const serviceCategoryId = getValue('service_category_id').trim() || null;
+    const sortOrder = parseInt(getValue('sort_order'), 10) || 0;
+
+    const payload = {
+      code: code,
+      name: name,
+      short_name: getValue('short_name').trim(),
+      description: getValue('description').trim(),
+      duration_minutes: durationMinutes,
+      price_cents: priceCents,
+      is_active: getChecked('is_active'),
+      sort_order: sortOrder,
+      booking_time_mode: getValue('booking_time_mode'),
+      service_category_id: serviceCategoryId
+    };
+
+    try {
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving…';
+      }
+
+      let newServiceId = serviceId;
+
+      if (isNewService) {
+        // Insert new service
+        const { data, error } = await window.supabaseClient
+          .from('service')
+          .insert([payload])
+          .select('id')
+          .single();
+
+        if (error) throw error;
+        newServiceId = data.id;
+
+        if (saveBtn) {
+          saveBtn.textContent = 'Saved';
+          saveBtn.disabled = true;
+        }
+
+        setServicesMsg('Service created successfully!', 'text-green-600');
+
+        // Reload services and expand the new service
+        setTimeout(async () => {
+          expandedServiceId = newServiceId;
+          await loadAdminServices();
+        }, 1500);
+      } else {
+        // Update existing service
+        const { error } = await window.supabaseClient
+          .from('service')
+          .update(payload)
+          .eq('id', serviceId);
+
+        if (error) throw error;
+
+        // Update local cache
+        const idx = allAdminServices.findIndex(s => s.id === serviceId);
+        if (idx !== -1) {
+          allAdminServices[idx] = {
+            ...allAdminServices[idx],
+            ...payload
+          };
+        }
+
+        if (saveBtn) {
+          saveBtn.textContent = 'Saved';
+          saveBtn.disabled = true;
+        }
+
+        setServicesMsg('Service updated successfully!', 'text-green-600');
+
+        setTimeout(() => {
+          if (saveBtn) {
+            saveBtn.textContent = 'Save';
+            saveBtn.disabled = false;
+          }
+          setServicesMsg('', '');
+          renderAdminServices();
+        }, 1500);
+      }
+    } catch (e) {
+      console.error('[admin-services] save failed:', e);
+      setServicesMsg('Failed to save service: ' + e.message, 'text-red-600');
+      if (saveBtn) {
+        saveBtn.textContent = isNewService ? 'Create Service' : 'Save';
+        saveBtn.disabled = false;
+      }
+    }
+  };
+
+  window.deleteService = async function(serviceId) {
+    if (!serviceId || serviceId === 'new') return;
+    if (!window.supabaseClient) {
+      setServicesMsg('Supabase client not ready.', 'text-red-600');
+      return;
+    }
+
+    const service = allAdminServices.find(s => s.id === serviceId);
+    if (!service) return;
+
+    const serviceName = service.name || 'this service';
+
+    // Check if service has existing bookings
+    const { data: bookings, error: bookingError } = await window.supabaseClient
+      .from('booking')
+      .select('id')
+      .eq('service_code', service.code)
+      .limit(1);
+
+    if (bookingError) {
+      console.error('[admin-services] booking check failed:', bookingError);
+      setServicesMsg('Failed to check for existing bookings.', 'text-red-600');
+      return;
+    }
+
+    if (bookings && bookings.length > 0) {
+      if (window.Modal && typeof window.Modal.confirm === 'function') {
+        window.Modal.confirm(
+          `This service has existing bookings and cannot be deleted. Would you like to deactivate it instead?`,
+          async () => {
+            // Deactivate service
+            try {
+              const { error } = await window.supabaseClient
+                .from('service')
+                .update({ is_active: false })
+                .eq('id', serviceId);
+
+              if (error) throw error;
+
+              // Update local cache
+              const idx = allAdminServices.findIndex(s => s.id === serviceId);
+              if (idx !== -1) {
+                allAdminServices[idx].is_active = false;
+              }
+
+              setServicesMsg('Service deactivated successfully!', 'text-green-600');
+              expandedServiceId = null;
+              renderAdminServices();
+
+              setTimeout(() => {
+                setServicesMsg('', '');
+              }, 3000);
+            } catch (e) {
+              console.error('[admin-services] deactivate failed:', e);
+              setServicesMsg('Failed to deactivate service: ' + e.message, 'text-red-600');
+            }
+          },
+          null,
+          'Deactivate Service',
+          { confirmText: 'Yes, Deactivate', cancelText: 'Cancel' }
+        );
+      } else {
+        const ok = window.confirm(`This service has existing bookings and cannot be deleted. Would you like to deactivate it instead?`);
+        if (!ok) return;
+
+        try {
+          const { error } = await window.supabaseClient
+            .from('service')
+            .update({ is_active: false })
+            .eq('id', serviceId);
+
+          if (error) throw error;
+
+          // Update local cache
+          const idx = allAdminServices.findIndex(s => s.id === serviceId);
+          if (idx !== -1) {
+            allAdminServices[idx].is_active = false;
+          }
+
+          setServicesMsg('Service deactivated successfully!', 'text-green-600');
+          expandedServiceId = null;
+          renderAdminServices();
+
+          setTimeout(() => {
+            setServicesMsg('', '');
+          }, 3000);
+        } catch (e) {
+          console.error('[admin-services] deactivate failed:', e);
+          setServicesMsg('Failed to deactivate service: ' + e.message, 'text-red-600');
+        }
+      }
+      return;
+    }
+
+    // No bookings, can delete
+    if (window.Modal && typeof window.Modal.confirm === 'function') {
+      window.Modal.confirm(
+        `Are you sure you want to delete "${escapeHtml(serviceName)}"? This action cannot be undone.`,
+        async () => {
+          try {
+            const { error } = await window.supabaseClient
+              .from('service')
+              .delete()
+              .eq('id', serviceId);
+
+            if (error) throw error;
+
+            // Remove from local cache
+            allAdminServices = allAdminServices.filter(s => s.id !== serviceId);
+            window.allAdminServices = allAdminServices;
+
+            setServicesMsg('Service deleted successfully!', 'text-green-600');
+            expandedServiceId = null;
+            renderAdminServices();
+
+            setTimeout(() => {
+              setServicesMsg('', '');
+            }, 3000);
+          } catch (e) {
+            console.error('[admin-services] delete failed:', e);
+            setServicesMsg('Failed to delete service: ' + e.message, 'text-red-600');
+          }
+        },
+        null,
+        'Delete Service',
+        { confirmText: 'Yes, Delete', cancelText: 'Cancel' }
+      );
+    } else {
+      const ok = window.confirm(`Are you sure you want to delete "${serviceName}"? This action cannot be undone.`);
+      if (!ok) return;
+
+      try {
+        const { error } = await window.supabaseClient
+          .from('service')
+          .delete()
+          .eq('id', serviceId);
+
+        if (error) throw error;
+
+        // Remove from local cache
+        allAdminServices = allAdminServices.filter(s => s.id !== serviceId);
+        window.allAdminServices = allAdminServices;
+
+        setServicesMsg('Service deleted successfully!', 'text-green-600');
+        expandedServiceId = null;
+        renderAdminServices();
+
+        setTimeout(() => {
+          setServicesMsg('', '');
+        }, 3000);
+      } catch (e) {
+        console.error('[admin-services] delete failed:', e);
+        setServicesMsg('Failed to delete service: ' + e.message, 'text-red-600');
+      }
+    }
+  };
+
+  function initAdminServices() {
+    console.log('[admin-services] Initialising...');
+
+    const section = document.getElementById('section-services');
+    if (!section) {
+      console.error('[admin-services] Section element not found!');
+      return;
+    }
+
+    if (section.dataset.servicesInit === '1') {
+      return;
+    }
+
+    section.dataset.servicesInit = '1';
+
+    console.log('[admin-services] Section found, setting up observer');
+
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+          const isVisible = !section.classList.contains('hidden');
+          console.log('[admin-services] Visibility changed, isVisible:', isVisible);
+
+          if (isVisible && allAdminServices.length === 0) {
+            console.log('[admin-services] Section is visible and no services loaded yet, loading...');
+            wireServicesEvents();
+            loadAdminServices();
+          }
+        }
+      });
+    });
+
+    observer.observe(section, { attributes: true });
+
+    wireServicesEvents();
+
+    if (!section.classList.contains('hidden')) {
+      console.log('[admin-services] Section already visible, loading services');
+      loadAdminServices();
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAdminServices);
+  } else {
+    initAdminServices();
+  }
+})();
+</script>

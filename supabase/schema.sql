@@ -29,6 +29,11 @@ CREATE TYPE public.msg_status AS ENUM (
     'failed'
 );
 
+CREATE TYPE public.booking_time_mode AS ENUM (
+    'offered_start_times',
+    'entered_start_time'
+);
+
 -- =====================================================================
 -- CORE TABLES
 -- =====================================================================
@@ -70,6 +75,18 @@ COMMENT ON COLUMN public.client.password_changed_at IS 'Timestamp of last passwo
 COMMENT ON COLUMN public.client.stripe_customer_id IS 'Stripe customer ID for this client';
 COMMENT ON COLUMN public.client.stripe_default_payment_method_id IS 'Default saved Stripe payment method ID for this client';
 
+-- Service category table: organizes services into categories
+CREATE TABLE public.service_category (
+    id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
+    name text NOT NULL,
+    sort_order integer,
+    is_active boolean DEFAULT true NOT NULL,
+    icon_name text,
+    message_text text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
 -- Service table: defines available driving lesson services
 CREATE TABLE public.service (
     id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
@@ -83,10 +100,14 @@ CREATE TABLE public.service (
     created_at timestamp with time zone DEFAULT now(),
     google_booking_url text,
     sort_order integer,
+    service_category_id uuid,
+    booking_time_mode public.booking_time_mode DEFAULT 'offered_start_times'::public.booking_time_mode NOT NULL,
     CONSTRAINT service_google_booking_url_format CHECK (((google_booking_url IS NULL) OR (google_booking_url ~ '^https://calendar\.app\.google/[A-Za-z0-9]+$'::text)))
 );
 
 COMMENT ON COLUMN public.service.short_name IS 'Compact service label for SMS and space-constrained UI, e.g. Auto – 1 hr.';
+COMMENT ON COLUMN public.service.service_category_id IS 'Optional category grouping for this service';
+COMMENT ON COLUMN public.service.booking_time_mode IS 'Controls how booking start time is selected: offered_start_times or entered_start_time';
 
 -- Package table: defines lesson packages for bulk purchase
 CREATE TABLE public.package (
@@ -772,6 +793,12 @@ CREATE TRIGGER t_client_progress_updated
     FOR EACH ROW 
     EXECUTE FUNCTION public.set_client_progress_updated();
 
+-- Trigger: UPDATE timestamp on service category changes
+CREATE TRIGGER t_service_category_updated 
+    BEFORE UPDATE ON public.service_category 
+    FOR EACH ROW 
+    EXECUTE FUNCTION public.set_updated_at();
+
 -- Trigger: UPDATE remaining credits on client_credit changes
 CREATE TRIGGER t_client_credit_remaining 
     BEFORE INSERT OR UPDATE ON public.client_credit 
@@ -805,6 +832,12 @@ ALTER TABLE ONLY public.client
 
 ALTER TABLE ONLY public.client
     ADD CONSTRAINT client_email_key UNIQUE (email);
+
+ALTER TABLE ONLY public.service_category
+    ADD CONSTRAINT service_category_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.service_category
+    ADD CONSTRAINT service_category_name_key UNIQUE (name);
 
 ALTER TABLE ONLY public.service
     ADD CONSTRAINT service_pkey1 PRIMARY KEY (id);
@@ -867,8 +900,13 @@ CREATE INDEX idx_client_intake_completed ON public.client USING btree (intake_co
 CREATE INDEX idx_client_is_test ON public.client USING btree (is_test);
 CREATE INDEX idx_client_stripe_customer_id ON public.client USING btree (stripe_customer_id) WHERE (stripe_customer_id IS NOT NULL);
 
+-- Service category indexes
+CREATE INDEX idx_service_category_sort_order ON public.service_category USING btree (sort_order);
+CREATE INDEX idx_service_category_is_active ON public.service_category USING btree (is_active);
+
 -- Service indexes
 CREATE INDEX idx_service_sort_order ON public.service USING btree (sort_order);
+CREATE INDEX idx_service_category_id ON public.service USING btree (service_category_id);
 
 -- Booking indexes
 CREATE INDEX idx_booking_client_id ON public.booking USING btree (client_id);
@@ -924,6 +962,9 @@ ALTER TABLE ONLY public.client_credit
 ALTER TABLE ONLY public.client_credit
     ADD CONSTRAINT client_credit_package_id_fkey FOREIGN KEY (package_id) REFERENCES public.package(id);
 
+ALTER TABLE ONLY public.service
+    ADD CONSTRAINT service_category_id_fkey FOREIGN KEY (service_category_id) REFERENCES public.service_category(id) ON DELETE SET NULL;
+
 ALTER TABLE ONLY public.sms_log
     ADD CONSTRAINT sms_log_booking_id_fkey FOREIGN KEY (booking_id) REFERENCES public.booking(id) ON DELETE CASCADE;
 
@@ -944,6 +985,7 @@ ALTER TABLE ONLY public.availability_slot_old
 -- =====================================================================
 
 ALTER TABLE public.client ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.service_category ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.service ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.package ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.booking ENABLE ROW LEVEL SECURITY;
@@ -973,6 +1015,13 @@ CREATE POLICY client_insert ON public.client FOR INSERT TO authenticated, anon
 CREATE POLICY client_update ON public.client FOR UPDATE TO authenticated 
     USING ((public.is_admin() OR (email = COALESCE((auth.jwt() ->> 'email'::text), ''::text)))) 
     WITH CHECK ((public.is_admin() OR (email = COALESCE((auth.jwt() ->> 'email'::text), ''::text))));
+
+-- Service category policies
+CREATE POLICY "Users can read active service categories" ON public.service_category FOR SELECT TO authenticated, anon 
+    USING ((is_active = true));
+
+CREATE POLICY "Service role full access service_category" ON public.service_category TO service_role 
+    USING (true);
 
 -- Service policies
 CREATE POLICY "Users can read active services" ON public.service FOR SELECT TO authenticated, anon 
@@ -1107,6 +1156,18 @@ CREATE POLICY schedule_select_public ON public.schedule_old FOR SELECT
 
 CREATE POLICY slot_select_free ON public.availability_slot_old FOR SELECT 
     USING ((is_booked = false));
+
+-- =====================================================================
+-- EXPLICIT API GRANTS
+-- =====================================================================
+
+-- Service table grants
+GRANT SELECT ON TABLE public.service TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.service TO authenticated;
+
+-- Service category table grants
+GRANT SELECT ON TABLE public.service_category TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.service_category TO authenticated;
 
 -- =====================================================================
 -- END OF SCHEMA

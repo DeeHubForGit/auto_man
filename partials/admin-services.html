@@ -159,6 +159,17 @@
     border-color: var(--danger-red) !important;
     color: var(--danger-red) !important;
   }
+
+  #section-services .service-delete-btn {
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0 !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    line-height: 1;
+  }
 </style>
 
 <section id="section-services" class="section-content bg-white border rounded-2xl shadow-sm p-5 hidden">
@@ -373,7 +384,7 @@
     const summarySection = isNew
       ? `<div class="text-sm text-gray-600">Fill in the required fields to create a new service</div>`
       : `<div class="service-summary">
-            <div class="flex items-center gap-2">
+            <div class="flex items-start gap-2 flex-wrap">
               <div class="font-semibold text-base sm:text-lg leading-tight text-gray-900">${escapeHtml(displayName)}</div>
               ${statusPillHtml}
             </div>
@@ -402,7 +413,7 @@
 
     const headerButtons = isNew
       ? ''
-      : `<div class="shrink-0 flex items-center gap-2">
+      : `<div class="shrink-0 flex items-start gap-2">
             <button type="button" class="btn btn-primary px-2 sm:px-4" onclick="event.stopPropagation(); window.toggleServiceCard('${escapeHtml(s.id)}')" aria-label="Edit service details">
               <span class="hidden sm:inline" data-role="service-toggle-label">Edit</span>
               <svg class="w-5 h-5 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -411,8 +422,8 @@
               <span class="service-chevron" data-role="service-chevron">▾</span>
             </button>
 
-            <button type="button" class="btn btn-outline-red px-2 sm:px-4" onclick="event.stopPropagation(); window.deleteService('${escapeHtml(s.id)}')" aria-label="Delete service">
-              Delete
+            <button type="button" class="btn btn-outline-red service-delete-btn" onclick="event.stopPropagation(); window.deleteService('${escapeHtml(s.id)}')" aria-label="Delete service" title="Delete service">
+              ×
             </button>
           </div>`;
 

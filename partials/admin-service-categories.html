@@ -1,0 +1,1009 @@
+<!-- Admin Service Categories Section -->
+<style>
+  #adminCategoriesList .category-card {
+    width: 100%;
+    background-color: #dbeafe !important;
+    border: 2px solid #3b82f6 !important;
+    border-radius: 0.5rem;
+    color: #111827 !important;
+  }
+
+  #adminCategoriesList .category-card:hover {
+    border-color: #2563eb !important;
+  }
+
+  #adminCategoriesList .category-card.inactive-category {
+    background-color: #f1f5f9 !important;
+    border-color: #94a3b8 !important;
+  }
+
+  #adminCategoriesList .category-card.inactive-category:hover {
+    border-color: #64748b !important;
+  }
+
+  #adminCategoriesList .category-card input,
+  #adminCategoriesList .category-card textarea {
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  #adminCategoriesList .category-card label {
+    color: #111827 !important;
+  }
+
+  #section-categories .category-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 10px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
+    color: #111827;
+  }
+
+  #section-categories .category-pill.active {
+    border-color: #93c5fd;
+    background: #dbeafe;
+    color: #1d4ed8 !important;
+  }
+
+  #section-categories .category-pill.inactive {
+    border-color: #94a3b8;
+    background: #f8fafc;
+    color: #475569 !important;
+  }
+
+  #section-categories .category-header {
+    cursor: pointer;
+  }
+
+  #section-categories .category-chevron {
+    transition: transform 0.15s ease;
+  }
+
+  #section-categories .category-chevron.is-open {
+    transform: rotate(180deg);
+  }
+
+  #adminCategoriesList .category-summary,
+  #adminCategoriesList .category-summary * {
+    color: #111827 !important;
+  }
+
+  #adminCategoriesList .category-card [data-role="category-details"] .text-red-600 {
+    color: var(--danger-red) !important;
+  }
+
+  #section-categories .btn-outline-red {
+    background: transparent !important;
+    border: 1px solid var(--danger-red) !important;
+    color: var(--danger-red) !important;
+  }
+
+  #section-categories .btn-outline-red:hover {
+    background: rgba(220, 38, 38, 0.08) !important;
+    border-color: var(--danger-red) !important;
+    color: var(--danger-red) !important;
+  }
+
+  #section-categories .category-delete-btn {
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0 !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    line-height: 1;
+  }
+
+  .icon-upload-area {
+    border: 2px dashed #d1d5db;
+    border-radius: 0.5rem;
+    background: #f9fafb;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+
+  .icon-upload-area:hover {
+    border-color: #3b82f6;
+    background: #eff6ff;
+  }
+
+  .icon-upload-area.dragging {
+    border-color: #3b82f6;
+    background: #dbeafe;
+  }
+
+  .icon-preview {
+    max-width: 120px;
+    max-height: 120px;
+    object-fit: contain;
+  }
+</style>
+
+<section id="section-categories" class="section-content bg-white border rounded-2xl shadow-sm p-5 hidden">
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <h2 class="text-xl font-semibold">Service Categories</h2>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button id="categoriesAddBtn" class="btn btn-primary" type="button">
+        Add Category
+      </button>
+      <button id="categoriesRefreshBtn" class="btn btn-primary-light" type="button">
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <div class="flex items-center justify-between mb-4">
+    <div class="text-sm text-gray-500">
+      <span id="categoriesCount">0</span>
+      <span class="text-gray-400">categories</span>
+    </div>
+  </div>
+
+  <div id="categoriesMsg" class="text-sm mb-3"></div>
+  <div id="adminCategoriesList" class="flex flex-col gap-4"></div>
+</section>
+
+<script>
+(function() {
+  let allAdminCategories = [];
+  let expandedCategoryId = null;
+  let pendingImageFiles = {};
+
+  function setCategoriesMsg(text, cls) {
+    const el = document.getElementById('categoriesMsg');
+    if (!el) return;
+    el.textContent = text || '';
+    el.className = 'text-sm mb-3 ' + (cls || '');
+  }
+
+  function safeText(value) {
+    return (value === null || value === undefined) ? '' : String(value);
+  }
+
+  function escapeHtml(str) {
+    return safeText(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function collapseAllCategoryCards(exceptId = null) {
+    document.querySelectorAll('#adminCategoriesList .category-card').forEach(card => {
+      const cardId = card.getAttribute('data-category-id');
+      if (exceptId && cardId === exceptId) return;
+      const details = card.querySelector('[data-role="category-details"]');
+      const chevron = card.querySelector('[data-role="category-chevron"]');
+      const label = card.querySelector('[data-role="category-toggle-label"]');
+      if (details) details.classList.add('hidden');
+      if (chevron) chevron.classList.remove('is-open');
+      if (label) label.textContent = 'Edit';
+    });
+  }
+
+  function restoreExpandedCard() {
+    if (!expandedCategoryId) return;
+    const card = document.querySelector(`#adminCategoriesList .category-card[data-category-id="${expandedCategoryId}"]`);
+    if (!card) {
+      expandedCategoryId = null;
+      return;
+    }
+    collapseAllCategoryCards(expandedCategoryId);
+    const details = card.querySelector('[data-role="category-details"]');
+    const chevron = card.querySelector('[data-role="category-chevron"]');
+    const label = card.querySelector('[data-role="category-toggle-label"]');
+    if (details) details.classList.remove('hidden');
+    if (chevron) chevron.classList.add('is-open');
+    if (label) label.textContent = 'Close';
+  }
+
+  function sanitiseFilename(filename) {
+    return filename.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 100);
+  }
+
+  function validateImageFile(file) {
+    const validTypes = ['image/png', 'image/jpeg', 'image/webp'];
+    const maxSize = 2 * 1024 * 1024;
+
+    if (!validTypes.includes(file.type)) {
+      return { ok: false, error: 'Only PNG, JPG/JPEG, and WebP images are allowed.' };
+    }
+
+    if (file.size > maxSize) {
+      return { ok: false, error: 'Image must be under 2 MB.' };
+    }
+
+    return { ok: true };
+  }
+
+  function handleIconFileSelect(categoryId, file) {
+    const validation = validateImageFile(file);
+    if (!validation.ok) {
+      const card = document.querySelector(`[data-category-id="${categoryId}"]`);
+      if (card) {
+        const errorEl = card.querySelector('[data-role="icon-error"]');
+        if (errorEl) {
+          errorEl.textContent = validation.error;
+          errorEl.classList.remove('hidden');
+        }
+      }
+      return;
+    }
+
+    pendingImageFiles[categoryId] = file;
+
+    const card = document.querySelector(`[data-category-id="${categoryId}"]`);
+    if (card) {
+      const errorEl = card.querySelector('[data-role="icon-error"]');
+      if (errorEl) errorEl.classList.add('hidden');
+
+      const preview = card.querySelector('[data-role="icon-preview"]');
+      const uploadArea = card.querySelector('[data-role="icon-upload-area"]');
+      const previewContainer = card.querySelector('[data-role="icon-preview-container"]');
+      const uploadText = card.querySelector('[data-role="upload-text"]');
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (preview) preview.src = e.target.result;
+        if (previewContainer) previewContainer.classList.remove('hidden');
+        if (uploadText) uploadText.textContent = 'Drop new image or click to replace';
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  function setupIconUpload(categoryId) {
+    const card = document.querySelector(`[data-category-id="${categoryId}"]`);
+    if (!card) return;
+
+    const uploadArea = card.querySelector('[data-role="icon-upload-area"]');
+    const fileInput = card.querySelector('[data-role="icon-file-input"]');
+    const removeBtn = card.querySelector('[data-role="icon-remove-btn"]');
+
+    if (uploadArea && fileInput) {
+      uploadArea.onclick = (e) => {
+        e.stopPropagation();
+        fileInput.click();
+      };
+
+      uploadArea.ondragover = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        uploadArea.classList.add('dragging');
+      };
+
+      uploadArea.ondragleave = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        uploadArea.classList.remove('dragging');
+      };
+
+      uploadArea.ondrop = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        uploadArea.classList.remove('dragging');
+
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+          handleIconFileSelect(categoryId, files[0]);
+        }
+      };
+
+      fileInput.onchange = (e) => {
+        const files = e.target.files;
+        if (files.length > 0) {
+          handleIconFileSelect(categoryId, files[0]);
+        }
+      };
+    }
+
+    if (removeBtn) {
+      removeBtn.onclick = (e) => {
+        e.stopPropagation();
+        delete pendingImageFiles[categoryId];
+
+        const preview = card.querySelector('[data-role="icon-preview"]');
+        const previewContainer = card.querySelector('[data-role="icon-preview-container"]');
+        const uploadText = card.querySelector('[data-role="upload-text"]');
+        const errorEl = card.querySelector('[data-role="icon-error"]');
+
+        if (preview) preview.src = '';
+        if (previewContainer) previewContainer.classList.add('hidden');
+        if (uploadText) uploadText.textContent = 'Drop image here or click to upload';
+        if (errorEl) errorEl.classList.add('hidden');
+        if (fileInput) fileInput.value = '';
+
+        const removeMarker = card.querySelector('[data-field="remove_icon"]');
+        if (removeMarker) removeMarker.value = 'true';
+      };
+    }
+  }
+
+  function renderCategoryCard(c, options = {}) {
+    const isNew = options.isNew === true;
+
+    const name = safeText(c.name);
+    const sortOrder = c.sort_order || 0;
+    const messageText = safeText(c.message_text || '');
+    const isActive = c.is_active !== false;
+    const iconPath = safeText(c.icon_path || '');
+
+    const displayName = isNew ? 'New Category' : (name || '(No name)');
+
+    const inputCls = 'w-full bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent';
+    const labelCls = 'block text-sm font-medium mb-1 text-gray-900';
+
+    const requiredMarker = isNew ? ' <span class="text-red-600">*</span>' : '';
+    const cardClasses = isNew
+      ? 'category-card p-4 border-2 border-blue-500 bg-blue-50'
+      : `category-card p-4 ${isActive ? '' : 'inactive-category'}`;
+    const saveButtonText = isNew ? 'Create Category' : 'Save';
+    const cancelOnClick = isNew ? 'window.cancelNewCategory()' : `window.toggleCategoryCard('${escapeHtml(c.id)}')`;
+
+    const statusPillHtml = isNew ? '' : (
+      isActive
+        ? '<span class="category-pill active" data-role="summary-status-pill">✓ Active</span>'
+        : '<span class="category-pill inactive" data-role="summary-status-pill">✗ Inactive</span>'
+    );
+
+    const iconUrl = iconPath ? `${window.SITE_CONFIG.SUPABASE_URL}/storage/v1/object/public/service-category-icons/${iconPath}` : '';
+    const showPreview = iconUrl || pendingImageFiles[c.id];
+
+    const summarySection = isNew
+      ? `<div class="text-sm text-gray-600">Fill in the required fields to create a new service category</div>`
+      : `<div class="category-summary">
+            <div class="flex items-start gap-2 flex-wrap">
+              <div class="font-semibold text-base sm:text-lg leading-tight text-gray-900">${escapeHtml(displayName)}</div>
+              ${statusPillHtml}
+            </div>
+
+            <div class="mt-1 flex flex-wrap items-start gap-x-4 gap-y-1 text-sm text-gray-900">
+              <div class="flex items-start gap-2 min-w-0">
+                <span class="font-medium">Sort Order:</span>
+                <span>${sortOrder}</span>
+              </div>
+              ${iconPath ? `
+              <div class="flex items-start gap-2 min-w-0">
+                <span class="font-medium">Icon:</span>
+                <span>Uploaded</span>
+              </div>
+              ` : ''}
+            </div>
+          </div>`;
+
+    const headerButtons = isNew
+      ? ''
+      : `<div class="shrink-0 flex items-start gap-2">
+            <button type="button" class="btn btn-primary px-2 sm:px-4" onclick="event.stopPropagation(); window.toggleCategoryCard('${escapeHtml(c.id)}')" aria-label="Edit category details">
+              <span class="hidden sm:inline" data-role="category-toggle-label">Edit</span>
+              <svg class="w-5 h-5 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              <span class="category-chevron" data-role="category-chevron">▾</span>
+            </button>
+
+            <button type="button" class="btn btn-outline-red category-delete-btn" onclick="event.stopPropagation(); window.deleteCategory('${escapeHtml(c.id)}')" aria-label="Delete category" title="Delete category">
+              ×
+            </button>
+          </div>`;
+
+    const headerOnClick = isNew ? '' : `onclick="window.toggleCategoryCard('${escapeHtml(c.id)}')"`;
+    const detailsClasses = isNew ? 'mt-4 pt-4 border-t border-gray-400' : 'hidden mt-4 pt-4 border-t border-gray-400';
+
+    return `
+      <div class="${cardClasses}" data-category-id="${escapeHtml(c.id)}">
+        <div class="category-header flex items-start justify-between gap-3" ${headerOnClick}>
+          <div class="min-w-0 flex-1">
+            ${summarySection}
+          </div>
+          ${headerButtons}
+        </div>
+
+        <div class="${detailsClasses}" data-role="category-details" onclick="event.stopPropagation()">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div class="mb-3">
+                <label class="${labelCls}">Name${requiredMarker}</label>
+                <input class="${inputCls}" data-field="name" value="${escapeHtml(name)}" placeholder="e.g. Automatic Lessons" />
+                <div class="text-xs text-red-600 mt-1 hidden" data-role="name-help">Name is required</div>
+              </div>
+
+              <div class="mb-3">
+                <label class="${labelCls}">Sort Order</label>
+                <input type="number" class="${inputCls}" data-field="sort_order" value="${sortOrder}" min="0" placeholder="0" />
+              </div>
+
+              <div class="mb-3">
+                <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-900">
+                  <input type="checkbox" data-field="is_active" ${isActive ? 'checked' : ''} />
+                  Active
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <div class="mb-3">
+                <label class="${labelCls}">Icon Image</label>
+                <div class="icon-upload-area p-4 text-center" data-role="icon-upload-area">
+                  <input type="file" class="hidden" accept="image/png,image/jpeg,image/webp" data-role="icon-file-input" />
+                  <input type="hidden" data-field="remove_icon" value="" />
+                  
+                  <div data-role="icon-preview-container" class="${showPreview ? '' : 'hidden'}">
+                    <img src="${iconUrl}" alt="Icon preview" class="icon-preview mx-auto mb-2" data-role="icon-preview" />
+                    <button type="button" class="text-sm text-red-600 hover:underline" data-role="icon-remove-btn">Remove Icon</button>
+                  </div>
+
+                  <div class="text-sm text-gray-600" data-role="upload-text">
+                    ${showPreview ? 'Drop new image or click to replace' : 'Drop image here or click to upload'}
+                  </div>
+                  <div class="text-xs text-gray-500 mt-1">PNG, JPG, WebP (max 2 MB)</div>
+                </div>
+                <div class="text-xs text-red-600 mt-1 hidden" data-role="icon-error"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <label class="${labelCls}">Message Text (optional)</label>
+            <textarea class="${inputCls}" data-field="message_text" rows="2" placeholder="Optional message to display with this category">${escapeHtml(messageText)}</textarea>
+          </div>
+
+          <div class="mt-4">
+            <div class="flex items-center gap-3">
+              <button type="button" class="btn btn-primary" data-role="save-btn" onclick="window.saveCategory('${escapeHtml(c.id)}')">${saveButtonText}</button>
+              <button type="button" class="btn btn-outline-blue" onclick="${cancelOnClick}">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderAdminCategories() {
+    const list = document.getElementById('adminCategoriesList');
+    const countEl = document.getElementById('categoriesCount');
+    if (!list) return;
+
+    const categories = allAdminCategories.slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+    
+    if (countEl) countEl.textContent = String(categories.length);
+
+    let newCategoryCardHtml = '';
+    if (expandedCategoryId === 'new') {
+      const blankCategory = {
+        id: 'new',
+        name: '',
+        sort_order: 0,
+        is_active: true,
+        message_text: '',
+        icon_path: null
+      };
+      newCategoryCardHtml = renderCategoryCard(blankCategory, { isNew: true });
+    }
+
+    if (categories.length === 0 && !newCategoryCardHtml) {
+      list.innerHTML = newCategoryCardHtml + `
+        <div class="p-8 text-center">
+          <div class="text-gray-300 font-medium">
+            No service categories found.
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    const html = categories.map(c => renderCategoryCard(c, { isNew: false })).join('');
+    list.innerHTML = newCategoryCardHtml + html;
+    restoreExpandedCard();
+
+    if (expandedCategoryId) {
+      setupIconUpload(expandedCategoryId);
+    }
+  }
+
+  async function loadAdminCategories() {
+    if (!window.supabaseClient) {
+      setCategoriesMsg('Supabase client not ready.', 'text-red-600');
+      return;
+    }
+
+    const list = document.getElementById('adminCategoriesList');
+    if (list) list.innerHTML = '<div class="text-gray-500">Loading…</div>';
+    setCategoriesMsg('', '');
+
+    try {
+      const { data, error } = await window.supabaseClient
+        .from('service_category')
+        .select('*')
+        .order('sort_order', { ascending: true });
+
+      if (error) throw error;
+
+      allAdminCategories = Array.isArray(data) ? data : [];
+      window.allAdminCategories = allAdminCategories;
+
+      renderAdminCategories();
+    } catch (e) {
+      console.error('[admin-categories] load failed:', e);
+      setCategoriesMsg('Failed to load categories: ' + e.message, 'text-red-600');
+      if (list) list.innerHTML = '<div class="text-gray-500">No data.</div>';
+    }
+  }
+
+  function wireCategoriesEvents() {
+    const refresh = document.getElementById('categoriesRefreshBtn');
+    if (refresh) {
+      refresh.addEventListener('click', async () => {
+        await loadAdminCategories();
+      });
+    }
+
+    const addBtn = document.getElementById('categoriesAddBtn');
+    if (addBtn) {
+      addBtn.addEventListener('click', () => {
+        window.addNewCategory();
+      });
+    }
+
+    const list = document.getElementById('adminCategoriesList');
+    if (list && !list.dataset.bound) {
+      list.dataset.bound = '1';
+      list.addEventListener('input', (e) => {
+        const target = e.target;
+        if (!target) return;
+        const card = target.closest('.category-card');
+        if (!card) return;
+
+        const field = target.getAttribute('data-field');
+        if (field === 'name') {
+          const nameHelp = card.querySelector('[data-role="name-help"]');
+          if (nameHelp) nameHelp.classList.add('hidden');
+        }
+      });
+    }
+  }
+
+  window.toggleCategoryCard = function(categoryId) {
+    if (!categoryId) return;
+    const card = document.querySelector(`#adminCategoriesList .category-card[data-category-id="${categoryId}"]`);
+    if (!card) return;
+
+    const details = card.querySelector('[data-role="category-details"]');
+    const chevron = card.querySelector('[data-role="category-chevron"]');
+    const label = card.querySelector('[data-role="category-toggle-label"]');
+    if (!details) return;
+
+    const isOpen = !details.classList.contains('hidden');
+
+    if (isOpen) {
+      details.classList.add('hidden');
+      if (chevron) chevron.classList.remove('is-open');
+      if (label) label.textContent = 'Edit';
+      expandedCategoryId = null;
+      delete pendingImageFiles[categoryId];
+      renderAdminCategories();
+      return;
+    }
+
+    expandedCategoryId = categoryId;
+    collapseAllCategoryCards(categoryId);
+    details.classList.remove('hidden');
+    if (chevron) chevron.classList.add('is-open');
+    if (label) label.textContent = 'Close';
+
+    setTimeout(() => setupIconUpload(categoryId), 100);
+  };
+
+  window.addNewCategory = function() {
+    expandedCategoryId = 'new';
+    renderAdminCategories();
+    setTimeout(() => setupIconUpload('new'), 100);
+    const newCard = document.querySelector('#adminCategoriesList .category-card[data-category-id="new"]');
+    if (newCard) {
+      newCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  };
+
+  window.cancelNewCategory = function() {
+    expandedCategoryId = null;
+    delete pendingImageFiles['new'];
+    renderAdminCategories();
+  };
+
+  async function uploadCategoryIcon(categoryId, file) {
+    if (!window.supabaseClient || !categoryId || !file) {
+      return { ok: false, error: 'Missing required parameters' };
+    }
+
+    try {
+      const timestamp = Date.now();
+      const sanitised = sanitiseFilename(file.name);
+      const filename = `${timestamp}-${sanitised}`;
+      const path = `service-categories/${categoryId}/${filename}`;
+
+      const { data, error } = await window.supabaseClient.storage
+        .from('service-category-icons')
+        .upload(path, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) {
+        console.error('[admin-categories] upload failed:', error);
+        return { ok: false, error: error.message };
+      }
+
+      return { ok: true, path: path };
+    } catch (e) {
+      console.error('[admin-categories] upload exception:', e);
+      return { ok: false, error: e.message };
+    }
+  }
+
+  async function deleteStorageIcon(iconPath) {
+    if (!window.supabaseClient || !iconPath) return;
+
+    try {
+      const { error } = await window.supabaseClient.storage
+        .from('service-category-icons')
+        .remove([iconPath]);
+
+      if (error) {
+        console.error('[admin-categories] failed to delete old icon:', error);
+      }
+    } catch (e) {
+      console.error('[admin-categories] delete icon exception:', e);
+    }
+  }
+
+  window.saveCategory = async function(categoryId) {
+    if (!categoryId) return;
+    if (!window.supabaseClient) {
+      setCategoriesMsg('Supabase client not ready.', 'text-red-600');
+      return;
+    }
+
+    const card = document.querySelector(`#adminCategoriesList .category-card[data-category-id="${categoryId}"]`);
+    if (!card) return;
+
+    const saveBtn = card.querySelector('[data-role="save-btn"]');
+    const getEl = (field) => card.querySelector(`[data-field="${field}"]`);
+    const getValue = (field) => (getEl(field)?.value || '').toString();
+    const getChecked = (field) => (getEl(field)?.checked === true);
+
+    const isNewCategory = categoryId === 'new';
+
+    const name = getValue('name').trim();
+    const sortOrder = parseInt(getValue('sort_order'), 10) || 0;
+    const messageText = getValue('message_text').trim();
+    const isActive = getChecked('is_active');
+    const removeIcon = getValue('remove_icon') === 'true';
+
+    let hasError = false;
+
+    if (!name) {
+      const nameHelp = card.querySelector('[data-role="name-help"]');
+      if (nameHelp) {
+        nameHelp.textContent = 'Name is required';
+        nameHelp.classList.remove('hidden');
+      }
+      const nameInput = getEl('name');
+      if (nameInput) nameInput.focus();
+      hasError = true;
+    }
+
+    if (hasError) return;
+
+    const payload = {
+      name: name,
+      sort_order: sortOrder,
+      is_active: isActive,
+      message_text: messageText
+    };
+
+    try {
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving…';
+      }
+
+      let finalCategoryId = categoryId;
+
+      if (isNewCategory) {
+        const { data, error } = await window.supabaseClient
+          .from('service_category')
+          .insert([payload])
+          .select('id')
+          .single();
+
+        if (error) throw error;
+        finalCategoryId = data.id;
+      } else {
+        const { error } = await window.supabaseClient
+          .from('service_category')
+          .update(payload)
+          .eq('id', categoryId);
+
+        if (error) throw error;
+      }
+
+      const pendingFile = pendingImageFiles[categoryId];
+      const category = allAdminCategories.find(c => c.id === finalCategoryId);
+      const oldIconPath = category?.icon_path;
+
+      let iconOperationFailed = false;
+
+      if (removeIcon && !pendingFile) {
+        const { error: removeIconError } = await window.supabaseClient
+          .from('service_category')
+          .update({ icon_path: null })
+          .eq('id', finalCategoryId);
+
+        if (removeIconError) {
+          console.error('[admin-categories] Failed to remove icon_path from database:', removeIconError);
+          setCategoriesMsg('Failed to remove icon: ' + removeIconError.message, 'text-red-600');
+          if (saveBtn) {
+            saveBtn.textContent = isNewCategory ? 'Create Category' : 'Save';
+            saveBtn.disabled = false;
+          }
+          return;
+        }
+
+        if (oldIconPath) {
+          await deleteStorageIcon(oldIconPath);
+        }
+      } else if (pendingFile) {
+        const uploadResult = await uploadCategoryIcon(finalCategoryId, pendingFile);
+        if (uploadResult.ok) {
+          const { error: iconUpdateError } = await window.supabaseClient
+            .from('service_category')
+            .update({ icon_path: uploadResult.path })
+            .eq('id', finalCategoryId);
+
+          if (iconUpdateError) {
+            console.error('[admin-categories] Failed to update icon_path in database:', iconUpdateError);
+            setCategoriesMsg('Failed to save icon path: ' + iconUpdateError.message, 'text-red-600');
+            
+            // Clean up orphaned Storage file
+            await deleteStorageIcon(uploadResult.path);
+            
+            const iconError = card.querySelector('[data-role="icon-error"]');
+            if (iconError) {
+              iconError.textContent = 'Database update failed: ' + iconUpdateError.message;
+              iconError.classList.remove('hidden');
+            }
+            
+            if (saveBtn) {
+              saveBtn.textContent = isNewCategory ? 'Create Category' : 'Save';
+              saveBtn.disabled = false;
+            }
+            return;
+          }
+
+          // Only delete old icon after successful database update
+          if (oldIconPath && oldIconPath !== uploadResult.path) {
+            await deleteStorageIcon(oldIconPath);
+          }
+
+          delete pendingImageFiles[categoryId];
+        } else {
+          const iconError = card.querySelector('[data-role="icon-error"]');
+          if (iconError) {
+            iconError.textContent = 'Failed to upload icon: ' + uploadResult.error;
+            iconError.classList.remove('hidden');
+          }
+          setCategoriesMsg('Icon upload failed: ' + uploadResult.error, 'text-red-600');
+          if (saveBtn) {
+            saveBtn.textContent = isNewCategory ? 'Create Category' : 'Save';
+            saveBtn.disabled = false;
+          }
+          return;
+        }
+      }
+
+      if (saveBtn) {
+        saveBtn.textContent = 'Saved';
+        saveBtn.disabled = true;
+      }
+
+      setTimeout(async () => {
+        if (saveBtn) {
+          saveBtn.textContent = isNewCategory ? 'Create Category' : 'Save';
+          saveBtn.disabled = false;
+        }
+        setCategoriesMsg('', '');
+        expandedCategoryId = isNewCategory ? finalCategoryId : expandedCategoryId;
+        await loadAdminCategories();
+      }, 1500);
+
+    } catch (e) {
+      console.error('[admin-categories] save failed:', e);
+      setCategoriesMsg('Failed to save category: ' + e.message, 'text-red-600');
+      if (saveBtn) {
+        saveBtn.textContent = isNewCategory ? 'Create Category' : 'Save';
+        saveBtn.disabled = false;
+      }
+    }
+  };
+
+  window.deleteCategory = async function(categoryId) {
+    if (!categoryId || categoryId === 'new') return;
+    if (!window.supabaseClient) {
+      setCategoriesMsg('Supabase client not ready.', 'text-red-600');
+      return;
+    }
+
+    const category = allAdminCategories.find(c => c.id === categoryId);
+    if (!category) return;
+
+    const categoryName = category.name || 'this category';
+
+    const { data: services, error: servicesError } = await window.supabaseClient
+      .from('service')
+      .select('id')
+      .eq('service_category_id', categoryId)
+      .limit(1);
+
+    if (servicesError) {
+      console.error('[admin-categories] service check failed:', servicesError);
+      setCategoriesMsg('Failed to check for existing services.', 'text-red-600');
+      return;
+    }
+
+    if (services && services.length > 0) {
+      if (window.Modal && typeof window.Modal.confirm === 'function') {
+        window.Modal.confirm(
+          `This category has services assigned to it and cannot be deleted. Would you like to deactivate it instead?`,
+          async () => {
+            try {
+              const { error } = await window.supabaseClient
+                .from('service_category')
+                .update({ is_active: false })
+                .eq('id', categoryId);
+
+              if (error) throw error;
+
+              const idx = allAdminCategories.findIndex(c => c.id === categoryId);
+              if (idx !== -1) {
+                allAdminCategories[idx].is_active = false;
+              }
+
+              setCategoriesMsg('Category deactivated successfully!', 'text-green-600');
+              expandedCategoryId = null;
+              renderAdminCategories();
+
+              setTimeout(() => {
+                setCategoriesMsg('', '');
+              }, 3000);
+            } catch (e) {
+              console.error('[admin-categories] deactivate failed:', e);
+              setCategoriesMsg('Failed to deactivate category: ' + e.message, 'text-red-600');
+            }
+          },
+          null,
+          'Deactivate Category',
+          { confirmText: 'Yes, Deactivate', cancelText: 'Cancel' }
+        );
+      } else {
+        alert('This category has services assigned to it and cannot be deleted. Please deactivate it instead.');
+      }
+      return;
+    }
+
+    if (window.Modal && typeof window.Modal.confirm === 'function') {
+      window.Modal.confirm(
+        `Are you sure you want to delete "${escapeHtml(categoryName)}"? This action cannot be undone.`,
+        async () => {
+          try {
+            const { error } = await window.supabaseClient
+              .from('service_category')
+              .delete()
+              .eq('id', categoryId);
+
+            if (error) throw error;
+
+            if (category.icon_path) {
+              await deleteStorageIcon(category.icon_path);
+            }
+
+            allAdminCategories = allAdminCategories.filter(c => c.id !== categoryId);
+            window.allAdminCategories = allAdminCategories;
+
+            setCategoriesMsg('Category deleted successfully!', 'text-green-600');
+            expandedCategoryId = null;
+            renderAdminCategories();
+
+            setTimeout(() => {
+              setCategoriesMsg('', '');
+            }, 3000);
+          } catch (e) {
+            console.error('[admin-categories] delete failed:', e);
+            setCategoriesMsg('Failed to delete category: ' + e.message, 'text-red-600');
+          }
+        },
+        null,
+        'Delete Category',
+        { confirmText: 'Yes, Delete', cancelText: 'Cancel' }
+      );
+    } else {
+      const ok = window.confirm(`Are you sure you want to delete "${categoryName}"? This action cannot be undone.`);
+      if (!ok) return;
+
+      try {
+        const { error } = await window.supabaseClient
+          .from('service_category')
+          .delete()
+          .eq('id', categoryId);
+
+        if (error) throw error;
+
+        if (category.icon_path) {
+          await deleteStorageIcon(category.icon_path);
+        }
+
+        allAdminCategories = allAdminCategories.filter(c => c.id !== categoryId);
+        window.allAdminCategories = allAdminCategories;
+
+        setCategoriesMsg('Category deleted successfully!', 'text-green-600');
+        expandedCategoryId = null;
+        renderAdminCategories();
+
+        setTimeout(() => {
+          setCategoriesMsg('', '');
+        }, 3000);
+      } catch (e) {
+        console.error('[admin-categories] delete failed:', e);
+        setCategoriesMsg('Failed to delete category: ' + e.message, 'text-red-600');
+      }
+    }
+  };
+
+  function initAdminCategories() {
+    const section = document.getElementById('section-categories');
+    if (!section) return;
+
+    if (section.dataset.categoriesInit === '1') {
+      return;
+    }
+
+    section.dataset.categoriesInit = '1';
+
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+          const isVisible = !section.classList.contains('hidden');
+
+          if (isVisible && allAdminCategories.length === 0) {
+            wireCategoriesEvents();
+            loadAdminCategories();
+          }
+        }
+      });
+    });
+
+    observer.observe(section, { attributes: true });
+
+    wireCategoriesEvents();
+
+    if (!section.classList.contains('hidden')) {
+      loadAdminCategories();
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAdminCategories);
+  } else {
+    initAdminCategories();
+  }
+})();
+</script>

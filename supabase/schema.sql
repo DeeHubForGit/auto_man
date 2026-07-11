@@ -1,8 +1,9 @@
 -- =====================================================================
--- AUTO MAN DRIVING SCHOOL - DATABASE SCHEMA (PUBLIC SCHEMA ONLY)
+-- AUTO MAN DRIVING SCHOOL - DATABASE SCHEMA
 -- =====================================================================
--- Generated FROM pg_dump, cleaned to include only public schema elements
--- Excludes: auth, extensions, graphql, pgbouncer, realtime, storage, vault schemas
+-- Generated FROM pg_dump and consolidated with required Auto-Man Storage configuration
+-- Includes public schema elements plus the service category icon Storage bucket and policies
+-- Excludes unrelated auth, graphql, pgbouncer, realtime, storage, and vault schema objects
 -- =====================================================================
 
 -- =====================================================================
@@ -81,11 +82,13 @@ CREATE TABLE public.service_category (
     name text NOT NULL,
     sort_order integer,
     is_active boolean DEFAULT true NOT NULL,
-    icon_name text,
+    icon_path text,
     message_text text,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now()
 );
+
+COMMENT ON COLUMN public.service_category.icon_path IS 'Supabase Storage object path for the uploaded icon image (e.g. service-categories/{uuid}/{filename}). Null if no icon is uploaded.';
 
 -- Service table: defines available driving lesson services
 CREATE TABLE public.service (
@@ -1020,6 +1023,16 @@ CREATE POLICY client_update ON public.client FOR UPDATE TO authenticated
 CREATE POLICY "Users can read active service categories" ON public.service_category FOR SELECT TO authenticated, anon 
     USING ((is_active = true));
 
+CREATE POLICY "Admin can insert service categories" ON public.service_category FOR INSERT TO authenticated
+    WITH CHECK (public.is_admin());
+
+CREATE POLICY "Admin can update service categories" ON public.service_category FOR UPDATE TO authenticated
+    USING (public.is_admin())
+    WITH CHECK (public.is_admin());
+
+CREATE POLICY "Admin can delete service categories" ON public.service_category FOR DELETE TO authenticated
+    USING (public.is_admin());
+
 CREATE POLICY "Service role full access service_category" ON public.service_category TO service_role 
     USING (true);
 
@@ -1168,6 +1181,76 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.service TO authenticated;
 -- Service category table grants
 GRANT SELECT ON TABLE public.service_category TO anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.service_category TO authenticated;
+
+-- =====================================================================
+-- SUPABASE STORAGE: SERVICE CATEGORY ICONS
+-- =====================================================================
+
+-- Public bucket for service category icon images
+INSERT INTO storage.buckets (
+    id,
+    name,
+    public,
+    file_size_limit,
+    allowed_mime_types
+)
+VALUES (
+    'service-category-icons',
+    'service-category-icons',
+    true,
+    2097152,
+    ARRAY['image/png', 'image/jpeg', 'image/webp']
+)
+ON CONFLICT (id) DO UPDATE
+SET
+    name = EXCLUDED.name,
+    public = EXCLUDED.public,
+    file_size_limit = EXCLUDED.file_size_limit,
+    allowed_mime_types = EXCLUDED.allowed_mime_types;
+
+DROP POLICY IF EXISTS "Public can view service category icons" ON storage.objects;
+DROP POLICY IF EXISTS "Admins can upload service category icons" ON storage.objects;
+DROP POLICY IF EXISTS "Admins can update service category icons" ON storage.objects;
+DROP POLICY IF EXISTS "Admins can delete service category icons" ON storage.objects;
+
+CREATE POLICY "Public can view service category icons"
+ON storage.objects
+FOR SELECT
+TO public
+USING (
+    bucket_id = 'service-category-icons'
+);
+
+CREATE POLICY "Admins can upload service category icons"
+ON storage.objects
+FOR INSERT
+TO authenticated
+WITH CHECK (
+    bucket_id = 'service-category-icons'
+    AND public.is_admin()
+);
+
+CREATE POLICY "Admins can update service category icons"
+ON storage.objects
+FOR UPDATE
+TO authenticated
+USING (
+    bucket_id = 'service-category-icons'
+    AND public.is_admin()
+)
+WITH CHECK (
+    bucket_id = 'service-category-icons'
+    AND public.is_admin()
+);
+
+CREATE POLICY "Admins can delete service category icons"
+ON storage.objects
+FOR DELETE
+TO authenticated
+USING (
+    bucket_id = 'service-category-icons'
+    AND public.is_admin()
+);
 
 -- =====================================================================
 -- END OF SCHEMA

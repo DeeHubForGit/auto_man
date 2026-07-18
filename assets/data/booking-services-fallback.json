@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "last_updated": "2026-07-18",
+  "categories": [
+    {
+      "id": "automatic",
+      "name": "Automatic Lessons",
+      "sort_order": 1,
+      "is_active": true,
+      "icon_url": "images/auto-gearbox.png",
+      "message_text": null,
+      "services": [
+        {
+          "code": "auto_60",
+          "name": "Automatic Driving Lesson — 1 hour",
+          "description": "Perfect for beginners and skill improvement",
+          "duration_minutes": 60,
+          "price_cents": 8500,
+          "google_booking_url": "https://calendar.app.google/3ehp4B9MRcF83CEE9",
+          "sort_order": 1,
+          "is_active": true
+        },
+        {
+          "code": "auto_90",
+          "name": "Automatic Driving Lesson — 1.5 hours",
+          "description": "Extra time for complex skills",
+          "duration_minutes": 90,
+          "price_cents": 12500,
+          "google_booking_url": "https://calendar.app.google/tTykRfbx3w9izTY86",
+          "sort_order": 2,
+          "is_active": true
+        },
+        {
+          "code": "auto_120",
+          "name": "Automatic Driving Lesson — 2 hours",
+          "description": "Extended session for comprehensive practice",
+          "duration_minutes": 120,
+          "price_cents": 16500,
+          "google_booking_url": "https://calendar.app.google/QtGWGiyNpcqq9C1z8",
+          "sort_order": 3,
+          "is_active": true
+        }
+      ]
+    },
+    {
+      "id": "manual",
+      "name": "Manual Lessons",
+      "sort_order": 2,
+      "is_active": true,
+      "icon_url": "images/manual-gearbox.png",
+      "message_text": "Call {{OWNER}} {{PHONE}}",
+      "services": []
+    },
+    {
+      "id": "senior",
+      "name": "Senior Lessons",
+      "sort_order": 3,
+      "is_active": true,
+      "icon_url": "images/elderly-couple.png",
+      "message_text": null,
+      "services": [
+        {
+          "code": "senior_auto_60",
+          "name": "Senior Automatic Driving Lesson — 1 hour",
+          "description": "For senior drivers focusing on safety and confidence. Pensioner discount included.",
+          "duration_minutes": 60,
+          "price_cents": 7500,
+          "google_booking_url": "https://calendar.app.google/vvE6utyXe4aa7BQb9",
+          "sort_order": 7,
+          "is_active": true
+        }
+      ]
+    }
+  ]
+}

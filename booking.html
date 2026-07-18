@@ -46,7 +46,7 @@
 
       <!-- Services (Auto-expanded categories) -->
       <div id="booking-services-container" class="space-y-8">
-        <!-- Categories and services will be dynamically loaded from Supabase -->
+        <!-- Categories and services will be dynamically loaded from Supabase or the JSON fallback -->
       </div>
 
       <div class="mt-10 p-6 bg-slate-800/50 rounded-xl">
@@ -82,7 +82,7 @@
     // Render booking services on DOM ready
     document.addEventListener('DOMContentLoaded', async function() {
       await waitForSupabaseClient();
-      renderBookingServices();
+      await renderBookingServices();
     });
 
     async function waitForSupabaseClient() {
@@ -102,16 +102,6 @@
       return div.innerHTML;
     }
 
-    function formatDuration(minutes) {
-      if (!minutes) return '';
-      if (minutes < 60) return `${minutes} min`;
-      const hours = minutes / 60;
-      if (hours === 1) return '1 hour';
-      if (hours === 1.5) return '1.5 hours';
-      if (hours === Math.floor(hours)) return `${hours} hours`;
-      return `${hours} hours`;
-    }
-
     function formatPrice(cents) {
       if (cents === null || cents === undefined) return '';
 
@@ -127,6 +117,21 @@
       imgElement.src = 'images/auto-man-small-logo120x120.png';
     }
 
+    function replaceBookingConfigTokens(value) {
+      if (!value || typeof value !== 'string') return value;
+      
+      let result = value;
+      if (window.SITE_CONFIG) {
+        if (window.SITE_CONFIG.OWNER_NAME) {
+          result = result.replace(/\{\{OWNER\}\}/g, window.SITE_CONFIG.OWNER_NAME);
+        }
+        if (window.SITE_CONFIG.PHONE_NUMBER_DISPLAY) {
+          result = result.replace(/\{\{PHONE\}\}/g, window.SITE_CONFIG.PHONE_NUMBER_DISPLAY);
+        }
+      }
+      return result;
+    }
+
     async function renderBookingServices() {
       const container = document.getElementById('booking-services-container');
       if (!container) return;
@@ -134,180 +139,195 @@
       container.replaceChildren();
 
       try {
-        if (!window.supabaseClient) {
-          console.warn('[booking] Supabase client not available, using config fallback');
-          renderBookingServicesFromConfig();
-          return;
+        // Try to load from Supabase database
+        const categories = await loadBookingServicesFromDatabase();
+        console.log('[booking] Using Supabase data');
+        renderBookingServiceCategories(categories);
+      } catch (dbError) {
+        console.error('[booking] Failed to load from database:', dbError);
+        
+        try {
+          // Fall back to JSON file
+          const { categories, last_updated } = await loadBookingServicesFromFallback();
+          console.warn('[booking] Using fallback data' + (last_updated ? ` (last updated: ${last_updated})` : ''));
+          renderBookingServiceCategories(categories);
+        } catch (fallbackError) {
+          console.error('[booking] Failed to load fallback data:', fallbackError);
+          // Show final unavailable message
+          renderBookingServicesUnavailable();
         }
-
-        const { data: categories, error: catError } = await window.supabaseClient
-          .from('service_category')
-          .select('*')
-          .eq('is_active', true)
-          .order('sort_order', { ascending: true });
-
-        if (catError) {
-          console.error('[booking] Failed to load categories:', catError);
-          renderBookingServicesFromConfig();
-          return;
-        }
-
-        if (!categories || categories.length === 0) {
-          console.warn('[booking] No active categories found, using config fallback');
-          renderBookingServicesFromConfig();
-          return;
-        }
-
-        for (const category of categories) {
-          const { data: services, error: svcError } = await window.supabaseClient
-            .from('service')
-            .select('*')
-            .eq('service_category_id', category.id)
-            .eq('is_active', true)
-            .order('sort_order', { ascending: true });
-
-          if (svcError) {
-            console.error('[booking] Failed to load services for category:', category.name, svcError);
-            continue;
-          }
-
-          const categoryDiv = document.createElement('div');
-          categoryDiv.className = 'booking-category';
-
-          const iconUrl = category.icon_path
-            ? `${window.SITE_CONFIG.SUPABASE_URL}/storage/v1/object/public/service-category-icons/${category.icon_path}`
-            : 'images/auto-man-small-logo120x120.png';
-
-          const headerButton = document.createElement('button');
-          headerButton.className = 'w-full text-left mb-4 flex items-center gap-3 group';
-          headerButton.onclick = () => toggleCategory(category.id);
-          headerButton.innerHTML = `
-            <img src="${escapeHtml(iconUrl)}" 
-                 alt="${escapeHtml(category.name)}" 
-                 class="w-8 h-8 object-contain"
-                 onerror="handleImageError(this)">
-            <h2 class="text-xl font-semibold tracking-tight flex-1">${escapeHtml(category.name)}</h2>
-            <svg id="chevron-${category.id}" class="w-5 h-5 text-slate-400 chevron-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          `;
-
-          const servicesDiv = document.createElement('div');
-          servicesDiv.id = `services-${category.id}`;
-          servicesDiv.className = 'space-y-3 category-services p-1';
-
-          if (!services || services.length === 0) {
-            const comingSoonDiv = document.createElement('div');
-            comingSoonDiv.className = 'service-card rounded-2xl p-4 shadow-sm ring-1 ring-white/10 flex items-center justify-center gap-3';
-            const message = category.message_text || 'Bookings are currently unavailable for this category';
-            comingSoonDiv.innerHTML = `
-              <span class="text-gray-300 font-medium">${escapeHtml(message)}</span>
-            `;
-            servicesDiv.appendChild(comingSoonDiv);
-          } else {
-            services.forEach(service => {
-              const serviceDiv = document.createElement('div');
-              serviceDiv.className = 'service-card group flex flex-wrap items-center gap-3 justify-between rounded-2xl p-4 shadow-sm ring-1 ring-white/10 hover:ring-blue-400/60 transition';
-
-              const price = formatPrice(service.price_cents);
-              const name = service.name || '';
-              const description = service.description || '';
-              const bookingUrl = service.google_booking_url || '#';
-
-              serviceDiv.innerHTML = `
-                <div class="min-w-0 flex-1">
-                  <p class="font-medium">${escapeHtml(name)}</p>
-                  ${description ? `<p class="text-xs text-gray-400">${escapeHtml(description)}</p>` : ''}
-                </div>
-                <div class="flex items-center gap-4">
-                  <span class="text-gray-300 font-medium">$${price}</span>
-                  ${bookingUrl !== '#' ? `
-                  <a href="${escapeHtml(bookingUrl)}"
-                     target="_blank"
-                     rel="noopener noreferrer"
-                     class="btn btn-primary whitespace-nowrap">
-                    Book Now
-                  </a>
-                  ` : ''}
-                </div>
-              `;
-
-              servicesDiv.appendChild(serviceDiv);
-            });
-          }
-
-          categoryDiv.appendChild(headerButton);
-          categoryDiv.appendChild(servicesDiv);
-          container.appendChild(categoryDiv);
-        }
-      } catch (e) {
-        console.error('[booking] Error loading services:', e);
-        renderBookingServicesFromConfig();
       }
     }
 
-    function renderBookingServicesFromConfig() {
-      const container = document.getElementById('booking-services-container');
-      if (!container || !window.SITE_CONFIG || !window.SITE_CONFIG.BOOKING_CATEGORIES) {
-        return;
+    async function loadBookingServicesFromDatabase() {
+      if (!window.supabaseClient) {
+        throw new Error('Supabase client not available');
       }
 
-      container.replaceChildren();
+      const { data: categories, error: catError } = await window.supabaseClient
+        .from('service_category')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
 
-      const categories = window.SITE_CONFIG.BOOKING_CATEGORIES;
+      if (catError) {
+        throw catError;
+      }
+
+      if (!categories || categories.length === 0) {
+        throw new Error('No active categories found');
+      }
+
+      // Load services for each category
+      const categoriesWithServices = [];
       
-      categories.forEach((category, index) => {
-        // Create category section
+      for (const category of categories) {
+        const { data: services, error: svcError } = await window.supabaseClient
+          .from('service')
+          .select('*')
+          .eq('service_category_id', category.id)
+          .eq('is_active', true)
+          .order('sort_order', { ascending: true });
+
+        if (svcError) {
+          throw svcError;
+        }
+
+        // Calculate icon URL
+        const icon_url = category.icon_path
+          ? `${window.SITE_CONFIG.SUPABASE_URL}/storage/v1/object/public/service-category-icons/${category.icon_path}`
+          : 'images/auto-man-small-logo120x120.png';
+
+        categoriesWithServices.push({
+          id: category.id,
+          name: category.name,
+          sort_order: category.sort_order,
+          is_active: category.is_active,
+          icon_url: icon_url,
+          message_text: category.message_text,
+          services: services || []
+        });
+      }
+
+      return categoriesWithServices;
+    }
+
+    async function loadBookingServicesFromFallback() {
+      const response = await fetch('assets/data/booking-services-fallback.json', {
+        cache: 'no-cache'
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to load fallback file: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (!data.categories || !Array.isArray(data.categories) || data.categories.length === 0) {
+        throw new Error('Invalid fallback data structure');
+      }
+
+      // Filter and sort categories and services
+      const categories = data.categories
+        .filter(cat => cat.is_active !== false)
+        .map(cat => ({
+          ...cat,
+          services: (cat.services || [])
+            .filter(svc => svc.is_active !== false)
+            .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+        }))
+        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
+      return {
+        categories: categories,
+        last_updated: data.last_updated
+      };
+    }
+
+    function renderBookingServiceCategories(categories) {
+      const container = document.getElementById('booking-services-container');
+      if (!container) return;
+
+      categories.forEach(category => {
         const categoryDiv = document.createElement('div');
         categoryDiv.className = 'booking-category';
+
+        // Category icon URL with fallback
+        const iconUrl = category.icon_url || 'images/auto-man-small-logo120x120.png';
 
         // Category header (clickable to collapse/expand)
         const headerButton = document.createElement('button');
         headerButton.className = 'w-full text-left mb-4 flex items-center gap-3 group';
         headerButton.onclick = () => toggleCategory(category.id);
         headerButton.innerHTML = `
-          <img src="${category.icon}" alt="${category.name}" class="w-8 h-8 object-contain">
-          <h2 class="text-xl font-semibold tracking-tight flex-1">${category.name}</h2>
-          <svg id="chevron-${category.id}" class="w-5 h-5 text-slate-400 chevron-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <img src="${escapeHtml(iconUrl)}" 
+               alt="${escapeHtml(category.name)}" 
+               class="w-8 h-8 object-contain"
+               onerror="handleImageError(this)">
+          <h2 class="text-xl font-semibold tracking-tight flex-1">${escapeHtml(category.name)}</h2>
+          <svg id="chevron-${escapeHtml(category.id)}" class="w-5 h-5 text-slate-400 chevron-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
           </svg>
         `;
 
-        // Services container (auto-expanded by default)
+        // Services container
         const servicesDiv = document.createElement('div');
-        servicesDiv.id = `services-${category.id}`;
+        servicesDiv.id = `services-${escapeHtml(category.id)}`;
         servicesDiv.className = 'space-y-3 category-services p-1';
 
-        // Check if coming soon
-        if (category.comingSoon) {
-          const comingSoonDiv = document.createElement('div');
-          comingSoonDiv.className = 'service-card rounded-2xl p-4 shadow-sm ring-1 ring-white/10 flex items-center justify-center gap-3';
-          comingSoonDiv.innerHTML = `
-            <span class="text-gray-300 font-medium">📱 Call {{OWNER}} {{PHONE}}</span>
+        if (!category.services || category.services.length === 0) {
+          // Category has no services - show message
+          const messageDiv = document.createElement('div');
+          messageDiv.className = 'service-card rounded-2xl p-4 shadow-sm ring-1 ring-white/10 flex items-center justify-center gap-3';
+          
+          let messageText = category.message_text || 'Bookings are currently unavailable for this category';
+          messageText = replaceBookingConfigTokens(messageText);
+          
+          messageDiv.innerHTML = `
+            <span class="text-gray-300 font-medium">${escapeHtml(messageText)}</span>
           `;
-          servicesDiv.appendChild(comingSoonDiv);
+          servicesDiv.appendChild(messageDiv);
         } else {
-          // Render each service
+          // Render services
           category.services.forEach(service => {
             const serviceDiv = document.createElement('div');
             serviceDiv.className = 'service-card group flex flex-wrap items-center gap-3 justify-between rounded-2xl p-4 shadow-sm ring-1 ring-white/10 hover:ring-blue-400/60 transition';
 
-            serviceDiv.innerHTML = `
+            const displayName = service.name || '';
+            const description = service.description || '';
+            const price = formatPrice(service.price_cents);
+            const bookingUrl = service.google_booking_url || '';
+
+            let contentHtml = `
               <div class="min-w-0 flex-1">
-                <p class="font-medium">${service.name} — ${service.duration}</p>
-                <p class="text-xs text-gray-400">${service.description}</p>
-              </div>
-              <div class="flex items-center gap-4">
-                <span class="text-gray-300 font-medium">$${service.price}</span>
-                <a href="${service.bookingUrl}"
-                   target="_blank"
-                   rel="noopener noreferrer"
-                   class="btn btn-primary whitespace-nowrap">
-                  Book Now
-                </a>
+                <p class="font-medium">${escapeHtml(displayName)}</p>
+                ${description ? `<p class="text-xs text-gray-400">${escapeHtml(description)}</p>` : ''}
               </div>
             `;
 
+            // Add price and booking button if available
+            if (price || bookingUrl) {
+              contentHtml += `<div class="flex items-center gap-4">`;
+              
+              if (price) {
+                contentHtml += `<span class="text-gray-300 font-medium">$${escapeHtml(price)}</span>`;
+              }
+              
+              if (bookingUrl) {
+                contentHtml += `
+                  <a href="${escapeHtml(bookingUrl)}"
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     class="btn btn-primary whitespace-nowrap">
+                    Book Now
+                  </a>
+                `;
+              }
+              
+              contentHtml += `</div>`;
+            }
+
+            serviceDiv.innerHTML = contentHtml;
             servicesDiv.appendChild(serviceDiv);
           });
         }
@@ -316,6 +336,27 @@
         categoryDiv.appendChild(servicesDiv);
         container.appendChild(categoryDiv);
       });
+    }
+
+    function renderBookingServicesUnavailable() {
+      const container = document.getElementById('booking-services-container');
+      if (!container) return;
+
+      const unavailableDiv = document.createElement('div');
+      unavailableDiv.className = 'service-card rounded-2xl p-6 shadow-sm ring-1 ring-white/10 text-center';
+      
+      const ownerName = window.SITE_CONFIG.OWNER_NAME;
+      const phoneDisplay = window.SITE_CONFIG.PHONE_NUMBER_DISPLAY;
+      const phoneLink = window.SITE_CONFIG.PHONE_NUMBER_LINK;
+      
+      unavailableDiv.innerHTML = `
+        <p class="text-gray-300 font-medium">
+          Booking services are temporarily unavailable. Please call ${escapeHtml(ownerName)} on 
+          <a href="tel:${escapeHtml(phoneLink)}" class="text-blue-400 hover:text-blue-300">${escapeHtml(phoneDisplay)}</a>.
+        </p>
+      `;
+      
+      container.appendChild(unavailableDiv);
     }
 
     function toggleCategory(categoryId) {

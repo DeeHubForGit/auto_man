@@ -1,0 +1,796 @@
+<!-- Admin Business Hours Section -->
+<style>
+
+  #adminBusinessHoursList .day-card {
+    width: 100%;
+    background-color: #dbeafe !important;
+    border: 2px solid #3b82f6 !important;
+    border-radius: 0.5rem;
+    color: #111827 !important;
+  }
+
+  #adminBusinessHoursList .day-card:hover {
+    border-color: #2563eb !important;
+  }
+
+  #adminBusinessHoursList .day-card h3 {
+    color: #111827 !important;
+  }
+
+  #adminBusinessHoursList .period-row {
+    background-color: #ffffff !important;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+  }
+
+  #adminBusinessHoursList .period-row:hover {
+    border-color: #9ca3af;
+  }
+
+  #adminBusinessHoursList .period-row label {
+    display: block;
+    color: #374151 !important;
+  }
+
+  #adminBusinessHoursList .period-row input[type="time"] {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .business-hours-time-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 10.5rem));
+    gap: 0.75rem;
+  }
+
+  /* Chromium time input optimizations */
+  #adminBusinessHoursList input[type="time"]::-webkit-datetime-edit {
+    padding: 0;
+  }
+
+  #adminBusinessHoursList input[type="time"]::-webkit-calendar-picker-indicator {
+    margin-left: 0.35rem;
+    padding: 0;
+    width: 1rem;
+    height: 1rem;
+  }
+
+  @media (max-width: 639px) {
+    .business-hours-time-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.5rem;
+    }
+
+    #adminBusinessHoursList .period-row input[type="time"] {
+      padding-left: 0.5rem;
+      padding-right: 0.35rem;
+    }
+  }
+
+  #adminBusinessHoursList .day-card input,
+  #adminBusinessHoursList .day-card select {
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  #adminBusinessHoursList .day-card label {
+    color: #111827 !important;
+  }
+
+  #adminBusinessHoursList .closed-notice {
+    color: #374151 !important;
+    font-weight: 500;
+  }
+
+  /* Ensure validation error text stays red */
+  #adminBusinessHoursList .day-card [data-role$="-error"] {
+    color: var(--danger) !important;
+  }
+
+  #section-business-hours .btn-outline-red {
+    background: transparent !important;
+    border: 1px solid var(--danger) !important;
+    color: var(--danger) !important;
+  }
+
+  #section-business-hours .btn-outline-red:hover {
+    background: rgba(220, 38, 38, 0.08) !important;
+    border-color: var(--danger) !important;
+    color: var(--danger) !important;
+  }
+
+
+</style>
+
+<section id="section-business-hours" class="section-content hidden">
+  <div class="bg-white rounded-2xl border shadow-sm p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-semibold">Business Hours</h2>
+      
+      <button id="businessHoursRefreshBtn" class="btn btn-primary" type="button" aria-label="Refresh business hours" title="Refresh">
+        <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 8c0-3.3-2.7-6-6-6S2 4.7 2 8s2.7 6 6 6c1.8 0 3.4-.8 4.5-2M14 3v5h-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="hidden sm:inline">Refresh</span>
+      </button>
+    </div>
+
+    <div id="businessHoursMsg" class="text-sm mb-3"></div>
+    <div id="adminBusinessHoursList" class="flex flex-col gap-4"></div>
+  </div>
+</section>
+
+<script>
+(function() {
+  const DAYS_OF_WEEK = [
+    { value: 0, name: 'Sunday' },
+    { value: 1, name: 'Monday' },
+    { value: 2, name: 'Tuesday' },
+    { value: 3, name: 'Wednesday' },
+    { value: 4, name: 'Thursday' },
+    { value: 5, name: 'Friday' },
+    { value: 6, name: 'Saturday' }
+  ];
+
+  let allBusinessHours = [];
+  let addingForDay = null;
+  let businessHoursLoaded = false;
+
+  function setBusinessHoursMsg(text, cls) {
+    const el = document.getElementById('businessHoursMsg');
+    if (!el) return;
+    el.textContent = text || '';
+    el.className = 'text-sm mb-3 ' + (cls || '');
+  }
+
+  function safeText(value) {
+    return (value === null || value === undefined) ? '' : String(value);
+  }
+
+  function escapeHtml(str) {
+    return safeText(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  // Format time from database format (HH:MM:SS or HH:MM) to display format (h:mm am/pm)
+  function formatTimeDisplay(timeStr) {
+    if (!timeStr) return '';
+    try {
+      const parts = timeStr.split(':');
+      if (parts.length < 2) return timeStr;
+      
+      const hours = parseInt(parts[0], 10);
+      const minutes = parseInt(parts[1], 10);
+      
+      if (isNaN(hours) || isNaN(minutes)) return timeStr;
+      
+      const ampm = hours >= 12 ? 'pm' : 'am';
+      const displayHours = hours === 0 ? 12 : (hours > 12 ? hours - 12 : hours);
+      const displayMinutes = String(minutes).padStart(2, '0');
+      
+      return `${displayHours}:${displayMinutes} ${ampm}`;
+    } catch (e) {
+      return timeStr;
+    }
+  }
+
+  // Format time from input (HH:MM) to database format (HH:MM:SS)
+  function formatTimeForDb(timeStr) {
+    if (!timeStr) return null;
+    const parts = timeStr.split(':');
+    if (parts.length === 2) {
+      return `${parts[0]}:${parts[1]}:00`;
+    }
+    return timeStr;
+  }
+
+  // Get periods for a specific day
+  function getPeriodsForDay(dayOfWeek) {
+    return allBusinessHours
+      .filter(p => p.day_of_week === dayOfWeek)
+      .sort((a, b) => {
+        if (a.start_time < b.start_time) return -1;
+        if (a.start_time > b.start_time) return 1;
+        return 0;
+      });
+  }
+
+  // Check if two time periods overlap
+  function periodsOverlap(start1, end1, start2, end2) {
+    return start1 < end2 && end1 > start2;
+  }
+
+  function renderDayCard(day) {
+    const periods = getPeriodsForDay(day.value);
+    const hasPeriods = periods.length > 0;
+    const isAdding = addingForDay === day.value;
+
+    // Render existing periods as inline editable rows
+    const periodsHtml = periods.map(p => renderPeriodRow(p, day)).join('');
+
+    // Render new period row if adding
+    const newPeriodHtml = isAdding ? renderNewPeriodRow(day) : '';
+
+    // Show "Closed" only when no periods exist and not adding
+    const closedHtml = !hasPeriods && !isAdding 
+      ? '<div class="closed-notice text-sm mb-2">Closed</div>' 
+      : '';
+
+    // Show Add Period button when not currently adding
+    const addButtonHtml = !isAdding ? `
+      <button type="button" class="btn btn-primary text-sm mt-2" onclick="window.addBusinessHoursPeriod(${day.value})">
+        Add Period
+      </button>
+    ` : '';
+
+    return `
+      <div class="day-card p-4" data-day="${day.value}">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-lg font-semibold text-gray-900">${escapeHtml(day.name)}</h3>
+        </div>
+        
+        ${closedHtml}
+        
+        <div class="flex flex-col gap-3">
+          ${periodsHtml}
+          ${newPeriodHtml}
+        </div>
+        
+        ${addButtonHtml}
+      </div>
+    `;
+  }
+
+  function renderPeriodRow(period, day) {
+    const periodId = period.id;
+    
+    // Convert database time (HH:MM:SS) to input format (HH:MM)
+    const startTime = (period.start_time || '').substring(0, 5);
+    const endTime = (period.end_time || '').substring(0, 5);
+
+    const inputCls = 'w-full min-w-0 bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent';
+    const labelCls = 'text-xs font-medium text-gray-700 mb-1';
+
+    return `
+      <div class="period-row bg-white border border-gray-300 rounded-lg p-3" data-period-id="${escapeHtml(periodId)}">
+        <div class="business-hours-time-grid mb-3">
+          <div class="min-w-0">
+            <label class="${labelCls}">Start Time</label>
+            <input 
+              type="time" 
+              class="${inputCls}" 
+              data-field="start_time"
+              value="${escapeHtml(startTime)}"
+            />
+            <div class="text-xs text-red-600 mt-1 hidden" data-role="start-error"></div>
+          </div>
+          
+          <div class="min-w-0">
+            <label class="${labelCls}">End Time</label>
+            <input 
+              type="time" 
+              class="${inputCls}" 
+              data-field="end_time"
+              value="${escapeHtml(endTime)}"
+            />
+            <div class="text-xs text-red-600 mt-1 hidden" data-role="end-error"></div>
+          </div>
+        </div>
+        
+        <div class="text-xs text-red-600 mb-3 hidden" data-role="form-error"></div>
+        
+        <div class="flex items-center gap-3">
+          <button 
+            type="button" 
+            class="btn btn-primary text-sm px-4 py-2" 
+            data-role="save-btn"
+            onclick="window.saveExistingPeriod('${escapeHtml(periodId)}', ${day.value})"
+          >
+            Save
+          </button>
+          <button 
+            type="button" 
+            class="btn btn-outline-red text-sm px-4 py-2" 
+            onclick="window.deleteBusinessHoursPeriod('${escapeHtml(periodId)}', '${escapeHtml(day.name)}')"
+            aria-label="Delete period" 
+            title="Delete period"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderNewPeriodRow(day) {
+    const inputCls = 'w-full min-w-0 bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent';
+    const labelCls = 'text-xs font-medium text-gray-700 mb-1';
+
+    return `
+      <div class="period-row bg-white border border-gray-300 rounded-lg p-3" data-new-period="${day.value}">
+        <div class="business-hours-time-grid mb-3">
+          <div class="min-w-0">
+            <label class="${labelCls}">Start Time</label>
+            <input 
+              type="time" 
+              class="${inputCls}" 
+              data-field="start_time"
+              value=""
+            />
+            <div class="text-xs text-red-600 mt-1 hidden" data-role="start-error"></div>
+          </div>
+          
+          <div class="min-w-0">
+            <label class="${labelCls}">End Time</label>
+            <input 
+              type="time" 
+              class="${inputCls}" 
+              data-field="end_time"
+              value=""
+            />
+            <div class="text-xs text-red-600 mt-1 hidden" data-role="end-error"></div>
+          </div>
+        </div>
+        
+        <div class="text-xs text-red-600 mb-3 hidden" data-role="form-error"></div>
+        
+        <div class="flex items-center gap-3">
+          <button 
+            type="button" 
+            class="btn btn-primary text-sm px-4 py-2" 
+            onclick="window.saveNewPeriod(${day.value})"
+          >
+            Add Period
+          </button>
+          <button 
+            type="button" 
+            class="btn btn-outline-blue text-sm px-4 py-2" 
+            onclick="window.cancelAddPeriod()"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderBusinessHours() {
+    const list = document.getElementById('adminBusinessHoursList');
+    if (!list) return;
+
+    const html = DAYS_OF_WEEK.map(day => renderDayCard(day)).join('');
+    list.innerHTML = html;
+  }
+
+  async function loadBusinessHours() {
+    if (!window.supabaseClient) {
+      setBusinessHoursMsg('Supabase client not ready.', 'text-red-600');
+      return;
+    }
+
+    const list = document.getElementById('adminBusinessHoursList');
+    if (list) list.innerHTML = '<div class="text-gray-500">Loading…</div>';
+    setBusinessHoursMsg('', '');
+
+    try {
+      console.log('[admin-business-hours] Loading business hours from database...');
+      
+      const { data, error } = await window.supabaseClient
+        .from('business_hours')
+        .select('*')
+        .order('day_of_week', { ascending: true })
+        .order('start_time', { ascending: true });
+
+      console.log('[admin-business-hours] Query result:', { data, error });
+
+      if (error) throw error;
+
+      allBusinessHours = Array.isArray(data) ? data : [];
+      window.allBusinessHours = allBusinessHours;
+      businessHoursLoaded = true;
+
+      console.log('[admin-business-hours] Loaded periods:', allBusinessHours.length);
+
+      renderBusinessHours();
+    } catch (e) {
+      console.error('[admin-business-hours] load failed:', e);
+      setBusinessHoursMsg('Business hours could not be loaded. Please try again.', 'text-red-600');
+      if (list) list.innerHTML = '<div class="text-gray-500">No data.</div>';
+    }
+  }
+
+  window.addBusinessHoursPeriod = function(dayOfWeek) {
+    addingForDay = dayOfWeek;
+    renderBusinessHours();
+
+    // Scroll to the day card
+    const card = document.querySelector(`[data-day="${dayOfWeek}"]`);
+    if (card) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  };
+
+  window.cancelAddPeriod = function() {
+    addingForDay = null;
+    renderBusinessHours();
+  };
+
+  function getFormField(form, fieldName) {
+    return form.querySelector(`[data-field="${fieldName}"]`);
+  }
+
+  function getFormError(form, roleName) {
+    return form.querySelector(`[data-role="${roleName}"]`);
+  }
+
+  window.saveExistingPeriod = async function(periodId, dayOfWeek) {
+    if (!window.supabaseClient) {
+      setBusinessHoursMsg('Supabase client not ready.', 'text-red-600');
+      return;
+    }
+
+    const row = document.querySelector(`[data-period-id="${periodId}"]`);
+    if (!row) return;
+
+    const saveBtn = row.querySelector('[data-role="save-btn"]');
+    const startTimeInput = getFormField(row, 'start_time');
+    const endTimeInput = getFormField(row, 'end_time');
+    const startError = getFormError(row, 'start-error');
+    const endError = getFormError(row, 'end-error');
+    const formError = getFormError(row, 'form-error');
+
+    // Clear all errors
+    if (startError) startError.classList.add('hidden');
+    if (endError) endError.classList.add('hidden');
+    if (formError) formError.classList.add('hidden');
+
+    const startTime = (startTimeInput?.value || '').trim();
+    const endTime = (endTimeInput?.value || '').trim();
+
+    let hasError = false;
+
+    // Validate required fields
+    if (!startTime) {
+      if (startError) {
+        startError.textContent = 'Start time is required';
+        startError.classList.remove('hidden');
+      }
+      if (!hasError && startTimeInput) startTimeInput.focus();
+      hasError = true;
+    }
+
+    if (!endTime) {
+      if (endError) {
+        endError.textContent = 'End time is required';
+        endError.classList.remove('hidden');
+      }
+      if (!hasError && endTimeInput) endTimeInput.focus();
+      hasError = true;
+    }
+
+    if (hasError) return;
+
+    // Validate end time is later than start time
+    if (startTime && endTime && startTime >= endTime) {
+      if (formError) {
+        formError.textContent = 'End time must be later than start time.';
+        formError.classList.remove('hidden');
+      }
+      return;
+    }
+
+    // Check for overlaps with existing periods on the same day
+    const dayPeriods = getPeriodsForDay(dayOfWeek);
+    const dbStartTime = formatTimeForDb(startTime);
+    const dbEndTime = formatTimeForDb(endTime);
+
+    for (const existing of dayPeriods) {
+      // Skip the current period when editing
+      if (existing.id === periodId) continue;
+
+      if (periodsOverlap(dbStartTime, dbEndTime, existing.start_time, existing.end_time)) {
+        const dayName = DAYS_OF_WEEK.find(d => d.value === dayOfWeek)?.name || 'this day';
+        if (formError) {
+          formError.textContent = `This period overlaps existing business hours for ${dayName}.`;
+          formError.classList.remove('hidden');
+        }
+        return;
+      }
+    }
+
+    const payload = {
+      day_of_week: dayOfWeek,
+      start_time: dbStartTime,
+      end_time: dbEndTime
+    };
+
+    try {
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving…';
+      }
+
+      const { error } = await window.supabaseClient
+        .from('business_hours')
+        .update(payload)
+        .eq('id', periodId);
+
+      if (error) {
+        // Check for overlap error from database
+        if (error.message && error.message.toLowerCase().includes('overlap')) {
+          const dayName = DAYS_OF_WEEK.find(d => d.value === dayOfWeek)?.name || 'this day';
+          throw new Error(`This period overlaps existing business hours for ${dayName}.`);
+        }
+        throw error;
+      }
+
+      // Update local data
+      const idx = allBusinessHours.findIndex(p => p.id === periodId);
+      if (idx !== -1) {
+        allBusinessHours[idx] = { ...allBusinessHours[idx], ...payload };
+      }
+
+      if (saveBtn) {
+        saveBtn.textContent = 'Saved';
+      }
+
+      setTimeout(() => {
+        if (saveBtn) {
+          saveBtn.textContent = 'Save';
+          saveBtn.disabled = false;
+        }
+        setBusinessHoursMsg('', '');
+      }, 1500);
+
+    } catch (e) {
+      console.error('[admin-business-hours] save existing period failed:', e);
+      
+      // Check for overlap error
+      let userMessage = 'The period could not be saved. Please try again.';
+      if (e.message && e.message.toLowerCase().includes('overlap')) {
+        const dayName = DAYS_OF_WEEK.find(d => d.value === dayOfWeek)?.name || 'this day';
+        userMessage = `This period overlaps existing business hours for ${dayName}.`;
+      }
+      
+      if (formError) {
+        formError.textContent = userMessage;
+        formError.classList.remove('hidden');
+      }
+      if (saveBtn) {
+        saveBtn.textContent = 'Save';
+        saveBtn.disabled = false;
+      }
+    }
+  };
+
+  window.saveNewPeriod = async function(dayOfWeek) {
+    if (!window.supabaseClient) {
+      setBusinessHoursMsg('Supabase client not ready.', 'text-red-600');
+      return;
+    }
+
+    const row = document.querySelector(`[data-new-period="${dayOfWeek}"]`);
+    if (!row) return;
+
+    const saveBtn = row.querySelector('button[onclick*="saveNewPeriod"]');
+    const startTimeInput = getFormField(row, 'start_time');
+    const endTimeInput = getFormField(row, 'end_time');
+    const startError = getFormError(row, 'start-error');
+    const endError = getFormError(row, 'end-error');
+    const formError = getFormError(row, 'form-error');
+
+    // Clear all errors
+    if (startError) startError.classList.add('hidden');
+    if (endError) endError.classList.add('hidden');
+    if (formError) formError.classList.add('hidden');
+
+    const startTime = (startTimeInput?.value || '').trim();
+    const endTime = (endTimeInput?.value || '').trim();
+
+    let hasError = false;
+
+    // Validate required fields
+    if (!startTime) {
+      if (startError) {
+        startError.textContent = 'Start time is required';
+        startError.classList.remove('hidden');
+      }
+      if (!hasError && startTimeInput) startTimeInput.focus();
+      hasError = true;
+    }
+
+    if (!endTime) {
+      if (endError) {
+        endError.textContent = 'End time is required';
+        endError.classList.remove('hidden');
+      }
+      if (!hasError && endTimeInput) endTimeInput.focus();
+      hasError = true;
+    }
+
+    if (hasError) return;
+
+    // Validate end time is later than start time
+    if (startTime && endTime && startTime >= endTime) {
+      if (formError) {
+        formError.textContent = 'End time must be later than start time.';
+        formError.classList.remove('hidden');
+      }
+      return;
+    }
+
+    // Check for overlaps with existing periods on the same day
+    const dayPeriods = getPeriodsForDay(dayOfWeek);
+    const dbStartTime = formatTimeForDb(startTime);
+    const dbEndTime = formatTimeForDb(endTime);
+
+    for (const existing of dayPeriods) {
+      if (periodsOverlap(dbStartTime, dbEndTime, existing.start_time, existing.end_time)) {
+        const dayName = DAYS_OF_WEEK.find(d => d.value === dayOfWeek)?.name || 'this day';
+        if (formError) {
+          formError.textContent = `This period overlaps existing business hours for ${dayName}.`;
+          formError.classList.remove('hidden');
+        }
+        return;
+      }
+    }
+
+    const payload = {
+      day_of_week: dayOfWeek,
+      start_time: dbStartTime,
+      end_time: dbEndTime
+    };
+
+    try {
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving…';
+      }
+
+      const { data, error } = await window.supabaseClient
+        .from('business_hours')
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) {
+        // Check for overlap error from database
+        if (error.message && error.message.toLowerCase().includes('overlap')) {
+          const dayName = DAYS_OF_WEEK.find(d => d.value === dayOfWeek)?.name || 'this day';
+          throw new Error(`This period overlaps existing business hours for ${dayName}.`);
+        }
+        throw error;
+      }
+
+      allBusinessHours.push(data);
+
+      if (saveBtn) {
+        saveBtn.textContent = 'Saved';
+      }
+
+      setTimeout(() => {
+        addingForDay = null;
+        renderBusinessHours();
+        setBusinessHoursMsg('', '');
+      }, 1500);
+
+    } catch (e) {
+      console.error('[admin-business-hours] save new period failed:', e);
+      
+      // Check for overlap error
+      let userMessage = 'The period could not be saved. Please try again.';
+      if (e.message && e.message.toLowerCase().includes('overlap')) {
+        const dayName = DAYS_OF_WEEK.find(d => d.value === dayOfWeek)?.name || 'this day';
+        userMessage = `This period overlaps existing business hours for ${dayName}.`;
+      }
+      
+      if (formError) {
+        formError.textContent = userMessage;
+        formError.classList.remove('hidden');
+      }
+      if (saveBtn) {
+        saveBtn.textContent = 'Add Period';
+        saveBtn.disabled = false;
+      }
+    }
+  };
+
+  async function performDeletePeriod(periodId) {
+    try {
+      const { error } = await window.supabaseClient
+        .from('business_hours')
+        .delete()
+        .eq('id', periodId);
+
+      if (error) throw error;
+
+      allBusinessHours = allBusinessHours.filter(p => p.id !== periodId);
+      window.allBusinessHours = allBusinessHours;
+
+      renderBusinessHours();
+    } catch (e) {
+      console.error('[admin-business-hours] delete failed:', e);
+      setBusinessHoursMsg('The period could not be deleted. Please try again.', 'text-red-600');
+    }
+  }
+
+  window.deleteBusinessHoursPeriod = async function(periodId, dayName) {
+    if (!periodId) return;
+    if (!window.supabaseClient) {
+      setBusinessHoursMsg('Supabase client not ready.', 'text-red-600');
+      return;
+    }
+
+    const period = allBusinessHours.find(p => p.id === periodId);
+    if (!period) return;
+
+    const displayStart = formatTimeDisplay(period.start_time);
+    const displayEnd = formatTimeDisplay(period.end_time);
+
+    const confirmMsg = `Are you sure you want to delete the ${dayName} period ${displayStart}–${displayEnd}? This action cannot be undone.`;
+
+    if (window.Modal && typeof window.Modal.confirm === 'function') {
+      window.Modal.confirm(
+        confirmMsg,
+        () => performDeletePeriod(periodId),
+        null,
+        'Delete Period',
+        { confirmText: 'Yes, Delete', cancelText: 'Cancel' }
+      );
+    } else {
+      const ok = window.confirm(confirmMsg);
+      if (ok) {
+        await performDeletePeriod(periodId);
+      }
+    }
+  };
+
+  function initAdminBusinessHours() {
+    const section = document.getElementById('section-business-hours');
+    if (!section) return;
+
+    if (section.dataset.businessHoursInit === '1') {
+      return;
+    }
+
+    section.dataset.businessHoursInit = '1';
+
+    // Wire Refresh button once
+    const refresh = document.getElementById('businessHoursRefreshBtn');
+    if (refresh) {
+      refresh.addEventListener('click', async () => {
+        await loadBusinessHours();
+      });
+    }
+
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+          const isVisible = !section.classList.contains('hidden');
+
+          if (isVisible && !businessHoursLoaded) {
+            loadBusinessHours();
+          }
+        }
+      });
+    });
+
+    observer.observe(section, { attributes: true });
+
+    if (!section.classList.contains('hidden')) {
+      loadBusinessHours();
+    }
+  }
+
+  // Initialize when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAdminBusinessHours);
+  } else {
+    initAdminBusinessHours();
+  }
+})();
+</script>

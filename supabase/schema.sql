@@ -112,6 +112,23 @@ COMMENT ON COLUMN public.service.short_name IS 'Compact service label for SMS an
 COMMENT ON COLUMN public.service.service_category_id IS 'Optional category grouping for this service';
 COMMENT ON COLUMN public.service.booking_time_mode IS 'Controls how booking start time is selected: offered_start_times or entered_start_time';
 
+-- Business Hours table: defines global operating hours
+CREATE TABLE public.business_hours (
+    id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
+    day_of_week integer NOT NULL,
+    start_time time without time zone NOT NULL,
+    end_time time without time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT business_hours_day_of_week_check CHECK ((day_of_week >= 0) AND (day_of_week <= 6)),
+    CONSTRAINT business_hours_time_check CHECK (end_time > start_time)
+);
+
+COMMENT ON TABLE public.business_hours IS 'Defines the global operating periods for each day of the week. A day may contain multiple non-overlapping periods.';
+COMMENT ON COLUMN public.business_hours.day_of_week IS 'Day of week where 0 = Sunday and 6 = Saturday.';
+COMMENT ON COLUMN public.business_hours.start_time IS 'Start of the business operating period.';
+COMMENT ON COLUMN public.business_hours.end_time IS 'End of the business operating period.';
+
 -- Package table: defines lesson packages for bulk purchase
 CREATE TABLE public.package (
     id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
@@ -443,6 +460,29 @@ CREATE FUNCTION public.set_client_progress_updated() RETURNS trigger
 BEGIN
   new.updated_at = now();
   RETURN new;
+END;
+$$;
+
+-- Function: Prevent overlapping business hours periods
+CREATE FUNCTION public.prevent_business_hours_overlap() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM public.business_hours bh
+        WHERE bh.day_of_week = NEW.day_of_week
+          AND bh.id IS DISTINCT FROM NEW.id
+          AND NEW.start_time < bh.end_time
+          AND NEW.end_time > bh.start_time
+    ) THEN
+        RAISE EXCEPTION USING
+            ERRCODE = '23514',
+            MESSAGE = 'Business hours periods cannot overlap for the same day.';
+    END IF;
+
+    RETURN NEW;
 END;
 $$;
 
@@ -826,6 +866,18 @@ CREATE TRIGGER trigger_update_refund_eligible
     FOR EACH ROW 
     EXECUTE FUNCTION public.update_refund_eligible();
 
+-- Trigger: Prevent overlapping business hours
+CREATE TRIGGER trg_business_hours_prevent_overlap 
+    BEFORE INSERT OR UPDATE ON public.business_hours 
+    FOR EACH ROW 
+    EXECUTE FUNCTION public.prevent_business_hours_overlap();
+
+-- Trigger: UPDATE timestamp on business hours changes
+CREATE TRIGGER t_business_hours_updated 
+    BEFORE UPDATE ON public.business_hours 
+    FOR EACH ROW 
+    EXECUTE FUNCTION public.set_updated_at();
+
 -- =====================================================================
 -- PRIMARY KEYS
 -- =====================================================================
@@ -847,6 +899,12 @@ ALTER TABLE ONLY public.service
 
 ALTER TABLE ONLY public.service
     ADD CONSTRAINT service_code_key UNIQUE (code);
+
+ALTER TABLE ONLY public.business_hours
+    ADD CONSTRAINT business_hours_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.business_hours
+    ADD CONSTRAINT business_hours_exact_period_key UNIQUE (day_of_week, start_time, end_time);
 
 ALTER TABLE ONLY public.package
     ADD CONSTRAINT package_pkey PRIMARY KEY (id);
@@ -910,6 +968,9 @@ CREATE INDEX idx_service_category_is_active ON public.service_category USING btr
 -- Service indexes
 CREATE INDEX idx_service_sort_order ON public.service USING btree (sort_order);
 CREATE INDEX idx_service_category_id ON public.service USING btree (service_category_id);
+
+-- Business Hours indexes
+CREATE INDEX idx_business_hours_day_start ON public.business_hours USING btree (day_of_week, start_time);
 
 -- Booking indexes
 CREATE INDEX idx_booking_client_id ON public.booking USING btree (client_id);
@@ -990,6 +1051,7 @@ ALTER TABLE ONLY public.availability_slot_old
 ALTER TABLE public.client ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.service_category ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.service ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.business_hours ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.package ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.booking ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.client_credit ENABLE ROW LEVEL SECURITY;
@@ -1042,6 +1104,24 @@ CREATE POLICY "Users can read active services" ON public.service FOR SELECT TO a
 
 CREATE POLICY "Service role full access service" ON public.service TO service_role 
     USING (true);
+
+-- Business Hours policies
+CREATE POLICY "Users can read business hours" ON public.business_hours FOR SELECT TO anon, authenticated 
+    USING (true);
+
+CREATE POLICY "Admins can insert business hours" ON public.business_hours FOR INSERT TO authenticated 
+    WITH CHECK (public.is_admin());
+
+CREATE POLICY "Admins can update business hours" ON public.business_hours FOR UPDATE TO authenticated 
+    USING (public.is_admin()) 
+    WITH CHECK (public.is_admin());
+
+CREATE POLICY "Admins can delete business hours" ON public.business_hours FOR DELETE TO authenticated 
+    USING (public.is_admin());
+
+CREATE POLICY "Service role full access business_hours" ON public.business_hours TO service_role 
+    USING (true) 
+    WITH CHECK (true);
 
 -- Package policies
 CREATE POLICY "Users can read active packages" ON public.package FOR SELECT TO authenticated, anon 
@@ -1174,6 +1254,8 @@ CREATE POLICY slot_select_free ON public.availability_slot_old FOR SELECT
 -- EXPLICIT API GRANTS
 -- =====================================================================
 
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+
 -- Service table grants
 GRANT SELECT ON TABLE public.service TO anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.service TO authenticated;
@@ -1181,6 +1263,11 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.service TO authenticated;
 -- Service category table grants
 GRANT SELECT ON TABLE public.service_category TO anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.service_category TO authenticated;
+
+-- Business Hours table grants
+GRANT SELECT ON TABLE public.business_hours TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.business_hours TO authenticated;
+GRANT ALL PRIVILEGES ON TABLE public.business_hours TO service_role;
 
 -- =====================================================================
 -- SUPABASE STORAGE: SERVICE CATEGORY ICONS

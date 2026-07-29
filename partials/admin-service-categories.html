@@ -90,14 +90,25 @@
   }
 
   #section-categories .category-delete-btn {
-    width: 2.5rem;
     height: 2.5rem;
-    padding: 0 !important;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.5rem;
-    line-height: 1;
+  }
+
+  /* Mobile: square button with icon */
+  @media (max-width: 639px) {
+    #section-categories .category-delete-btn {
+      width: 2.5rem;
+      padding: 0 !important;
+    }
+  }
+
+  /* Desktop: text with padding */
+  @media (min-width: 640px) {
+    #section-categories .category-delete-btn {
+      padding: 0.5rem 1rem !important;
+    }
   }
 
   .icon-upload-area {
@@ -133,7 +144,7 @@
 
     <div class="flex items-center gap-2">
       <button id="categoriesAddBtn" class="btn btn-primary" type="button">
-        Add Category
+        Add
       </button>
       <button id="categoriesRefreshBtn" class="btn btn-primary-light" type="button">
         Refresh
@@ -393,7 +404,10 @@
             </button>
 
             <button type="button" class="btn btn-outline-red category-delete-btn" onclick="event.stopPropagation(); window.deleteCategory('${escapeHtml(c.id)}')" aria-label="Delete category" title="Delete category">
-              ×
+              <svg class="w-5 h-5 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              <span class="hidden sm:inline">Delete</span>
             </button>
           </div>`;
 

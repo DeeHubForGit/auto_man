@@ -1,6 +1,18 @@
 {
-  "schema_version": 1,
-  "last_updated": "2026-07-18",
+  "schema_version": 2,
+  "last_updated": "2026-08-01",
+  "business_hours": [
+    {
+      "day_of_week": 0,
+      "start_time": "10:00:00",
+      "end_time": "17:00:00"
+    },
+    {
+      "day_of_week": 6,
+      "start_time": "10:00:00",
+      "end_time": "17:00:00"
+    }
+  ],
   "categories": [
     {
       "id": "automatic",

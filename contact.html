@@ -171,10 +171,16 @@
             </div>
             -->
             
-            <!-- Hours (optional) -->
-            <div class="bg-white rounded-xl shadow-lg p-6">
+            <!-- Hours -->
+            <div
+              data-business-hours-card
+              class="bg-white rounded-xl shadow-lg p-6 hidden"
+            >
               <p class="text-sm text-gray-200 mb-2">Hours</p>
-              <p class="text-white">{{HOURS}}</p>
+              <div
+                data-business-hours
+                class="space-y-1 text-white"
+              ></div>
             </div>
           </div>
         </aside>

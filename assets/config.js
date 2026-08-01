@@ -16,8 +16,16 @@ const SITE_CONFIG = {
   PHONE_NUMBER_DISPLAY: '0403 632 313', // For display (with spaces)
   EMAIL: 'info@automandrivingschool.com.au',
   
-  // Business hours
-  WORKING_HOURS: '10 am to 5 pm on weekends',
+  // Business hours display text (updated dynamically after loading from database/fallback)
+  // NOTE: {{HOURS}} token gets replaced once during page load with whatever value WORKING_HOURS
+  // contains at that time. For dynamically updated hours that reflect database changes,
+  // use <div data-business-hours> instead (see contact.html for implementation).
+  WORKING_HOURS: '',
+  
+  // Business hours data (loaded from fallback JSON then updated from database)
+  BUSINESS_HOURS_ROWS: [],
+  BUSINESS_HOURS_LINES: [],
+  BUSINESS_HOURS_SOURCE: null, // 'fallback', 'database', or 'emergency'
   
   // Business hours used for admin warnings (soft only, not enforced)
   BUSINESS_HOURS: {
@@ -223,6 +231,279 @@ window.SITE_CONFIG.getPackage = function(id) {
 window.SITE_CONFIG.getPopularPackage = function() {
   return this.PACKAGES.find(p => p.popular);
 };
+
+// Business hours helper function
+window.SITE_CONFIG.getBusinessHoursLines = function() {
+  return [...this.BUSINESS_HOURS_LINES];
+};
+
+// =====================================================================
+// Business Hours Loading System
+// =====================================================================
+
+// Normalize and validate business hours rows
+function normaliseBusinessHours(rows) {
+  if (!Array.isArray(rows)) {
+    console.warn('[config] Business hours data is not an array');
+    return [];
+  }
+  
+  const valid = [];
+  for (const row of rows) {
+    const dayOfWeek = parseInt(row.day_of_week, 10);
+    const startTime = row.start_time;
+    const endTime = row.end_time;
+    
+    // Validate day_of_week
+    if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
+      console.warn('[config] Invalid day_of_week:', row);
+      continue;
+    }
+    
+    // Validate times exist
+    if (!startTime || !endTime) {
+      console.warn('[config] Missing start_time or end_time:', row);
+      continue;
+    }
+    
+    // Validate start < end (basic string comparison works for HH:MM:SS format)
+    if (startTime >= endTime) {
+      console.warn('[config] start_time must be before end_time:', row);
+      continue;
+    }
+    
+    valid.push({
+      day_of_week: dayOfWeek,
+      start_time: startTime,
+      end_time: endTime
+    });
+  }
+  
+  return valid;
+}
+
+// Format a time string (HH:MM:SS) to display format (e.g., "9 am", "3:45 pm")
+function formatBusinessTime(timeStr) {
+  const parts = timeStr.split(':');
+  let hours = parseInt(parts[0], 10);
+  const minutes = parseInt(parts[1], 10);
+  
+  const isPM = hours >= 12;
+  if (hours === 0) hours = 12; // midnight
+  else if (hours > 12) hours -= 12;
+  
+  const period = isPM ? 'pm' : 'am';
+  
+  // Omit :00 for whole hours
+  if (minutes === 0) {
+    return `${hours} ${period}`;
+  }
+  return `${hours}:${minutes.toString().padStart(2, '0')} ${period}`;
+}
+
+// Build formatted display lines from business hours rows
+function buildBusinessHoursLines(rows) {
+  if (!rows || rows.length === 0) {
+    return [];
+  }
+  
+  // Day names in display order (Monday first)
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const displayOrder = [1, 2, 3, 4, 5, 6, 0]; // Monday to Sunday
+  
+  // Group periods by day
+  const dayMap = new Map();
+  for (const row of rows) {
+    const day = row.day_of_week;
+    if (!dayMap.has(day)) {
+      dayMap.set(day, []);
+    }
+    dayMap.get(day).push({
+      start: row.start_time,
+      end: row.end_time
+    });
+  }
+  
+  // Sort periods within each day by start time
+  for (const [day, periods] of dayMap.entries()) {
+    periods.sort((a, b) => a.start.localeCompare(b.start));
+  }
+  
+  // Build display lines in day order
+  const lines = [];
+  for (const dayNum of displayOrder) {
+    if (!dayMap.has(dayNum)) continue;
+    
+    const dayName = dayNames[dayNum];
+    const periods = dayMap.get(dayNum);
+    
+    const timeRanges = periods.map(p => 
+      `${formatBusinessTime(p.start)}–${formatBusinessTime(p.end)}`
+    );
+    
+    lines.push(`${dayName}: ${timeRanges.join(', ')}`);
+  }
+  
+  return lines;
+}
+
+// Set business hours and update display
+function setBusinessHours(rows, source) {
+  SITE_CONFIG.BUSINESS_HOURS_ROWS = normaliseBusinessHours(rows);
+  SITE_CONFIG.BUSINESS_HOURS_SOURCE = source;
+  SITE_CONFIG.BUSINESS_HOURS_LINES = buildBusinessHoursLines(SITE_CONFIG.BUSINESS_HOURS_ROWS);
+  
+  // Update WORKING_HOURS for backward compatibility with {{HOURS}} token
+  if (SITE_CONFIG.BUSINESS_HOURS_LINES.length > 0) {
+    SITE_CONFIG.WORKING_HOURS = SITE_CONFIG.BUSINESS_HOURS_LINES.join(', ');
+  } else {
+    SITE_CONFIG.WORKING_HOURS = '';
+  }
+  
+  renderBusinessHours();
+  window.dispatchEvent(new CustomEvent('configUpdated'));
+}
+
+// Render business hours into all [data-business-hours] containers
+function renderBusinessHours() {
+  const cards = document.querySelectorAll('[data-business-hours-card]');
+  const containers = document.querySelectorAll('[data-business-hours]');
+  const hasHours = SITE_CONFIG.BUSINESS_HOURS_LINES.length > 0;
+  
+  cards.forEach(card => {
+    card.classList.toggle('hidden', !hasHours);
+  });
+  
+  containers.forEach(container => {
+    container.textContent = '';
+    
+    if (!hasHours) {
+      return;
+    }
+    
+    SITE_CONFIG.BUSINESS_HOURS_LINES.forEach(line => {
+      const p = document.createElement('p');
+      const colonIndex = line.indexOf(':');
+      
+      if (colonIndex !== -1) {
+        const daySpan = document.createElement('span');
+        daySpan.className = 'font-semibold';
+        daySpan.textContent = line.substring(0, colonIndex + 1);
+        
+        const timeSpan = document.createElement('span');
+        timeSpan.textContent = line.substring(colonIndex + 1);
+        
+        p.appendChild(daySpan);
+        p.appendChild(timeSpan);
+      } else {
+        p.textContent = line;
+      }
+      
+      container.appendChild(p);
+    });
+  });
+}
+
+// Load business hours from fallback JSON
+let fallbackLoadPromise = null;
+async function loadBookingConfigFallback() {
+  if (fallbackLoadPromise) {
+    return fallbackLoadPromise;
+  }
+  
+  fallbackLoadPromise = (async () => {
+    try {
+      const response = await fetch('assets/data/booking-services-fallback.json', {
+        cache: 'no-cache'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to load fallback JSON: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Load business hours from fallback
+      if (data.business_hours && Array.isArray(data.business_hours)) {
+        // Don't overwrite database hours if already loaded
+        if (SITE_CONFIG.BUSINESS_HOURS_SOURCE !== 'database') {
+          setBusinessHours(data.business_hours, 'fallback');
+        }
+      } else {
+        console.warn('[config] No business_hours found in fallback JSON');
+      }
+      
+      return data;
+    } catch (error) {
+      console.warn('[config] Could not load business hours fallback:', error.message);
+      // Set emergency fallback
+      if (!SITE_CONFIG.BUSINESS_HOURS_SOURCE) {
+        setBusinessHours([], 'emergency');
+      }
+    }
+  })();
+  
+  return fallbackLoadPromise;
+}
+
+// Load business hours from Supabase database
+async function loadBusinessHoursFromDatabase() {
+  if (!window.supabaseClient) {
+    console.warn('[config] Cannot load business hours: supabaseClient not available');
+    return;
+  }
+  
+  try {
+    const { data, error } = await window.supabaseClient
+      .from('business_hours')
+      .select('day_of_week, start_time, end_time')
+      .order('day_of_week', { ascending: true })
+      .order('start_time', { ascending: true });
+    
+    if (error) {
+      console.warn('[config] Failed to load business hours from database:', error.message);
+      // Keep fallback hours
+      return;
+    }
+    
+    // Database query succeeded - use this result even if empty
+    setBusinessHours(data || [], 'database');
+    
+  } catch (error) {
+    console.warn('[config] Error loading business hours from database:', error.message);
+    // Keep fallback hours
+  }
+}
+
+// Handle Supabase readiness and load database hours
+async function handleBusinessHoursSupabaseReady() {
+  // Wait for fallback to load first to prevent race condition
+  await loadBookingConfigFallback();
+  
+  // Then load from database
+  await loadBusinessHoursFromDatabase();
+}
+
+// Initialize business hours loading
+(function initBusinessHours() {
+  // Start loading fallback immediately
+  loadBookingConfigFallback();
+  
+  // Load from database after Supabase is ready
+  if (window.supabaseClient) {
+    handleBusinessHoursSupabaseReady();
+  } else {
+    window.addEventListener('partialsLoaded', handleBusinessHoursSupabaseReady);
+  }
+  
+  // Rerender after DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', renderBusinessHours);
+  }
+  
+  // Rerender after partials load
+  window.addEventListener('partialsLoaded', renderBusinessHours);
+})();
 
 // API integration placeholder
 // In the future, you can replace static config with API data:

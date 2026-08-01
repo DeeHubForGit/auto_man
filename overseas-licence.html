@@ -123,12 +123,18 @@
           Book Online
         </a>
       </div>
-      <p style="margin-top:24px;font-size:14px;color:var(--muted)">
-        <strong>Area covered:</strong> Geelong and surrounding suburbs<br>
-        <strong>Hours:</strong> {{HOURS}}
-      </p>
-    </div>
+      <div style="margin-top:24px;font-size:14px;color:var(--muted)">
+        <p style="margin:0">
+          <strong>Area covered:</strong> Geelong and surrounding suburbs
+        </p>
 
+        <div data-business-hours-card class="hidden">
+          <strong>Hours:</strong>
+          <div data-business-hours class="space-y-1"></div>
+        </div>
+      </div>
+    </div>
+    
     <!-- What to Expect -->
     <div data-include="partials/what-to-expect.html"></div>
 

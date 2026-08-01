@@ -123,10 +123,17 @@
         <a href="tel:{{PHONE_LINK}}" class="btn btn-primary" style="font-size:18px">📱 Call {{OWNER}} {{PHONE}}</a>
         <a href="booking.html" class="btn btn-secondary" style="font-size:18px">Book Now</a>
       </div>
-      <p style="margin-top:24px;font-size:14px;color:var(--muted)">
-        <strong>Area covered:</strong> <a href="service-areas.html" class="text-blue-dark">See Service Areas</a><br>
-        <strong>Hours:</strong> {{HOURS}}
-      </p>
+      <div style="margin-top:24px;font-size:14px;color:var(--muted)">
+        <p style="margin:0">
+          <strong>Area covered:</strong>
+          <a href="service-areas.html" class="text-blue-dark">See Service Areas</a>
+        </p>
+
+        <div data-business-hours-card class="hidden">
+          <strong>Hours:</strong>
+          <div data-business-hours class="space-y-1"></div>
+        </div>
+      </div>
     </div>
 
     <!-- What to Expect -->

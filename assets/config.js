@@ -43,6 +43,7 @@ const SITE_CONFIG = {
       id: 'beginner-drivers',
       name: 'Beginner Drivers',
       slug: 'beginner-drivers',
+      serviceCategoryName: 'Automatic Lessons',
       description: 'Learn with patient, experienced instructors at your own pace in a safe and supportive environment.',
       image: 'images/beginner-driver.jpg',
       icon: 'images/icons/l-plate.svg', // L-plate for learner drivers
@@ -129,8 +130,10 @@ const SITE_CONFIG = {
   ],
   
   // Bookable services (for booking system integration)
-  // This will be populated from the booking system API
+  // Loaded from database with JSON fallback
+  SERVICE_CATEGORIES: [],
   SERVICES: [],
+  BOOKING_SERVICES_SOURCE: null, // 'fallback', 'database'
   
   // Individual lesson pricing (by duration) - used on service pages
   // googleCalendarUrl is the direct Google Calendar link that gets embedded in google-booking.html
@@ -433,12 +436,26 @@ async function loadBookingConfigFallback() {
         console.warn('[config] No business_hours found in fallback JSON');
       }
       
+      // Load booking services from fallback
+      if (data.categories && Array.isArray(data.categories)) {
+        // Don't overwrite database services if already loaded
+        if (SITE_CONFIG.BOOKING_SERVICES_SOURCE !== 'database') {
+          const { categories, services } = normaliseBookingConfigFallback(data);
+          setBookingServices(categories, services, 'fallback');
+        }
+      } else {
+        console.warn('[config] No categories found in fallback JSON');
+      }
+      
       return data;
     } catch (error) {
-      console.warn('[config] Could not load business hours fallback:', error.message);
+      console.warn('[config] Could not load fallback:', error.message);
       // Set emergency fallback
       if (!SITE_CONFIG.BUSINESS_HOURS_SOURCE) {
         setBusinessHours([], 'emergency');
+      }
+      if (!SITE_CONFIG.BOOKING_SERVICES_SOURCE) {
+        setBookingServices([], [], 'emergency');
       }
     }
   })();
@@ -505,6 +522,217 @@ async function handleBusinessHoursSupabaseReady() {
   window.addEventListener('partialsLoaded', renderBusinessHours);
 })();
 
+// =====================================================================
+// Booking Services Loading System
+// =====================================================================
+
+// Normalize and validate booking config fallback data
+function normaliseBookingConfigFallback(fallbackData) {
+  if (!fallbackData || !Array.isArray(fallbackData.categories)) {
+    console.warn('[config] Invalid fallback categories structure');
+    return { categories: [], services: [] };
+  }
+  
+  const categories = [];
+  const services = [];
+  
+  for (const cat of fallbackData.categories) {
+    // Normalize category
+    if (cat.is_active === false) continue;
+    
+    const normalizedCat = {
+      id: cat.id,
+      name: cat.name,
+      sort_order: cat.sort_order || 0,
+      is_active: cat.is_active !== false,
+      message_text: cat.message_text || null,
+      icon_url: cat.icon_url || null
+    };
+    
+    categories.push(normalizedCat);
+    
+    // Normalize services for this category
+    if (Array.isArray(cat.services)) {
+      for (const svc of cat.services) {
+        if (svc.is_active === false) continue;
+        
+        const normalizedSvc = {
+          id: svc.id || null,
+          service_category_id: cat.id,
+          category_name: cat.name,
+          code: svc.code,
+          name: svc.name,
+          short_name: svc.short_name || null,
+          description: svc.description || null,
+          duration_minutes: svc.duration_minutes,
+          price_cents: svc.price_cents,
+          google_booking_url: svc.google_booking_url || null,
+          sort_order: svc.sort_order || 0,
+          is_active: svc.is_active !== false,
+          booking_time_mode: svc.booking_time_mode || null
+        };
+        
+        services.push(normalizedSvc);
+      }
+    }
+  }
+  
+  return { categories, services };
+}
+
+// Set booking services and update display
+function setBookingServices(categories, services, source) {
+  SITE_CONFIG.SERVICE_CATEGORIES = categories || [];
+  SITE_CONFIG.SERVICES = services || [];
+  SITE_CONFIG.BOOKING_SERVICES_SOURCE = source;
+  
+  window.dispatchEvent(new CustomEvent('configUpdated'));
+}
+
+// Get service category by name
+window.SITE_CONFIG.getServiceCategoryByName = function(name) {
+  if (!name || !Array.isArray(this.SERVICE_CATEGORIES)) return null;
+  return this.SERVICE_CATEGORIES.find(cat => cat.name === name) || null;
+};
+
+// Get active services for a category (by category name)
+window.SITE_CONFIG.getServicesForCategory = function(categoryName) {
+  if (!categoryName || !Array.isArray(this.SERVICES)) return [];
+  
+  return this.SERVICES
+    .filter(svc => svc.category_name === categoryName && svc.is_active !== false)
+    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+    .slice(); // Return new array
+};
+
+// Format duration in minutes to display string
+function formatDuration(minutes) {
+  if (!minutes || minutes <= 0) return '';
+  
+  if (minutes < 60) {
+    return `${minutes} minute lesson`;
+  }
+  
+  const hours = minutes / 60;
+  
+  if (hours === Math.floor(hours)) {
+    return `${hours} hour lesson`;
+  }
+  
+  return `${hours} hour lesson`;
+}
+
+// Format price in cents to display string
+function formatPrice(cents) {
+  if (cents == null || cents < 0) return '';
+  
+  const dollars = cents / 100;
+  
+  if (dollars === Math.floor(dollars)) {
+    return `$${dollars}`;
+  }
+  
+  return `$${dollars.toFixed(2)}`;
+}
+
+// Make format helpers available
+window.SITE_CONFIG.formatDuration = formatDuration;
+window.SITE_CONFIG.formatPrice = formatPrice;
+
+// Load booking services from Supabase database
+async function loadBookingServicesFromDatabase() {
+  if (!window.supabaseClient) {
+    console.warn('[config] Cannot load booking services: supabaseClient not available');
+    return;
+  }
+  
+  try {
+    // Load categories
+    const { data: catData, error: catError } = await window.supabaseClient
+      .from('service_category')
+      .select('id, name, sort_order, is_active, icon_path, message_text')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+    
+    if (catError) {
+      console.warn('[config] Failed to load service categories from database:', catError.message);
+      return;
+    }
+    
+    // Normalize categories with icon URLs
+    const categories = (catData || []).map(cat => ({
+      id: cat.id,
+      name: cat.name,
+      sort_order: cat.sort_order || 0,
+      is_active: cat.is_active !== false,
+      message_text: cat.message_text || null,
+      icon_url: cat.icon_path
+        ? `${SITE_CONFIG.SUPABASE_URL}/storage/v1/object/public/service-category-icons/${cat.icon_path}`
+        : null
+    }));
+    
+    // Load all active services
+    const { data: svcData, error: svcError } = await window.supabaseClient
+      .from('service')
+      .select('id, service_category_id, code, name, short_name, description, duration_minutes, price_cents, google_booking_url, sort_order, is_active, booking_time_mode')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+    
+    if (svcError) {
+      console.warn('[config] Failed to load services from database:', svcError.message);
+      return;
+    }
+    
+    // Map category IDs to names
+    const catIdToName = new Map(categories.map(c => [c.id, c.name]));
+    
+    // Normalize services with category names
+    const services = (svcData || []).map(svc => ({
+      id: svc.id,
+      service_category_id: svc.service_category_id,
+      category_name: catIdToName.get(svc.service_category_id) || '',
+      code: svc.code,
+      name: svc.name,
+      short_name: svc.short_name || null,
+      description: svc.description || null,
+      duration_minutes: svc.duration_minutes,
+      price_cents: svc.price_cents,
+      google_booking_url: svc.google_booking_url || null,
+      sort_order: svc.sort_order || 0,
+      is_active: svc.is_active !== false,
+      booking_time_mode: svc.booking_time_mode || null
+    }));
+    
+    // Database query succeeded - use this result even if empty
+    setBookingServices(categories, services, 'database');
+    
+  } catch (error) {
+    console.warn('[config] Error loading booking services from database:', error.message);
+    // Keep fallback services
+  }
+}
+
+// Handle Supabase readiness and load database services
+async function handleBookingServicesSupabaseReady() {
+  // Wait for fallback to load first to prevent race condition
+  await loadBookingConfigFallback();
+  
+  // Then load from database
+  await loadBookingServicesFromDatabase();
+}
+
+// Initialize booking services loading
+(function initBookingServices() {
+  // Fallback is already started by business hours init
+  
+  // Load from database after Supabase is ready
+  if (window.supabaseClient) {
+    handleBookingServicesSupabaseReady();
+  } else {
+    window.addEventListener('partialsLoaded', handleBookingServicesSupabaseReady);
+  }
+})();
+
 // API integration placeholder
 // In the future, you can replace static config with API data:
 window.SITE_CONFIG.loadFromAPI = async function(apiUrl) {
@@ -537,6 +765,11 @@ window.SITE_CONFIG.loadFromAPI = async function(apiUrl) {
 // Auto-replace phone number placeholders on page load
 (function() {
   function replacePhoneNumbers(){
+    // Early return if document.body is not available yet
+    if (!document.body) {
+      return;
+    }
+    
     // Replace tel: links
     document.querySelectorAll('a[href^="tel:"]').forEach(link => {
       if (link.href.includes('{{PHONE}}') || link.href.includes('{{PHONE_LINK}}') || link.href.includes('0410166232') || link.href.includes('04XXXXXXXX')) {

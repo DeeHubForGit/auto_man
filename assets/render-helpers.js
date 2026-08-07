@@ -157,12 +157,55 @@ function updateFAQPricing() {
 
 /**
  * Render lesson pricing cards (for sidebar on service pages)
- * Populates #lesson-pricing-grid using SITE_CONFIG.LESSON_PRICING
+ * Populates #lesson-pricing-grid using centralized service data or legacy LESSON_PRICING
  */
 function renderLessonPricing(containerId = 'lesson-pricing-grid') {
   const container = document.getElementById(containerId);
   if (!container || !window.SITE_CONFIG) return;
 
+  // Check if container has data-service-overview-id for centralized service loading
+  const overviewId = container.getAttribute('data-service-overview-id');
+  
+  if (overviewId) {
+    // Use centralized service loading
+    const overview = SITE_CONFIG.getServiceOverview(overviewId);
+    if (!overview || !overview.serviceCategoryName) {
+      console.warn('[render-helpers] No serviceCategoryName for overview:', overviewId);
+      container.innerHTML = '';
+      return;
+    }
+    
+    const services = SITE_CONFIG.getServicesForCategory(overview.serviceCategoryName);
+    
+    if (!Array.isArray(services) || services.length === 0) {
+      container.innerHTML = '';
+      return;
+    }
+    
+    container.innerHTML = services
+      .map(service => {
+        const duration = SITE_CONFIG.formatDuration(service.duration_minutes);
+        const price = SITE_CONFIG.formatPrice(service.price_cents);
+        const bookingUrl = service.google_booking_url || 'booking.html';
+        
+        return `
+          <a href="${bookingUrl}"
+             target="_blank"
+             rel="noopener noreferrer"
+             style="display:block;padding:12px;background:#1e3a8a22;border:1px solid #3b82f655;
+                    border-radius:8px;text-decoration:none;transition:all .2s;cursor:pointer"
+             onmouseover="this.style.background='#1e3a8a44';this.style.borderColor='#3b82f6'"
+             onmouseout="this.style.background='#1e3a8a22';this.style.borderColor='#3b82f655'">
+            <p style="margin:0;font-size:14px;color:var(--muted)">${duration}</p>
+            <p style="margin:4px 0 0 0;font-size:24px;font-weight:700;color:#e5e7eb">${price}</p>
+          </a>`;
+      })
+      .join('');
+    
+    return;
+  }
+
+  // Legacy behavior: use LESSON_PRICING for pages without data-service-overview-id
   const currentPage = window.location.pathname.toLowerCase();
   const useDiscounted = currentPage.includes('senior');
 

@@ -80,6 +80,7 @@
           <h3 style="margin:0 0 16px 0;font-size:24px;font-weight:700">Contact Us to Book Your Driving Test Package</h3>
           
           <div class="card no-card-hover"
+              data-driving-test-price-card
               style="margin:20px 0;padding:16px;background:rgba(59,130,246,0.1);
                       border-left:4px solid var(--brand);border-radius:8px">
             <h4 class="text-blue-dark price-amount"
@@ -199,19 +200,26 @@
     // Load service price from config
     (function() {
       function updateServicePrice() {
-        const service = SITE_CONFIG.getServiceOverview('driving-test-package');
-        if (!service) return;
-
-        // Update price display
+        const service = SITE_CONFIG.getServiceByCode('driving_test');
+        const priceCard = document.querySelector('[data-driving-test-price-card]');
         const priceEl = document.querySelector('[data-service-price="driving-test-package"]');
-        if (priceEl && service.cost) {
-          priceEl.textContent = `${service.cost}*`;
+        
+        // Hide price card if service doesn't exist or is inactive
+        if (!service) {
+          if (priceCard) {
+            priceCard.style.display = 'none';
+          }
+          return;
         }
-
-        // Update price note
-        const priceNoteEl = document.querySelector('[data-service-price-note="driving-test-package"]');
-        if (priceNoteEl && service.costNote) {
-          priceNoteEl.textContent = `*${service.costNote}`;
+        
+        // Show price card and update price
+        if (priceCard) {
+          priceCard.style.display = '';
+        }
+        
+        if (priceEl && service.price_cents != null) {
+          const formattedPrice = SITE_CONFIG.formatPrice(service.price_cents);
+          priceEl.textContent = `${formattedPrice}*`;
         }
       }
 

@@ -73,6 +73,7 @@ const SITE_CONFIG = {
       id: 'overseas-licence',
       name: 'Overseas Licence Conversion',
       slug: 'overseas-licence',
+      serviceCategoryName: 'Automatic Lessons',
       description: 'Convert your overseas licence to Australian standards and gain confidence with local road rules.',
       image: 'images/overseas-driver.jpg',
       icon: '🌏', // Globe for international
@@ -577,6 +578,31 @@ function normaliseBookingConfigFallback(fallbackData) {
     }
   }
   
+  // Process top-level uncategorised services
+  if (Array.isArray(fallbackData.services)) {
+    for (const svc of fallbackData.services) {
+      if (svc.is_active === false) continue;
+      
+      const normalizedSvc = {
+        id: svc.id || null,
+        service_category_id: svc.service_category_id || null,
+        category_name: '',
+        code: svc.code,
+        name: svc.name,
+        short_name: svc.short_name || null,
+        description: svc.description || null,
+        duration_minutes: svc.duration_minutes,
+        price_cents: svc.price_cents,
+        google_booking_url: svc.google_booking_url || null,
+        sort_order: svc.sort_order || 0,
+        is_active: svc.is_active !== false,
+        booking_time_mode: svc.booking_time_mode || null
+      };
+      
+      services.push(normalizedSvc);
+    }
+  }
+  
   return { categories, services };
 }
 
@@ -603,6 +629,15 @@ window.SITE_CONFIG.getServicesForCategory = function(categoryName) {
     .filter(svc => svc.category_name === categoryName && svc.is_active !== false)
     .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
     .slice(); // Return new array
+};
+
+// Get service by code
+window.SITE_CONFIG.getServiceByCode = function(code) {
+  if (!code || !Array.isArray(this.SERVICES)) return null;
+  
+  return this.SERVICES.find(service => 
+    service.code === code && service.is_active !== false
+  ) || null;
 };
 
 // Format duration in minutes to display string

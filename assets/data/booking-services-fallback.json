@@ -1,6 +1,6 @@
 {
-  "schema_version": 2,
-  "last_updated": "2026-08-01",
+  "schema_version": 3,
+  "last_updated": "2026-08-07",
   "business_hours": [
     {
       "day_of_week": 0,
@@ -82,6 +82,21 @@
           "is_active": true
         }
       ]
+    }
+  ],
+  "services": [
+    {
+      "code": "driving_test",
+      "name": "Driving Test Package — 2.5 hours",
+      "description": "Personalised pre-test lesson package including vehicle use and test accompaniment to help students feel prepared and confident on driving test day.",
+      "duration_minutes": 150,
+      "price_cents": 25000,
+      "google_booking_url": null,
+      "sort_order": 9,
+      "short_name": "Driving Test",
+      "service_category_id": null,
+      "booking_time_mode": "entered_start_time",
+      "is_active": true
     }
   ]
 }

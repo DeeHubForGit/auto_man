@@ -89,6 +89,7 @@ const SITE_CONFIG = {
       id: 'nervous-drivers',
       name: 'Nervous Drivers',
       slug: 'nervous-drivers',
+      serviceCategoryName: 'Automatic Lessons',
       description: 'Specialised support for nervous or anxious drivers. Build confidence with patient and understanding instruction.',
       image: 'images/nervous-driver.jpg',
       icon: '💙', // Heart for care/support

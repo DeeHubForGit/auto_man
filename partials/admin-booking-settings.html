@@ -1,0 +1,294 @@
+<!-- Admin Booking Settings Section -->
+<style>
+  #section-booking-settings .settings-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+  
+  @media (max-width: 768px) {
+    #section-booking-settings .settings-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  #section-booking-settings input,
+  #section-booking-settings select {
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+  
+  #section-booking-settings label {
+    color: #e5e7eb !important;
+  }
+</style>
+
+<section id="section-booking-settings" class="section-content hidden">
+  <div class="bg-white rounded-2xl border shadow-sm p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-semibold">Booking Settings</h2>
+    </div>
+
+    <div id="bookingSettingsMsg" class="text-sm mb-3"></div>
+
+    <form id="bookingSettingsForm" class="settings-grid">
+      <input type="hidden" id="settingsId" />
+      
+      <div class="form-group">
+        <label for="businessTimezone" class="block text-sm font-medium mb-2">Business Timezone</label>
+        <select id="businessTimezone" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          <option value="Australia/Melbourne">Australia/Melbourne</option>
+          <option value="Australia/Sydney">Australia/Sydney</option>
+          <option value="Australia/Brisbane">Australia/Brisbane</option>
+          <option value="Australia/Adelaide">Australia/Adelaide</option>
+          <option value="Australia/Perth">Australia/Perth</option>
+          <option value="Australia/Hobart">Australia/Hobart</option>
+          <option value="Australia/Darwin">Australia/Darwin</option>
+        </select>
+        <div id="businessTimezone-error" class="text-sm text-red-600 mt-1 hidden"></div>
+      </div>
+
+      <div class="form-group">
+        <label for="minimumNotice" class="block text-sm font-medium mb-2">Minimum Notice (hours)</label>
+        <input type="number" id="minimumNotice" min="0" step="0.25" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="4" />
+        <div id="minimumNotice-error" class="text-sm text-red-600 mt-1 hidden"></div>
+      </div>
+
+      <div class="form-group">
+        <label for="maximumBookingDays" class="block text-sm font-medium mb-2">Maximum Booking Days Ahead</label>
+        <input type="number" id="maximumBookingDays" min="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="90" />
+        <div id="maximumBookingDays-error" class="text-sm text-red-600 mt-1 hidden"></div>
+      </div>
+
+      <div class="form-group">
+        <label for="bookingBuffer" class="block text-sm font-medium mb-2">Booking Buffer (minutes)</label>
+        <input type="number" id="bookingBuffer" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="15" />
+        <div id="bookingBuffer-error" class="text-sm text-red-600 mt-1 hidden"></div>
+      </div>
+
+      <div class="form-group">
+        <label for="paymentHold" class="block text-sm font-medium mb-2">Payment Hold (minutes)</label>
+        <input type="number" id="paymentHold" min="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="15" />
+        <div id="paymentHold-error" class="text-sm text-red-600 mt-1 hidden"></div>
+      </div>
+
+      <div class="form-group">
+        <label for="slotInterval" class="block text-sm font-medium mb-2">Slot Interval (minutes)</label>
+        <input type="number" id="slotInterval" min="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="15" />
+        <div id="slotInterval-error" class="text-sm text-red-600 mt-1 hidden"></div>
+      </div>
+
+      <div class="form-group">
+        <label for="cancellationCutoff" class="block text-sm font-medium mb-2">Cancellation / Reschedule Cutoff (hours)</label>
+        <input type="number" id="cancellationCutoff" min="0" step="0.25" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="24" />
+        <div id="cancellationCutoff-error" class="text-sm text-red-600 mt-1 hidden"></div>
+      </div>
+    </form>
+
+    <div class="mt-6">
+      <button type="button" id="saveBookingSettings" class="btn btn-primary px-6 py-2.5">Save</button>
+    </div>
+  </div>
+</section>
+
+<script>
+(function() {
+  let settingsData = null;
+
+  async function loadBookingSettings() {
+    const msgEl = document.getElementById('bookingSettingsMsg');
+    msgEl.textContent = 'Loading settings...';
+    msgEl.className = 'text-sm mb-3 text-gray-600';
+
+    try {
+      const { data, error } = await window.supabaseClient
+        .from('booking_settings')
+        .select('*')
+        .limit(1)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        settingsData = data;
+        populateForm(data);
+        msgEl.textContent = '';
+      } else {
+        msgEl.textContent = 'No settings found.';
+        msgEl.className = 'text-sm mb-3 text-amber-600';
+      }
+    } catch (error) {
+      console.error('[admin-booking-settings] Load error:', error);
+      msgEl.textContent = 'Failed to load settings: ' + error.message;
+      msgEl.className = 'text-sm mb-3 text-red-600';
+    }
+  }
+
+  function populateForm(data) {
+    document.getElementById('settingsId').value = data.id || '';
+    document.getElementById('businessTimezone').value = data.business_timezone || 'Australia/Melbourne';
+    document.getElementById('minimumNotice').value = data.minimum_notice_minutes != null ? data.minimum_notice_minutes / 60 : '';
+    document.getElementById('maximumBookingDays').value = data.maximum_booking_days_ahead || '';
+    document.getElementById('bookingBuffer').value = data.booking_buffer_minutes != null ? data.booking_buffer_minutes : '';
+    document.getElementById('paymentHold').value = data.payment_hold_minutes || '';
+    document.getElementById('slotInterval').value = data.default_slot_interval_minutes || '';
+    document.getElementById('cancellationCutoff').value = data.cancellation_cutoff_minutes != null ? data.cancellation_cutoff_minutes / 60 : '';
+  }
+
+  function clearFieldErrors() {
+    const errorElements = document.querySelectorAll('#section-booking-settings [id$="-error"]');
+    errorElements.forEach(el => {
+      el.textContent = '';
+      el.classList.add('hidden');
+    });
+  }
+
+  function showFieldError(fieldId, message) {
+    const errorEl = document.getElementById(fieldId + '-error');
+    if (errorEl) {
+      errorEl.textContent = message;
+      errorEl.classList.remove('hidden');
+    }
+  }
+
+  function validateSettings() {
+    clearFieldErrors();
+    let isValid = true;
+
+    const minimumNotice = parseFloat(document.getElementById('minimumNotice').value);
+    const maximumBookingDays = parseInt(document.getElementById('maximumBookingDays').value, 10);
+    const bookingBuffer = parseInt(document.getElementById('bookingBuffer').value, 10);
+    const paymentHold = parseInt(document.getElementById('paymentHold').value, 10);
+    const slotInterval = parseInt(document.getElementById('slotInterval').value, 10);
+    const cancellationCutoff = parseFloat(document.getElementById('cancellationCutoff').value);
+
+    // Minimum Notice: 0 or greater
+    if (isNaN(minimumNotice) || minimumNotice < 0) {
+        showFieldError('minimumNotice', 'Must be 0 hours or greater');
+        isValid = false;
+    }
+
+    // Maximum Booking Days: 1 or greater
+    if (isNaN(maximumBookingDays) || maximumBookingDays < 1) {
+        showFieldError('maximumBookingDays', 'Must be 1 day or greater');
+        isValid = false;
+    }
+
+    // Booking Buffer: 0 or greater
+    if (isNaN(bookingBuffer) || bookingBuffer < 0) {
+        showFieldError('bookingBuffer', 'Must be 0 minutes or greater');
+        isValid = false;
+    }
+
+    // Payment Hold: 1 or greater
+    if (isNaN(paymentHold) || paymentHold < 1) {
+        showFieldError('paymentHold', 'Must be 1 minute or greater');
+        isValid = false;
+    }
+
+    // Slot Interval: 1 or greater
+    if (isNaN(slotInterval) || slotInterval < 1) {
+        showFieldError('slotInterval', 'Must be 1 minute or greater');
+        isValid = false;
+    }
+
+    // Cancellation Cutoff: 0 or greater
+    if (isNaN(cancellationCutoff) || cancellationCutoff < 0) {
+        showFieldError('cancellationCutoff', 'Must be 0 hours or greater');
+        isValid = false;
+    }
+
+    return isValid;
+  }
+
+  async function saveBookingSettings() {
+    if (!validateSettings()) {
+      return;
+    }
+
+    const saveBtn = document.getElementById('saveBookingSettings');
+    const msgEl = document.getElementById('bookingSettingsMsg');
+    const originalText = saveBtn.textContent;
+
+    saveBtn.textContent = 'Saving…';
+    saveBtn.disabled = true;
+
+    try {
+      const settingsId = document.getElementById('settingsId').value;
+      
+      if (!settingsId) {
+        throw new Error('Settings ID not found. Cannot update.');
+      }
+
+      const updates = {
+        business_timezone: document.getElementById('businessTimezone').value,
+        minimum_notice_minutes: Math.round(parseFloat(document.getElementById('minimumNotice').value) * 60),
+        maximum_booking_days_ahead: parseInt(document.getElementById('maximumBookingDays').value, 10),
+        booking_buffer_minutes: parseInt(document.getElementById('bookingBuffer').value, 10),
+        payment_hold_minutes: parseInt(document.getElementById('paymentHold').value, 10),
+        default_slot_interval_minutes: parseInt(document.getElementById('slotInterval').value, 10),
+        cancellation_cutoff_minutes: Math.round(parseFloat(document.getElementById('cancellationCutoff').value) * 60),
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await window.supabaseClient
+        .from('booking_settings')
+        .update(updates)
+        .eq('id', settingsId);
+
+      if (error) throw error;
+
+      // Show "Saved" on button
+      saveBtn.textContent = 'Saved';
+      
+      // Return to "Save" after 2 seconds
+      setTimeout(() => {
+        saveBtn.textContent = originalText;
+        saveBtn.disabled = false;
+      }, 2000);
+
+      msgEl.textContent = '';
+    } catch (error) {
+      console.error('[admin-booking-settings] Save error:', error);
+      msgEl.textContent = 'Failed to save: ' + error.message;
+      msgEl.className = 'text-sm mb-3 text-red-600';
+      
+      saveBtn.textContent = originalText;
+      saveBtn.disabled = false;
+    }
+  }
+
+  // Initialize when section becomes visible
+  function initBookingSettings() {
+    if (document.getElementById('section-booking-settings').classList.contains('hidden')) {
+      return;
+    }
+    
+    if (!settingsData) {
+      loadBookingSettings();
+    }
+  }
+
+  // Attach event listeners
+  document.getElementById('saveBookingSettings')?.addEventListener('click', saveBookingSettings);
+
+  // Listen for section show
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+        initBookingSettings();
+      }
+    });
+  });
+
+  const sectionEl = document.getElementById('section-booking-settings');
+  if (sectionEl) {
+    observer.observe(sectionEl, { attributes: true });
+  }
+
+  // Also initialize if already visible
+  if (window.location.hash === '#booking-settings') {
+    initBookingSettings();
+  }
+})();
+</script>

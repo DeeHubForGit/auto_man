@@ -105,6 +105,7 @@ const SITE_CONFIG = {
       id: 'senior-drivers',
       name: 'Senior Driver Retests',
       slug: 'senior-drivers',
+      serviceCategoryName: 'Senior Lessons',
       description: 'Refresher lessons and test preparation tailored for senior drivers. Maintain your independence with confidence.',
       image: 'images/older-driver.jpg',
       icon: 'images/icons/green-star.svg', // Green star for experienced drivers

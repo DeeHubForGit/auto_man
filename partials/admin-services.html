@@ -922,8 +922,6 @@
           saveBtn.disabled = true;
         }
 
-        setServicesMsg('Service created successfully!', 'text-green-600');
-
         // Reload services and expand the new service
         setTimeout(async () => {
           expandedServiceId = newServiceId;
@@ -951,8 +949,6 @@
           saveBtn.textContent = 'Saved';
           saveBtn.disabled = true;
         }
-
-        setServicesMsg('Service updated successfully!', 'text-green-600');
 
         setTimeout(() => {
           if (saveBtn) {

@@ -129,6 +129,36 @@ COMMENT ON COLUMN public.business_hours.day_of_week IS 'Day of week where 0 = Su
 COMMENT ON COLUMN public.business_hours.start_time IS 'Start of the business operating period.';
 COMMENT ON COLUMN public.business_hours.end_time IS 'End of the business operating period.';
 
+-- Booking Settings table: centralized booking configuration
+CREATE TABLE public.booking_settings (
+    id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
+    business_timezone text DEFAULT 'Australia/Melbourne'::text NOT NULL,
+    minimum_notice_minutes integer DEFAULT 240 NOT NULL,
+    maximum_booking_days_ahead integer DEFAULT 60 NOT NULL,
+    booking_buffer_minutes integer DEFAULT 15 NOT NULL,
+    payment_hold_minutes integer DEFAULT 15 NOT NULL,
+    default_slot_interval_minutes integer DEFAULT 15 NOT NULL,
+    cancellation_cutoff_minutes integer DEFAULT 1440 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT booking_settings_timezone_check CHECK ((business_timezone <> ''::text)),
+    CONSTRAINT booking_settings_minimum_notice_check CHECK ((minimum_notice_minutes >= 0)),
+    CONSTRAINT booking_settings_maximum_days_check CHECK ((maximum_booking_days_ahead > 0)),
+    CONSTRAINT booking_settings_buffer_check CHECK ((booking_buffer_minutes >= 0)),
+    CONSTRAINT booking_settings_payment_hold_check CHECK ((payment_hold_minutes > 0)),
+    CONSTRAINT booking_settings_slot_interval_check CHECK ((default_slot_interval_minutes > 0)),
+    CONSTRAINT booking_settings_cancellation_check CHECK ((cancellation_cutoff_minutes >= 0))
+);
+
+COMMENT ON TABLE public.booking_settings IS 'Singleton table storing centralized booking configuration. Only one row should exist.';
+COMMENT ON COLUMN public.booking_settings.business_timezone IS 'Business operating timezone (e.g., Australia/Melbourne)';
+COMMENT ON COLUMN public.booking_settings.minimum_notice_minutes IS 'Minimum notice required before booking start time (default 240 = 4 hours)';
+COMMENT ON COLUMN public.booking_settings.maximum_booking_days_ahead IS 'Maximum days in advance bookings can be made (default 60)';
+COMMENT ON COLUMN public.booking_settings.booking_buffer_minutes IS 'Buffer time between bookings to prevent back-to-back scheduling (default 15)';
+COMMENT ON COLUMN public.booking_settings.payment_hold_minutes IS 'How long to hold an unpaid booking slot before releasing (default 15)';
+COMMENT ON COLUMN public.booking_settings.default_slot_interval_minutes IS 'Time interval for available booking slots (default 15)';
+COMMENT ON COLUMN public.booking_settings.cancellation_cutoff_minutes IS 'Cutoff time before lesson when cancellation/reschedule is not allowed (default 1440 = 24 hours)';
+
 -- Package table: defines lesson packages for bulk purchase
 CREATE TABLE public.package (
     id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
@@ -878,6 +908,12 @@ CREATE TRIGGER t_business_hours_updated
     FOR EACH ROW 
     EXECUTE FUNCTION public.set_updated_at();
 
+-- Trigger: UPDATE timestamp on booking settings changes
+CREATE TRIGGER t_booking_settings_updated 
+    BEFORE UPDATE ON public.booking_settings 
+    FOR EACH ROW 
+    EXECUTE FUNCTION public.set_updated_at();
+
 -- =====================================================================
 -- PRIMARY KEYS
 -- =====================================================================
@@ -905,6 +941,9 @@ ALTER TABLE ONLY public.business_hours
 
 ALTER TABLE ONLY public.business_hours
     ADD CONSTRAINT business_hours_exact_period_key UNIQUE (day_of_week, start_time, end_time);
+
+ALTER TABLE ONLY public.booking_settings
+    ADD CONSTRAINT booking_settings_pkey PRIMARY KEY (id);
 
 ALTER TABLE ONLY public.package
     ADD CONSTRAINT package_pkey PRIMARY KEY (id);
@@ -971,6 +1010,9 @@ CREATE INDEX idx_service_category_id ON public.service USING btree (service_cate
 
 -- Business Hours indexes
 CREATE INDEX idx_business_hours_day_start ON public.business_hours USING btree (day_of_week, start_time);
+
+-- Booking Settings indexes
+CREATE UNIQUE INDEX booking_settings_single_row_idx ON public.booking_settings ((true));
 
 -- Booking indexes
 CREATE INDEX idx_booking_client_id ON public.booking USING btree (client_id);
@@ -1052,6 +1094,7 @@ ALTER TABLE public.client ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.service_category ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.service ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.business_hours ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.booking_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.package ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.booking ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.client_credit ENABLE ROW LEVEL SECURITY;
@@ -1120,6 +1163,18 @@ CREATE POLICY "Admins can delete business hours" ON public.business_hours FOR DE
     USING (public.is_admin());
 
 CREATE POLICY "Service role full access business_hours" ON public.business_hours TO service_role 
+    USING (true) 
+    WITH CHECK (true);
+
+-- Booking Settings policies
+CREATE POLICY "Users can read booking settings" ON public.booking_settings FOR SELECT TO anon, authenticated 
+    USING (true);
+
+CREATE POLICY "Admins can update booking settings" ON public.booking_settings FOR UPDATE TO authenticated 
+    USING (public.is_admin()) 
+    WITH CHECK (public.is_admin());
+
+CREATE POLICY "Service role full access booking_settings" ON public.booking_settings TO service_role 
     USING (true) 
     WITH CHECK (true);
 
@@ -1268,6 +1323,34 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.service_category TO authent
 GRANT SELECT ON TABLE public.business_hours TO anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.business_hours TO authenticated;
 GRANT ALL PRIVILEGES ON TABLE public.business_hours TO service_role;
+
+-- Booking Settings table grants
+GRANT SELECT ON TABLE public.booking_settings TO anon;
+GRANT SELECT, UPDATE ON TABLE public.booking_settings TO authenticated;
+GRANT ALL PRIVILEGES ON TABLE public.booking_settings TO service_role;
+
+-- Create the initial singleton booking settings record.
+INSERT INTO public.booking_settings (
+    business_timezone,
+    minimum_notice_minutes,
+    maximum_booking_days_ahead,
+    booking_buffer_minutes,
+    payment_hold_minutes,
+    default_slot_interval_minutes,
+    cancellation_cutoff_minutes
+)
+SELECT
+    'Australia/Melbourne',
+    240,
+    60,
+    15,
+    15,
+    15,
+    1440
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM public.booking_settings
+);
 
 -- =====================================================================
 -- SUPABASE STORAGE: SERVICE CATEGORY ICONS

@@ -1,0 +1,841 @@
+<!-- Admin Availability Exceptions Section -->
+<style>
+  #adminAvailabilityExceptionsList .exception-card {
+    width: 100%;
+    background-color: #dbeafe !important;
+    border: 2px solid #3b82f6 !important;
+    border-radius: 0.5rem;
+    color: #111827 !important;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  #adminAvailabilityExceptionsList .exception-card:hover {
+    border-color: #2563eb !important;
+  }
+
+  #adminAvailabilityExceptionsList .exception-card.inactive-exception {
+    background-color: #f1f5f9 !important;
+    border-color: #94a3b8 !important;
+  }
+
+  #adminAvailabilityExceptionsList .exception-card.inactive-exception:hover {
+    border-color: #64748b !important;
+  }
+
+  #adminAvailabilityExceptionsList .exception-card input,
+  #adminAvailabilityExceptionsList .exception-card select,
+  #adminAvailabilityExceptionsList .exception-card textarea {
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  #adminAvailabilityExceptionsList .exception-card label {
+    color: #111827 !important;
+  }
+
+  #section-availability-exceptions .btn-outline-red {
+    background: transparent !important;
+    border: 1px solid var(--danger) !important;
+    color: var(--danger) !important;
+  }
+
+  #section-availability-exceptions .btn-outline-red:hover {
+    background: rgba(220, 38, 38, 0.08) !important;
+    border-color: var(--danger) !important;
+    color: var(--danger) !important;
+  }
+
+  .exception-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+    align-items: end;
+  }
+
+  @media (max-width: 639px) {
+    .exception-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<section id="section-availability-exceptions" class="section-content hidden">
+  <div class="bg-white rounded-2xl border shadow-sm p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-semibold">Availability Exceptions</h2>
+      
+      <div class="flex gap-2">
+        <button id="addAvailabilityExceptionBtn" class="btn btn-primary" type="button">
+          Add Exception
+        </button>
+        <button id="availabilityExceptionsRefreshBtn" class="btn btn-primary-light" type="button" aria-label="Refresh availability exceptions" title="Refresh">
+          <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M14 8c0-3.3-2.7-6-6-6S2 4.7 2 8s2.7 6 6 6c1.8 0 3.4-.8 4.5-2M14 3v5h-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="hidden sm:inline">Refresh</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="availabilityExceptionsMsg" class="text-sm mb-3"></div>
+    <div id="adminAvailabilityExceptionsList"></div>
+  </div>
+</section>
+
+<script>
+(function() {
+  let allAvailabilityExceptions = [];
+  let allResources = [];
+  let allServiceTypes = [];
+  let allServiceCategories = [];
+  let allServices = [];
+  let isAddingNew = false;
+  let exceptionsLoaded = false;
+
+  function setExceptionsMsg(text, cls) {
+    const el = document.getElementById('availabilityExceptionsMsg');
+    if (!el) return;
+    el.textContent = text || '';
+    el.className = 'text-sm mb-3 ' + (cls || '');
+  }
+
+  function safeText(value) {
+    return (value === null || value === undefined) ? '' : String(value);
+  }
+
+  function escapeHtml(str) {
+    return safeText(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function formatTimeForDb(timeStr) {
+    if (!timeStr) return null;
+    const parts = timeStr.split(':');
+    if (parts.length === 2) {
+      return `${parts[0]}:${parts[1]}:00`;
+    }
+    return timeStr;
+  }
+
+  function getResourceName(resourceId) {
+    const resource = allResources.find(r => r.id === resourceId);
+    return resource ? resource.name : 'Unknown Resource';
+  }
+
+  function getTypeName(typeId) {
+    const type = allServiceTypes.find(t => t.id === typeId);
+    return type ? type.name : 'Unknown Type';
+  }
+
+  function getCategoryName(categoryId) {
+    const category = allServiceCategories.find(c => c.id === categoryId);
+    return category ? category.name : 'Unknown Category';
+  }
+
+  function getServiceName(serviceId) {
+    const service = allServices.find(s => s.id === serviceId);
+    return service ? service.name : 'Unknown Service';
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr + 'T00:00:00');
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch {
+      return dateStr;
+    }
+  }
+
+  function renderExceptionCard(exception, isNew = false) {
+    const exceptionId = isNew ? 'new' : exception.id;
+    const inputCls = 'w-full bg-white text-gray-900 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
+    const labelCls = 'text-xs font-medium text-gray-700 mb-1 block';
+    
+    const date = isNew ? '' : (exception.date || '');
+    const appliesTo = isNew ? 'business-wide' : getAppliesTo(exception);
+    const resourceId = isNew ? '' : (exception.resource_id || '');
+    const serviceTypeId = isNew ? '' : (exception.service_type_id || '');
+    const serviceCategoryId = isNew ? '' : (exception.service_category_id || '');
+    const serviceId = isNew ? '' : (exception.service_id || '');
+    const isAvailable = isNew ? false : (exception.is_available === true);
+    const fullDay = isNew ? true : (!exception.start_time && !exception.end_time);
+    const startTime = isNew ? '' : ((exception.start_time || '').substring(0, 5));
+    const endTime = isNew ? '' : ((exception.end_time || '').substring(0, 5));
+    const reason = isNew ? '' : (exception.reason || '');
+    const isActive = isNew ? true : (exception.is_active !== false);
+    
+    const cardCls = isActive ? 'exception-card' : 'exception-card inactive-exception';
+
+    const resourceOptions = allResources.map(r => 
+      `<option value="${escapeHtml(r.id)}"${r.id === resourceId ? ' selected' : ''}>${escapeHtml(r.name)}</option>`
+    ).join('');
+
+    const typeOptions = allServiceTypes.map(t => 
+      `<option value="${escapeHtml(t.id)}"${t.id === serviceTypeId ? ' selected' : ''}>${escapeHtml(t.name)}</option>`
+    ).join('');
+
+    const categoryOptions = allServiceCategories.map(c => 
+      `<option value="${escapeHtml(c.id)}"${c.id === serviceCategoryId ? ' selected' : ''}>${escapeHtml(c.name)}</option>`
+    ).join('');
+
+    const serviceOptions = allServices.map(s => 
+      `<option value="${escapeHtml(s.id)}"${s.id === serviceId ? ' selected' : ''}>${escapeHtml(s.name)}</option>`
+    ).join('');
+
+    const showResource = appliesTo !== 'business-wide';
+    const showType = appliesTo === 'type';
+    const showCategory = appliesTo === 'category';
+    const showService = appliesTo === 'service';
+    const showTimes = !fullDay;
+    const disableAvailable = appliesTo === 'business-wide';
+
+    return `
+      <div class="${cardCls}" data-exception-id="${escapeHtml(exceptionId)}">
+        <div class="exception-grid">
+          <div>
+            <label class="${labelCls}">Date</label>
+            <input type="date" class="${inputCls}" data-field="date" value="${escapeHtml(date)}" required />
+            <div class="text-xs text-red-600 mt-1 hidden" data-role="date-error"></div>
+          </div>
+
+          <div>
+            <label class="${labelCls}">Applies To</label>
+            <select class="${inputCls}" data-field="applies_to" onchange="window.handleAppliesToChange('${escapeHtml(exceptionId)}')" required>
+              <option value="business-wide"${appliesTo === 'business-wide' ? ' selected' : ''}>Business-wide</option>
+              <option value="resource"${appliesTo === 'resource' ? ' selected' : ''}>Resource</option>
+              <option value="type"${appliesTo === 'type' ? ' selected' : ''}>Type</option>
+              <option value="category"${appliesTo === 'category' ? ' selected' : ''}>Category</option>
+              <option value="service"${appliesTo === 'service' ? ' selected' : ''}>Service</option>
+            </select>
+            <div class="text-xs text-red-600 mt-1 hidden" data-role="applies_to-error"></div>
+          </div>
+
+          <div data-role="resource-selector" class="${showResource ? '' : 'hidden'}">
+            <label class="${labelCls}">Resource</label>
+            <select class="${inputCls}" data-field="resource_id">
+              <option value="">Select…</option>
+              ${resourceOptions}
+            </select>
+            <div class="text-xs text-red-600 mt-1 hidden" data-role="resource_id-error"></div>
+          </div>
+
+          <div data-role="type-selector" class="${showType ? '' : 'hidden'}">
+            <label class="${labelCls}">Service Type</label>
+            <select class="${inputCls}" data-field="service_type_id">
+              <option value="">Select…</option>
+              ${typeOptions}
+            </select>
+            <div class="text-xs text-red-600 mt-1 hidden" data-role="service_type_id-error"></div>
+          </div>
+
+          <div data-role="category-selector" class="${showCategory ? '' : 'hidden'}">
+            <label class="${labelCls}">Category</label>
+            <select class="${inputCls}" data-field="service_category_id">
+              <option value="">Select…</option>
+              ${categoryOptions}
+            </select>
+            <div class="text-xs text-red-600 mt-1 hidden" data-role="service_category_id-error"></div>
+          </div>
+
+          <div data-role="service-selector" class="${showService ? '' : 'hidden'}">
+            <label class="${labelCls}">Service</label>
+            <select class="${inputCls}" data-field="service_id">
+              <option value="">Select…</option>
+              ${serviceOptions}
+            </select>
+            <div class="text-xs text-red-600 mt-1 hidden" data-role="service_id-error"></div>
+          </div>
+
+          <div>
+            <label class="${labelCls}">Availability</label>
+            <select class="${inputCls}" data-field="is_available"${disableAvailable ? ' disabled' : ''}>
+              <option value="false"${!isAvailable ? ' selected' : ''}>Unavailable</option>
+              <option value="true"${isAvailable ? ' selected' : ''}>Available</option>
+            </select>
+            <div class="text-xs text-red-600 mt-1 hidden" data-role="is_available-error"></div>
+          </div>
+
+          <div>
+            <label class="${labelCls}">
+              <input type="checkbox" class="mr-1" data-field="full_day" onchange="window.handleFullDayChange('${escapeHtml(exceptionId)}')"${fullDay ? ' checked' : ''} />
+              Full Day
+            </label>
+          </div>
+
+          <div data-role="start-time-field" class="${showTimes ? '' : 'hidden'}">
+            <label class="${labelCls}">Start Time</label>
+            <input type="time" class="${inputCls}" data-field="start_time" value="${escapeHtml(startTime)}" />
+            <div class="text-xs text-red-600 mt-1 hidden" data-role="start_time-error"></div>
+          </div>
+
+          <div data-role="end-time-field" class="${showTimes ? '' : 'hidden'}">
+            <label class="${labelCls}">End Time</label>
+            <input type="time" class="${inputCls}" data-field="end_time" value="${escapeHtml(endTime)}" />
+            <div class="text-xs text-red-600 mt-1 hidden" data-role="end_time-error"></div>
+          </div>
+
+          <div class="col-span-full">
+            <label class="${labelCls}">Reason</label>
+            <textarea class="${inputCls}" data-field="reason" rows="2" required>${escapeHtml(reason)}</textarea>
+            <div class="text-xs text-red-600 mt-1 hidden" data-role="reason-error"></div>
+          </div>
+
+          <div>
+            <label class="${labelCls}">Active</label>
+            <select class="${inputCls}" data-field="is_active">
+              <option value="true"${isActive ? ' selected' : ''}>Yes</option>
+              <option value="false"${!isActive ? ' selected' : ''}>No</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex gap-2 mt-3">
+          <button type="button" class="btn btn-primary text-sm px-4 py-2" data-role="save-btn" onclick="window.saveAvailabilityException('${escapeHtml(exceptionId)}')">
+            Save
+          </button>
+          ${isNew ? 
+            `<button type="button" class="btn btn-outline-blue text-sm px-4 py-2" onclick="window.cancelAddException()">Cancel</button>` :
+            `<button type="button" class="btn btn-outline-red text-sm px-4 py-2" onclick="window.deleteAvailabilityException('${escapeHtml(exceptionId)}')">Delete</button>`
+          }
+        </div>
+
+        <div class="text-xs text-red-600 mt-2 hidden" data-role="form-error"></div>
+      </div>
+    `;
+  }
+
+  function getAppliesTo(exception) {
+    if (!exception.resource_id && !exception.service_type_id && !exception.service_category_id && !exception.service_id) {
+      return 'business-wide';
+    }
+    if (exception.resource_id && exception.service_id) {
+      return 'service';
+    }
+    if (exception.resource_id && exception.service_category_id) {
+      return 'category';
+    }
+    if (exception.resource_id && exception.service_type_id) {
+      return 'type';
+    }
+    if (exception.resource_id) {
+      return 'resource';
+    }
+    return 'business-wide';
+  }
+
+  function renderExceptions() {
+    const list = document.getElementById('adminAvailabilityExceptionsList');
+    if (!list) return;
+
+    // Sort by date descending (most recent first)
+    const sorted = [...allAvailabilityExceptions].sort((a, b) => {
+      if (a.date > b.date) return -1;
+      if (a.date < b.date) return 1;
+      return 0;
+    });
+
+    let html = sorted.map(exception => renderExceptionCard(exception)).join('');
+    
+    if (isAddingNew) {
+      html = renderExceptionCard(null, true) + html;
+    }
+
+    if (!html && !isAddingNew) {
+      html = '<div class="text-gray-500 text-sm">No availability exceptions configured.</div>';
+    }
+
+    list.innerHTML = html;
+  }
+
+  window.handleAppliesToChange = function(exceptionId) {
+    const card = document.querySelector(`[data-exception-id="${exceptionId}"]`);
+    if (!card) return;
+
+    const appliesToSelect = card.querySelector('[data-field="applies_to"]');
+    const resourceSelector = card.querySelector('[data-role="resource-selector"]');
+    const typeSelector = card.querySelector('[data-role="type-selector"]');
+    const categorySelector = card.querySelector('[data-role="category-selector"]');
+    const serviceSelector = card.querySelector('[data-role="service-selector"]');
+    const resourceInput = card.querySelector('[data-field="resource_id"]');
+    const typeInput = card.querySelector('[data-field="service_type_id"]');
+    const categoryInput = card.querySelector('[data-field="service_category_id"]');
+    const serviceInput = card.querySelector('[data-field="service_id"]');
+    const availabilitySelect = card.querySelector('[data-field="is_available"]');
+
+    const appliesTo = appliesToSelect.value;
+
+    if (appliesTo === 'business-wide') {
+      resourceSelector.classList.add('hidden');
+      typeSelector.classList.add('hidden');
+      categorySelector.classList.add('hidden');
+      serviceSelector.classList.add('hidden');
+      if (resourceInput) resourceInput.value = '';
+      if (typeInput) typeInput.value = '';
+      if (categoryInput) categoryInput.value = '';
+      if (serviceInput) serviceInput.value = '';
+      // Force unavailable for business-wide
+      if (availabilitySelect) {
+        availabilitySelect.value = 'false';
+        availabilitySelect.disabled = true;
+      }
+    } else if (appliesTo === 'resource') {
+      resourceSelector.classList.remove('hidden');
+      typeSelector.classList.add('hidden');
+      categorySelector.classList.add('hidden');
+      serviceSelector.classList.add('hidden');
+      if (typeInput) typeInput.value = '';
+      if (categoryInput) categoryInput.value = '';
+      if (serviceInput) serviceInput.value = '';
+      if (availabilitySelect) {
+        availabilitySelect.disabled = false;
+      }
+    } else if (appliesTo === 'type') {
+      resourceSelector.classList.remove('hidden');
+      typeSelector.classList.remove('hidden');
+      categorySelector.classList.add('hidden');
+      serviceSelector.classList.add('hidden');
+      if (categoryInput) categoryInput.value = '';
+      if (serviceInput) serviceInput.value = '';
+      if (availabilitySelect) {
+        availabilitySelect.disabled = false;
+      }
+    } else if (appliesTo === 'category') {
+      resourceSelector.classList.remove('hidden');
+      typeSelector.classList.add('hidden');
+      categorySelector.classList.remove('hidden');
+      serviceSelector.classList.add('hidden');
+      if (typeInput) typeInput.value = '';
+      if (serviceInput) serviceInput.value = '';
+      if (availabilitySelect) {
+        availabilitySelect.disabled = false;
+      }
+    } else if (appliesTo === 'service') {
+      resourceSelector.classList.remove('hidden');
+      typeSelector.classList.add('hidden');
+      categorySelector.classList.add('hidden');
+      serviceSelector.classList.remove('hidden');
+      if (typeInput) typeInput.value = '';
+      if (categoryInput) categoryInput.value = '';
+      if (availabilitySelect) {
+        availabilitySelect.disabled = false;
+      }
+    }
+  };
+
+  window.handleFullDayChange = function(exceptionId) {
+    const card = document.querySelector(`[data-exception-id="${exceptionId}"]`);
+    if (!card) return;
+
+    const fullDayCheckbox = card.querySelector('[data-field="full_day"]');
+    const startTimeField = card.querySelector('[data-role="start-time-field"]');
+    const endTimeField = card.querySelector('[data-role="end-time-field"]');
+    const startTimeInput = card.querySelector('[data-field="start_time"]');
+    const endTimeInput = card.querySelector('[data-field="end_time"]');
+
+    if (fullDayCheckbox.checked) {
+      startTimeField.classList.add('hidden');
+      endTimeField.classList.add('hidden');
+      if (startTimeInput) startTimeInput.value = '';
+      if (endTimeInput) endTimeInput.value = '';
+    } else {
+      startTimeField.classList.remove('hidden');
+      endTimeField.classList.remove('hidden');
+    }
+  };
+
+  async function loadData() {
+    if (!window.supabaseClient) {
+      setExceptionsMsg('Supabase client not ready.', 'text-red-600');
+      return;
+    }
+
+    setExceptionsMsg('Loading…', 'text-gray-600');
+
+    try {
+      const [exceptionsRes, resourcesRes, typesRes, categoriesRes, servicesRes] = await Promise.all([
+        window.supabaseClient.from('availability_exceptions').select('*').order('date', { ascending: false }),
+        window.supabaseClient.from('resource').select('*').order('name'),
+        window.supabaseClient.from('service_type').select('*').eq('is_active', true).order('sort_order').order('name'),
+        window.supabaseClient.from('service_category').select('*').eq('is_active', true).order('name'),
+        window.supabaseClient.from('service').select('*').eq('is_active', true).order('name')
+      ]);
+
+      if (exceptionsRes.error) throw exceptionsRes.error;
+      if (resourcesRes.error) throw resourcesRes.error;
+      if (typesRes.error) throw typesRes.error;
+      if (categoriesRes.error) throw categoriesRes.error;
+      if (servicesRes.error) throw servicesRes.error;
+
+      allAvailabilityExceptions = exceptionsRes.data || [];
+      allResources = resourcesRes.data || [];
+      allServiceTypes = typesRes.data || [];
+      allServiceCategories = categoriesRes.data || [];
+      allServices = servicesRes.data || [];
+      exceptionsLoaded = true;
+
+      renderExceptions();
+      setExceptionsMsg('', '');
+    } catch (e) {
+      console.error('[admin-availability-exceptions] load failed:', e);
+      setExceptionsMsg('Failed to load availability exceptions. Please try again.', 'text-red-600');
+      const list = document.getElementById('adminAvailabilityExceptionsList');
+      if (list) list.innerHTML = '';
+    }
+  }
+
+  window.addAvailabilityException = function() {
+    isAddingNew = true;
+    renderExceptions();
+    
+    const newCard = document.querySelector('[data-exception-id="new"]');
+    if (newCard) {
+      newCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  };
+
+  window.cancelAddException = function() {
+    isAddingNew = false;
+    renderExceptions();
+  };
+
+  function clearCardErrors(card) {
+    const errorEls = card.querySelectorAll('[data-role$="-error"]');
+    errorEls.forEach(el => el.classList.add('hidden'));
+  }
+
+  function showFieldError(card, fieldName, message) {
+    const errorEl = card.querySelector(`[data-role="${fieldName}-error"]`);
+    if (errorEl) {
+      errorEl.textContent = message;
+      errorEl.classList.remove('hidden');
+    }
+  }
+
+  function showFormError(card, message) {
+    const errorEl = card.querySelector('[data-role="form-error"]');
+    if (errorEl) {
+      errorEl.textContent = message;
+      errorEl.classList.remove('hidden');
+    }
+  }
+
+  function getFieldValue(card, fieldName) {
+    const input = card.querySelector(`[data-field="${fieldName}"]`);
+    if (!input) return '';
+    if (input.type === 'checkbox') return input.checked;
+    return input.value.trim();
+  }
+
+  function validateException(card) {
+    clearCardErrors(card);
+    let isValid = true;
+    let firstErrorField = null;
+
+    const date = getFieldValue(card, 'date');
+    const appliesTo = getFieldValue(card, 'applies_to');
+    const resourceId = getFieldValue(card, 'resource_id');
+    const typeId = getFieldValue(card, 'service_type_id');
+    const categoryId = getFieldValue(card, 'service_category_id');
+    const serviceId = getFieldValue(card, 'service_id');
+    const isAvailable = getFieldValue(card, 'is_available') === 'true';
+    const fullDay = getFieldValue(card, 'full_day');
+    const startTime = getFieldValue(card, 'start_time');
+    const endTime = getFieldValue(card, 'end_time');
+    const reason = getFieldValue(card, 'reason');
+
+    if (!date) {
+      showFieldError(card, 'date', 'Date is required');
+      if (!firstErrorField) firstErrorField = card.querySelector('[data-field="date"]');
+      isValid = false;
+    }
+
+    if (!appliesTo) {
+      showFieldError(card, 'applies_to', 'Applies To is required');
+      if (!firstErrorField) firstErrorField = card.querySelector('[data-field="applies_to"]');
+      isValid = false;
+    }
+
+    // Business-wide must be Unavailable
+    if (appliesTo === 'business-wide' && isAvailable) {
+      showFieldError(card, 'is_available', 'Business-wide exceptions must be Unavailable');
+      isValid = false;
+    }
+
+    // Available exceptions require a Resource
+    if (isAvailable && !resourceId) {
+      showFieldError(card, 'resource_id', 'Available exceptions require a Resource');
+      if (!firstErrorField) firstErrorField = card.querySelector('[data-field="resource_id"]');
+      isValid = false;
+    }
+
+    // Resource-level requires resourceId
+    if (appliesTo === 'resource' && !resourceId) {
+      showFieldError(card, 'resource_id', 'Resource is required');
+      if (!firstErrorField) firstErrorField = card.querySelector('[data-field="resource_id"]');
+      isValid = false;
+    }
+
+    // Type-level requires both resourceId and typeId
+    if (appliesTo === 'type') {
+      if (!resourceId) {
+        showFieldError(card, 'resource_id', 'Resource is required for Type exceptions');
+        if (!firstErrorField) firstErrorField = card.querySelector('[data-field="resource_id"]');
+        isValid = false;
+      }
+      if (!typeId) {
+        showFieldError(card, 'service_type_id', 'Service Type is required');
+        if (!firstErrorField) firstErrorField = card.querySelector('[data-field="service_type_id"]');
+        isValid = false;
+      }
+    }
+
+    // Category-level requires both resourceId and categoryId
+    if (appliesTo === 'category') {
+      if (!resourceId) {
+        showFieldError(card, 'resource_id', 'Resource is required for Category exceptions');
+        if (!firstErrorField) firstErrorField = card.querySelector('[data-field="resource_id"]');
+        isValid = false;
+      }
+      if (!categoryId) {
+        showFieldError(card, 'service_category_id', 'Category is required');
+        if (!firstErrorField) firstErrorField = card.querySelector('[data-field="service_category_id"]');
+        isValid = false;
+      }
+    }
+
+    // Service-level requires both resourceId and serviceId
+    if (appliesTo === 'service') {
+      if (!resourceId) {
+        showFieldError(card, 'resource_id', 'Resource is required for Service exceptions');
+        if (!firstErrorField) firstErrorField = card.querySelector('[data-field="resource_id"]');
+        isValid = false;
+      }
+      if (!serviceId) {
+        showFieldError(card, 'service_id', 'Service is required');
+        if (!firstErrorField) firstErrorField = card.querySelector('[data-field="service_id"]');
+        isValid = false;
+      }
+    }
+
+    // Partial-day exceptions require both times
+    if (!fullDay) {
+      if (!startTime) {
+        showFieldError(card, 'start_time', 'Start time is required for partial-day exceptions');
+        if (!firstErrorField) firstErrorField = card.querySelector('[data-field="start_time"]');
+        isValid = false;
+      }
+      if (!endTime) {
+        showFieldError(card, 'end_time', 'End time is required for partial-day exceptions');
+        if (!firstErrorField) firstErrorField = card.querySelector('[data-field="end_time"]');
+        isValid = false;
+      }
+      if (startTime && endTime && startTime >= endTime) {
+        showFormError(card, 'End time must be later than start time.');
+        isValid = false;
+      }
+    }
+
+    if (!reason) {
+      showFieldError(card, 'reason', 'Reason is required');
+      if (!firstErrorField) firstErrorField = card.querySelector('[data-field="reason"]');
+      isValid = false;
+    }
+
+    if (firstErrorField) {
+      firstErrorField.focus();
+    }
+
+    return isValid;
+  }
+
+  window.saveAvailabilityException = async function(exceptionId) {
+    if (!window.supabaseClient) {
+      setExceptionsMsg('Supabase client not ready.', 'text-red-600');
+      return;
+    }
+
+    const card = document.querySelector(`[data-exception-id="${exceptionId}"]`);
+    if (!card) return;
+
+    if (!validateException(card)) return;
+
+    const saveBtn = card.querySelector('[data-role="save-btn"]');
+    const originalBtnText = saveBtn ? saveBtn.textContent : '';
+
+    const date = getFieldValue(card, 'date');
+    const appliesTo = getFieldValue(card, 'applies_to');
+    const resourceId = getFieldValue(card, 'resource_id') || null;
+    const typeId = getFieldValue(card, 'service_type_id') || null;
+    const categoryId = getFieldValue(card, 'service_category_id') || null;
+    const serviceId = getFieldValue(card, 'service_id') || null;
+    const isAvailable = getFieldValue(card, 'is_available') === 'true';
+    const fullDay = getFieldValue(card, 'full_day');
+    const startTime = fullDay ? null : getFieldValue(card, 'start_time');
+    const endTime = fullDay ? null : getFieldValue(card, 'end_time');
+    const reason = getFieldValue(card, 'reason');
+    const isActive = getFieldValue(card, 'is_active') === 'true';
+
+    const payload = {
+      date: date,
+      resource_id: appliesTo === 'business-wide' ? null : resourceId,
+      service_type_id: appliesTo === 'type' ? typeId : null,
+      service_category_id: appliesTo === 'category' ? categoryId : null,
+      service_id: appliesTo === 'service' ? serviceId : null,
+      start_time: fullDay ? null : formatTimeForDb(startTime),
+      end_time: fullDay ? null : formatTimeForDb(endTime),
+      is_available: isAvailable,
+      reason: reason,
+      is_active: isActive
+    };
+
+    try {
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving…';
+      }
+
+      if (exceptionId === 'new') {
+        const { data, error } = await window.supabaseClient
+          .from('availability_exceptions')
+          .insert([payload])
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        allAvailabilityExceptions.push(data);
+        isAddingNew = false;
+      } else {
+        const { error } = await window.supabaseClient
+          .from('availability_exceptions')
+          .update(payload)
+          .eq('id', exceptionId);
+
+        if (error) throw error;
+
+        const idx = allAvailabilityExceptions.findIndex(e => e.id === exceptionId);
+        if (idx !== -1) {
+          allAvailabilityExceptions[idx] = { ...allAvailabilityExceptions[idx], ...payload };
+        }
+      }
+
+      if (saveBtn) {
+        saveBtn.textContent = 'Saved';
+      }
+
+      setTimeout(() => {
+        renderExceptions();
+        setExceptionsMsg('', '');
+      }, 1500);
+
+    } catch (e) {
+      console.error('[admin-availability-exceptions] save failed:', e);
+      showFormError(card, 'Failed to save exception. Please try again.');
+      if (saveBtn) {
+        saveBtn.textContent = originalBtnText;
+        saveBtn.disabled = false;
+      }
+    }
+  };
+
+  async function performDeleteException(exceptionId) {
+    try {
+      const { error } = await window.supabaseClient
+        .from('availability_exceptions')
+        .delete()
+        .eq('id', exceptionId);
+
+      if (error) throw error;
+
+      allAvailabilityExceptions = allAvailabilityExceptions.filter(e => e.id !== exceptionId);
+      renderExceptions();
+      setExceptionsMsg('', '');
+    } catch (e) {
+      console.error('[admin-availability-exceptions] delete failed:', e);
+      setExceptionsMsg('Failed to delete exception. Please try again.', 'text-red-600');
+    }
+  }
+
+  window.deleteAvailabilityException = function(exceptionId) {
+    if (!exceptionId || exceptionId === 'new') return;
+
+    const exception = allAvailabilityExceptions.find(e => e.id === exceptionId);
+    if (!exception) return;
+
+    const dateFormatted = formatDate(exception.date);
+    const appliesTo = getAppliesTo(exception);
+    const appliesToLabel = appliesTo === 'business-wide' ? 'Business-wide' :
+                          appliesTo === 'resource' ? getResourceName(exception.resource_id) :
+                          appliesTo === 'type' ? getTypeName(exception.service_type_id) :
+                          appliesTo === 'category' ? getCategoryName(exception.service_category_id) :
+                          getServiceName(exception.service_id);
+
+    const confirmMsg = `Are you sure you want to delete this availability exception?\n\nDate: ${dateFormatted}\nApplies To: ${appliesToLabel}\n\nThis action cannot be undone.`;
+
+    if (window.Modal && typeof window.Modal.confirm === 'function') {
+      window.Modal.confirm(
+        confirmMsg,
+        () => performDeleteException(exceptionId),
+        null,
+        'Delete Availability Exception',
+        { confirmText: 'Yes, Delete', cancelText: 'Cancel' }
+      );
+    } else {
+      const ok = window.confirm(confirmMsg);
+      if (ok) {
+        performDeleteException(exceptionId);
+      }
+    }
+  };
+
+  function initAvailabilityExceptions() {
+    const section = document.getElementById('section-availability-exceptions');
+    if (!section) return;
+
+    if (section.dataset.exceptionsInit === '1') return;
+    section.dataset.exceptionsInit = '1';
+
+    const addBtn = document.getElementById('addAvailabilityExceptionBtn');
+    if (addBtn) {
+      addBtn.addEventListener('click', window.addAvailabilityException);
+    }
+
+    const refreshBtn = document.getElementById('availabilityExceptionsRefreshBtn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', loadData);
+    }
+
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+          const isVisible = !section.classList.contains('hidden');
+          if (isVisible && !exceptionsLoaded) {
+            loadData();
+          }
+        }
+      });
+    });
+
+    observer.observe(section, { attributes: true });
+
+    if (!section.classList.contains('hidden')) {
+      loadData();
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAvailabilityExceptions);
+  } else {
+    initAvailabilityExceptions();
+  }
+})();
+</script>

@@ -90,6 +90,19 @@ CREATE TABLE public.service_category (
 
 COMMENT ON COLUMN public.service_category.icon_path IS 'Supabase Storage object path for the uploaded icon image (e.g. service-categories/{uuid}/{filename}). Null if no icon is uploaded.';
 
+-- Service Type table: operational grouping for services
+CREATE TABLE public.service_type (
+    id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
+    name text NOT NULL,
+    sort_order integer,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT service_type_name_check CHECK ((length(trim(name)) > 0))
+);
+
+COMMENT ON TABLE public.service_type IS 'Operational grouping for services, such as Automatic or Manual.';
+
 -- Service table: defines available driving lesson services
 CREATE TABLE public.service (
     id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
@@ -104,12 +117,14 @@ CREATE TABLE public.service (
     google_booking_url text,
     sort_order integer,
     service_category_id uuid,
+    service_type_id uuid,
     booking_time_mode public.booking_time_mode DEFAULT 'offered_start_times'::public.booking_time_mode NOT NULL,
     CONSTRAINT service_google_booking_url_format CHECK (((google_booking_url IS NULL) OR (google_booking_url ~ '^https://calendar\.app\.google/[A-Za-z0-9]+$'::text)))
 );
 
 COMMENT ON COLUMN public.service.short_name IS 'Compact service label for SMS and space-constrained UI, e.g. Auto – 1 hr.';
 COMMENT ON COLUMN public.service.service_category_id IS 'Optional category grouping for this service';
+COMMENT ON COLUMN public.service.service_type_id IS 'Optional operational service type, such as Automatic or Manual.';
 COMMENT ON COLUMN public.service.booking_time_mode IS 'Controls how booking start time is selected: offered_start_times or entered_start_time';
 
 -- Business Hours table: defines global operating hours
@@ -158,6 +173,81 @@ COMMENT ON COLUMN public.booking_settings.booking_buffer_minutes IS 'Buffer time
 COMMENT ON COLUMN public.booking_settings.payment_hold_minutes IS 'How long to hold an unpaid booking slot before releasing (default 15)';
 COMMENT ON COLUMN public.booking_settings.default_slot_interval_minutes IS 'Time interval for available booking slots (default 15)';
 COMMENT ON COLUMN public.booking_settings.cancellation_cutoff_minutes IS 'Cutoff time before lesson when cancellation/reschedule is not allowed (default 1440 = 24 hours)';
+
+-- Resource table: bookable resources (instructors, vehicles, etc.)
+CREATE TABLE public.resource (
+    id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
+    name text NOT NULL,
+    resource_type text NOT NULL,
+    email text,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT resource_name_check CHECK ((length(trim(name)) > 0)),
+    CONSTRAINT resource_type_check CHECK ((length(trim(resource_type)) > 0))
+);
+
+COMMENT ON TABLE public.resource IS 'Person or item that can provide a service or be booked.';
+COMMENT ON COLUMN public.resource.resource_type IS 'Resource type such as instructor, vehicle, room or equipment.';
+
+-- Availability table: recurring availability rules for resources
+CREATE TABLE public.availability (
+    id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
+    resource_id uuid NOT NULL,
+    scope text NOT NULL,
+    service_type_id uuid,
+    service_category_id uuid,
+    service_id uuid,
+    day_of_week integer NOT NULL,
+    start_time time without time zone NOT NULL,
+    end_time time without time zone NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT availability_scope_check CHECK ((scope = ANY (ARRAY['general'::text, 'type'::text, 'category'::text, 'service'::text]))),
+    CONSTRAINT availability_day_of_week_check CHECK ((day_of_week >= 0) AND (day_of_week <= 6)),
+    CONSTRAINT availability_time_check CHECK ((start_time < end_time)),
+    CONSTRAINT availability_scope_target_check CHECK (
+        ((scope = 'general'::text) AND (service_type_id IS NULL) AND (service_category_id IS NULL) AND (service_id IS NULL)) OR
+        ((scope = 'type'::text) AND (service_type_id IS NOT NULL) AND (service_category_id IS NULL) AND (service_id IS NULL)) OR
+        ((scope = 'category'::text) AND (service_type_id IS NULL) AND (service_category_id IS NOT NULL) AND (service_id IS NULL)) OR
+        ((scope = 'service'::text) AND (service_type_id IS NULL) AND (service_category_id IS NULL) AND (service_id IS NOT NULL))
+    )
+);
+
+COMMENT ON TABLE public.availability IS 'Recurring availability rules for resources, optionally scoped to a service type, category or service.';
+COMMENT ON COLUMN public.availability.scope IS 'Explicit availability scope: general, type, category or service.';
+COMMENT ON COLUMN public.availability.service_type_id IS 'Required when scope = type; otherwise null.';
+
+-- Availability Exceptions table: date-specific availability changes
+CREATE TABLE public.availability_exceptions (
+    id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
+    date date NOT NULL,
+    resource_id uuid,
+    service_type_id uuid,
+    service_category_id uuid,
+    service_id uuid,
+    start_time time without time zone,
+    end_time time without time zone,
+    is_available boolean NOT NULL,
+    reason text NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT availability_exceptions_target_check CHECK (
+        ((resource_id IS NULL) AND (service_type_id IS NULL) AND (service_category_id IS NULL) AND (service_id IS NULL) AND (is_available = false)) OR
+        ((resource_id IS NOT NULL) AND (num_nonnulls(service_type_id, service_category_id, service_id) <= 1))
+    ),
+    CONSTRAINT availability_exceptions_time_check CHECK (
+        ((start_time IS NULL) AND (end_time IS NULL)) OR
+        ((start_time IS NOT NULL) AND (end_time IS NOT NULL) AND (start_time < end_time))
+    )
+);
+
+COMMENT ON TABLE public.availability_exceptions IS 'Date-specific additions to or removals from normal recurring availability.';
+COMMENT ON COLUMN public.availability_exceptions.is_available IS 'False removes availability. True adds availability within business hours.';
+COMMENT ON COLUMN public.availability_exceptions.reason IS 'Free-text reason such as Public holiday, Sick leave or Special working hours.';
+COMMENT ON COLUMN public.availability_exceptions.service_type_id IS 'Optional operational Service Type target, such as Automatic or Manual.';
 
 -- Package table: defines lesson packages for bulk purchase
 CREATE TABLE public.package (
@@ -872,6 +962,30 @@ CREATE TRIGGER t_service_category_updated
     FOR EACH ROW 
     EXECUTE FUNCTION public.set_updated_at();
 
+-- Trigger: UPDATE timestamp on service type changes
+CREATE TRIGGER t_service_type_updated 
+    BEFORE UPDATE ON public.service_type 
+    FOR EACH ROW 
+    EXECUTE FUNCTION public.set_updated_at();
+
+-- Trigger: UPDATE timestamp on resource changes
+CREATE TRIGGER t_resource_updated 
+    BEFORE UPDATE ON public.resource 
+    FOR EACH ROW 
+    EXECUTE FUNCTION public.set_updated_at();
+
+-- Trigger: UPDATE timestamp on availability changes
+CREATE TRIGGER t_availability_updated 
+    BEFORE UPDATE ON public.availability 
+    FOR EACH ROW 
+    EXECUTE FUNCTION public.set_updated_at();
+
+-- Trigger: UPDATE timestamp on availability exceptions changes
+CREATE TRIGGER t_availability_exceptions_updated 
+    BEFORE UPDATE ON public.availability_exceptions 
+    FOR EACH ROW 
+    EXECUTE FUNCTION public.set_updated_at();
+
 -- Trigger: UPDATE remaining credits on client_credit changes
 CREATE TRIGGER t_client_credit_remaining 
     BEFORE INSERT OR UPDATE ON public.client_credit 
@@ -930,6 +1044,9 @@ ALTER TABLE ONLY public.service_category
 ALTER TABLE ONLY public.service_category
     ADD CONSTRAINT service_category_name_key UNIQUE (name);
 
+ALTER TABLE ONLY public.service_type
+    ADD CONSTRAINT service_type_pkey PRIMARY KEY (id);
+
 ALTER TABLE ONLY public.service
     ADD CONSTRAINT service_pkey1 PRIMARY KEY (id);
 
@@ -944,6 +1061,15 @@ ALTER TABLE ONLY public.business_hours
 
 ALTER TABLE ONLY public.booking_settings
     ADD CONSTRAINT booking_settings_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.resource
+    ADD CONSTRAINT resource_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.availability
+    ADD CONSTRAINT availability_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.availability_exceptions
+    ADD CONSTRAINT availability_exceptions_pkey PRIMARY KEY (id);
 
 ALTER TABLE ONLY public.package
     ADD CONSTRAINT package_pkey PRIMARY KEY (id);
@@ -1004,9 +1130,26 @@ CREATE INDEX idx_client_stripe_customer_id ON public.client USING btree (stripe_
 CREATE INDEX idx_service_category_sort_order ON public.service_category USING btree (sort_order);
 CREATE INDEX idx_service_category_is_active ON public.service_category USING btree (is_active);
 
+-- Service type indexes
+CREATE UNIQUE INDEX service_type_name_unique ON public.service_type USING btree (lower(name));
+
 -- Service indexes
 CREATE INDEX idx_service_sort_order ON public.service USING btree (sort_order);
 CREATE INDEX idx_service_category_id ON public.service USING btree (service_category_id);
+CREATE INDEX idx_service_service_type ON public.service USING btree (service_type_id);
+
+-- Availability indexes
+CREATE INDEX idx_availability_resource_day_active ON public.availability USING btree (resource_id, day_of_week) WHERE (is_active = true);
+CREATE INDEX idx_availability_type_day_active ON public.availability USING btree (service_type_id, day_of_week) WHERE ((is_active = true) AND (service_type_id IS NOT NULL));
+CREATE INDEX idx_availability_category_day_active ON public.availability USING btree (service_category_id, day_of_week) WHERE ((is_active = true) AND (service_category_id IS NOT NULL));
+CREATE INDEX idx_availability_service_day_active ON public.availability USING btree (service_id, day_of_week) WHERE ((is_active = true) AND (service_id IS NOT NULL));
+
+-- Availability exceptions indexes
+CREATE INDEX idx_availability_exceptions_date_active ON public.availability_exceptions USING btree (date) WHERE (is_active = true);
+CREATE INDEX idx_availability_exceptions_resource_date_active ON public.availability_exceptions USING btree (resource_id, date) WHERE ((is_active = true) AND (resource_id IS NOT NULL));
+CREATE INDEX idx_availability_exceptions_type_date_active ON public.availability_exceptions USING btree (service_type_id, date) WHERE ((is_active = true) AND (service_type_id IS NOT NULL));
+CREATE INDEX idx_availability_exceptions_category_date_active ON public.availability_exceptions USING btree (service_category_id, date) WHERE ((is_active = true) AND (service_category_id IS NOT NULL));
+CREATE INDEX idx_availability_exceptions_service_date_active ON public.availability_exceptions USING btree (service_id, date) WHERE ((is_active = true) AND (service_id IS NOT NULL));
 
 -- Business Hours indexes
 CREATE INDEX idx_business_hours_day_start ON public.business_hours USING btree (day_of_week, start_time);
@@ -1071,6 +1214,33 @@ ALTER TABLE ONLY public.client_credit
 ALTER TABLE ONLY public.service
     ADD CONSTRAINT service_category_id_fkey FOREIGN KEY (service_category_id) REFERENCES public.service_category(id) ON DELETE SET NULL;
 
+ALTER TABLE ONLY public.service
+    ADD CONSTRAINT service_service_type_fkey FOREIGN KEY (service_type_id) REFERENCES public.service_type(id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY public.availability
+    ADD CONSTRAINT availability_resource_fkey FOREIGN KEY (resource_id) REFERENCES public.resource(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.availability
+    ADD CONSTRAINT availability_service_type_fkey FOREIGN KEY (service_type_id) REFERENCES public.service_type(id);
+
+ALTER TABLE ONLY public.availability
+    ADD CONSTRAINT availability_service_category_fkey FOREIGN KEY (service_category_id) REFERENCES public.service_category(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.availability
+    ADD CONSTRAINT availability_service_fkey FOREIGN KEY (service_id) REFERENCES public.service(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.availability_exceptions
+    ADD CONSTRAINT availability_exceptions_resource_fkey FOREIGN KEY (resource_id) REFERENCES public.resource(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.availability_exceptions
+    ADD CONSTRAINT availability_exceptions_service_type_fkey FOREIGN KEY (service_type_id) REFERENCES public.service_type(id);
+
+ALTER TABLE ONLY public.availability_exceptions
+    ADD CONSTRAINT availability_exceptions_service_category_fkey FOREIGN KEY (service_category_id) REFERENCES public.service_category(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.availability_exceptions
+    ADD CONSTRAINT availability_exceptions_service_fkey FOREIGN KEY (service_id) REFERENCES public.service(id) ON DELETE CASCADE;
+
 ALTER TABLE ONLY public.sms_log
     ADD CONSTRAINT sms_log_booking_id_fkey FOREIGN KEY (booking_id) REFERENCES public.booking(id) ON DELETE CASCADE;
 
@@ -1092,7 +1262,11 @@ ALTER TABLE ONLY public.availability_slot_old
 
 ALTER TABLE public.client ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.service_category ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.service_type ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.service ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.resource ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.availability ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.availability_exceptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.business_hours ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.booking_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.package ENABLE ROW LEVEL SECURITY;
@@ -1141,12 +1315,64 @@ CREATE POLICY "Admin can delete service categories" ON public.service_category F
 CREATE POLICY "Service role full access service_category" ON public.service_category TO service_role 
     USING (true);
 
+-- Service type policies
+CREATE POLICY "Users can read service types" ON public.service_type FOR SELECT TO anon, authenticated 
+    USING ((is_active = true) OR public.is_admin());
+
+CREATE POLICY "Service role full access service_type" ON public.service_type TO service_role 
+    USING (true) 
+    WITH CHECK (true);
+
 -- Service policies
 CREATE POLICY "Users can read active services" ON public.service FOR SELECT TO authenticated, anon 
     USING ((is_active = true));
 
 CREATE POLICY "Service role full access service" ON public.service TO service_role 
     USING (true);
+
+-- Resource policies
+CREATE POLICY "Users can read active resources" ON public.resource FOR SELECT TO anon, authenticated 
+    USING ((is_active = true) OR public.is_admin());
+
+CREATE POLICY "Service role full access resource" ON public.resource TO service_role 
+    USING (true) 
+    WITH CHECK (true);
+
+-- Availability policies
+CREATE POLICY "Users can read active availability" ON public.availability FOR SELECT TO anon, authenticated 
+    USING ((is_active = true) OR public.is_admin());
+
+CREATE POLICY "Admins can insert availability" ON public.availability FOR INSERT TO authenticated 
+    WITH CHECK (public.is_admin());
+
+CREATE POLICY "Admins can update availability" ON public.availability FOR UPDATE TO authenticated 
+    USING (public.is_admin()) 
+    WITH CHECK (public.is_admin());
+
+CREATE POLICY "Admins can delete availability" ON public.availability FOR DELETE TO authenticated 
+    USING (public.is_admin());
+
+CREATE POLICY "Service role full access availability" ON public.availability TO service_role 
+    USING (true) 
+    WITH CHECK (true);
+
+-- Availability exceptions policies
+CREATE POLICY "Users can read active availability exceptions" ON public.availability_exceptions FOR SELECT TO anon, authenticated 
+    USING ((is_active = true) OR public.is_admin());
+
+CREATE POLICY "Admins can insert availability exceptions" ON public.availability_exceptions FOR INSERT TO authenticated 
+    WITH CHECK (public.is_admin());
+
+CREATE POLICY "Admins can update availability exceptions" ON public.availability_exceptions FOR UPDATE TO authenticated 
+    USING (public.is_admin()) 
+    WITH CHECK (public.is_admin());
+
+CREATE POLICY "Admins can delete availability exceptions" ON public.availability_exceptions FOR DELETE TO authenticated 
+    USING (public.is_admin());
+
+CREATE POLICY "Service role full access availability_exceptions" ON public.availability_exceptions TO service_role 
+    USING (true) 
+    WITH CHECK (true);
 
 -- Business Hours policies
 CREATE POLICY "Users can read business hours" ON public.business_hours FOR SELECT TO anon, authenticated 
@@ -1319,6 +1545,24 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.service TO authenticated;
 GRANT SELECT ON TABLE public.service_category TO anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.service_category TO authenticated;
 
+-- Service type table grants
+GRANT SELECT ON TABLE public.service_type TO anon, authenticated;
+GRANT ALL PRIVILEGES ON TABLE public.service_type TO service_role;
+
+-- Resource table grants
+GRANT SELECT ON TABLE public.resource TO anon, authenticated;
+GRANT ALL PRIVILEGES ON TABLE public.resource TO service_role;
+
+-- Availability table grants
+GRANT SELECT ON TABLE public.availability TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.availability TO authenticated;
+GRANT ALL PRIVILEGES ON TABLE public.availability TO service_role;
+
+-- Availability exceptions table grants
+GRANT SELECT ON TABLE public.availability_exceptions TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.availability_exceptions TO authenticated;
+GRANT ALL PRIVILEGES ON TABLE public.availability_exceptions TO service_role;
+
 -- Business Hours table grants
 GRANT SELECT ON TABLE public.business_hours TO anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.business_hours TO authenticated;
@@ -1351,6 +1595,81 @@ WHERE NOT EXISTS (
     SELECT 1
     FROM public.booking_settings
 );
+
+-- Create the initial resource: Darren (instructor)
+INSERT INTO public.resource (
+    name,
+    resource_type,
+    email,
+    is_active
+)
+SELECT
+    'Darren',
+    'instructor',
+    'darren@automandrivingschool.com.au',
+    true
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM public.resource
+    WHERE lower(name) = lower('Darren')
+      AND resource_type = 'instructor'
+);
+
+-- Create initial service types
+INSERT INTO public.service_type (
+    name,
+    sort_order,
+    is_active
+)
+SELECT
+    'Automatic',
+    1,
+    true
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM public.service_type
+    WHERE lower(name) = 'automatic'
+);
+
+INSERT INTO public.service_type (
+    name,
+    sort_order,
+    is_active
+)
+SELECT
+    'Manual',
+    2,
+    true
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM public.service_type
+    WHERE lower(name) = 'manual'
+);
+
+-- Map existing Auto-Man services to service types
+UPDATE public.service s
+SET service_type_id = st.id
+FROM public.service_type st
+WHERE lower(st.name) = 'automatic'
+  AND s.code IN (
+      'auto_60',
+      'auto_90',
+      'auto_120',
+      'senior_auto_60'
+  )
+  AND s.service_type_id IS NULL;
+
+UPDATE public.service s
+SET service_type_id = st.id
+FROM public.service_type st
+WHERE lower(st.name) = 'manual'
+  AND s.code IN (
+      'manual_60',
+      'manual_90',
+      'manual_120',
+      'senior_manual_60'
+  )
+  AND s.service_type_id IS NULL;
 
 -- =====================================================================
 -- SUPABASE STORAGE: SERVICE CATEGORY ICONS

@@ -228,6 +228,7 @@
 (function() {
   let allAdminServices = [];
   let allServiceCategories = [];
+  let allServiceTypes = [];
   let servicesSearchDebounce = null;
   let expandedServiceId = null;
 
@@ -372,6 +373,7 @@
     const isActive = s.is_active !== false;
     const bookingTimeMode = safeText(s.booking_time_mode || 'offered_start_times');
     const serviceCategoryId = safeText(s.service_category_id || '');
+    const serviceTypeId = safeText(s.service_type_id || '');
 
     const displayName = isNew ? 'New Service' : (name || '(No name)');
     const categoryName = getCategoryNameById(s.service_category_id);
@@ -451,6 +453,11 @@
       return `<option value="${escapeHtml(cat.id)}" ${selected}>${escapeHtml(cat.name)}</option>`;
     }).join('');
 
+    const typeOptions = allServiceTypes.map(type => {
+      const selected = type.id === serviceTypeId ? 'selected' : '';
+      return `<option value="${escapeHtml(type.id)}" ${selected}>${escapeHtml(type.name)}</option>`;
+    }).join('');
+
     return `
       <div class="${cardClasses}" data-service-id="${escapeHtml(s.id)}">
         <div class="service-header flex items-start justify-between gap-3" ${headerOnClick}>
@@ -488,6 +495,14 @@
                   <select class="${inputCls}" data-field="service_category_id">
                     <option value="">None</option>
                     ${categoryOptions}
+                  </select>
+                </div>
+
+                <div>
+                  <label class="${labelCls}">Service Type</label>
+                  <select class="${inputCls}" data-field="service_type_id">
+                    <option value="">None</option>
+                    ${typeOptions}
                   </select>
                 </div>
               </div>
@@ -624,6 +639,30 @@
     }
   }
 
+  async function loadServiceTypes() {
+    if (!window.supabaseClient) return;
+
+    try {
+      const { data, error } = await window.supabaseClient
+        .from('service_type')
+        .select('id,name,sort_order')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.warn('[admin-services] Service type table not found or error loading types:', error.message);
+        allServiceTypes = [];
+        return;
+      }
+
+      allServiceTypes = Array.isArray(data) ? data : [];
+    } catch (e) {
+      console.warn('[admin-services] Failed to load service types:', e);
+      allServiceTypes = [];
+    }
+  }
+
   async function loadAdminServices() {
     if (!window.supabaseClient) {
       setServicesMsg('Supabase client not ready.', 'text-red-600');
@@ -634,8 +673,9 @@
     if (list) list.innerHTML = '<div class="text-gray-500">Loading…</div>';
     setServicesMsg('', '');
 
-    // Load categories first (optional, may not exist yet)
+    // Load categories and types first (optional, may not exist yet)
     await loadServiceCategories();
+    await loadServiceTypes();
 
     try {
       console.log('[admin-services] Loading services from database...');
@@ -883,6 +923,7 @@
     }
 
     const serviceCategoryId = getValue('service_category_id').trim() || null;
+    const serviceTypeId = getValue('service_type_id').trim() || null;
     const sortOrder = parseInt(getValue('sort_order'), 10) || 0;
 
     const payload = {
@@ -895,7 +936,8 @@
       is_active: getChecked('is_active'),
       sort_order: sortOrder,
       booking_time_mode: getValue('booking_time_mode'),
-      service_category_id: serviceCategoryId
+      service_category_id: serviceCategoryId,
+      service_type_id: serviceTypeId
     };
 
     try {

@@ -100,6 +100,10 @@
     color: #374151 !important;
   }
 
+  #adminServicesList .service-summary-description {
+    color: #111827 !important;
+  }
+
   /* Force black color for Created/Updated timestamps */
   #adminServicesList .service-card [data-role="service-details"] .text-xs:not(.text-red-600) {
     color: #111827 !important;
@@ -394,6 +398,9 @@
         : '<span class="service-pill inactive" data-role="summary-status-pill">✗ Inactive</span>'
     );
 
+    const orderPillHtml = isNew ? '' :
+      `<span class="text-xs text-gray-700"><strong>Order:</strong> ${sortOrder}</span>`;
+
     const summarySection = isNew
       ? `<div class="text-sm text-gray-600">Fill in the required fields to create a new service</div>`
       : `<div class="service-summary">
@@ -402,26 +409,28 @@
               ${statusPillHtml}
             </div>
 
-            <div class="mt-1 flex flex-wrap items-start gap-x-4 gap-y-1 text-sm text-gray-900">
-              <div class="flex items-start gap-2 min-w-0">
+            <div class="mt-1 grid grid-cols-[9.5rem_1fr] gap-x-4 gap-y-1 text-sm text-gray-900">
+              <div class="whitespace-nowrap">
                 <span class="font-medium">Code:</span>
                 <span>${escapeHtml(code || '—')}</span>
               </div>
-              <div class="flex items-start gap-2 min-w-0">
+
+              <div class="whitespace-nowrap">
+                <span class="font-medium">Order:</span>
+                <span>${sortOrder}</span>
+              </div>
+
+              <div class="whitespace-nowrap">
                 <span class="font-medium">Duration:</span>
                 <span>${formatDuration(durationMinutes)}</span>
               </div>
-              <div class="flex items-start gap-2 min-w-0">
+
+              <div class="whitespace-nowrap">
                 <span class="font-medium">Price:</span>
                 <span>${formatPrice(priceCents)}</span>
               </div>
             </div>
 
-            ${description ? `
-            <div class="mt-1 text-sm text-gray-700 line-clamp-2">
-              ${escapeHtml(description)}
-            </div>
-            ` : ''}
           </div>`;
 
     const headerButtons = isNew
@@ -466,7 +475,11 @@
           </div>
           ${headerButtons}
         </div>
-
+        ${!isNew && description ? `
+        <div class="service-summary-description mt-1 text-sm line-clamp-2">
+          ${escapeHtml(description)}
+        </div>
+        ` : ''}
         <div class="${detailsClasses}" data-role="service-details" onclick="event.stopPropagation()">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -683,6 +696,7 @@
       const { data, error } = await window.supabaseClient
         .from('service')
         .select('*')
+        .order('sort_order', { ascending: true })
         .order('name', { ascending: true });
 
       console.log('[admin-services] Query result:', { data, error });

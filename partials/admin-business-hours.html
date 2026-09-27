@@ -72,30 +72,36 @@
   }
 
   @media (max-width: 639px) {
-    .business-hours-time-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.5rem;
-    }
-
     .business-hours-row-desktop {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.5rem;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      column-gap: 0.5rem;
+      row-gap: 0.75rem;
     }
 
     .business-hours-buttons {
       grid-column: 1 / -1;
-      margin-top: 0.5rem;
+      margin-top: 0.25rem;
+    }
+
+    #adminBusinessHoursList .period-row {
+      width: 100%;
+      padding: 0.5rem;
+      box-sizing: border-box;
     }
 
     #adminBusinessHoursList .period-row input[type="time"] {
-      padding-left: 0.5rem;
-      padding-right: 0.35rem;
-    }
-    
-    #adminBusinessHoursList .period-row {
-      width: 100%;
+      width: calc(100% - 0.4rem);
+      min-width: 0;
+      max-width: calc(100% - 0.4rem);
+      box-sizing: border-box;
+      padding-left: 0.4rem;
+      padding-right: 0.25rem;
     }
 
+    #adminBusinessHoursList .period-row
+      .business-hours-row-desktop > div:nth-child(2) input[type="time"] {
+      justify-self: end;
+    }
   }
 
   #adminBusinessHoursList .day-card input,

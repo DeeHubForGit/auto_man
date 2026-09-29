@@ -171,6 +171,28 @@
     justify-content: center;
   }
 
+  #section-services .service-drag-handle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #4b5563 !important;
+    cursor: grab;
+    touch-action: none;
+  }
+
+  #section-services .service-drag-handle:active {
+    cursor: grabbing;
+  }
+
+  #section-services .service-dragging {
+    opacity: 0.5;
+  }
+
   /* Mobile: square button with icon */
   @media (max-width: 639px) {
     #section-services .service-delete-btn {
@@ -235,6 +257,7 @@
   let allServiceTypes = [];
   let servicesSearchDebounce = null;
   let expandedServiceId = null;
+  let servicesSortable = null;
 
   function setServicesMsg(text, cls) {
     const el = document.getElementById('servicesMsg');
@@ -288,6 +311,155 @@
     const mins = minutes % 60;
     if (mins === 0) return `${hours} hr`;
     return `${hours} hr ${mins} min`;
+  }
+
+  function loadSortableJs() {
+    return new Promise((resolve, reject) => {
+      if (window.Sortable) {
+        resolve();
+        return;
+      }
+
+      const existing = document.querySelector('script[data-sortablejs]');
+
+      if (existing) {
+        existing.addEventListener('load', resolve, { once: true });
+        existing.addEventListener('error', reject, { once: true });
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js';
+      script.dataset.sortablejs = '1';
+      script.onload = resolve;
+      script.onerror = reject;
+
+      document.head.appendChild(script);
+    });
+  }
+
+  async function saveServiceSortOrder() {
+    const list = document.getElementById('adminServicesList');
+    if (!list || !window.supabaseClient) return;
+
+    const visibleIds = Array.from(
+      list.querySelectorAll('.service-card[data-service-id]:not([data-service-id="new"])')
+    ).map(card => card.getAttribute('data-service-id'));
+
+    const activeServices = allAdminServices.filter(s => s.is_active === true);
+
+    if (visibleIds.length !== activeServices.length) {
+      setServicesMsg('Sort order could not be saved. Refresh and try again.', 'text-red-600');
+      await loadAdminServices();
+      return;
+    }
+
+    let activeIndex = 0;
+
+    const newIdOrder = allAdminServices.map(service => {
+      if (service.is_active === true) {
+        return visibleIds[activeIndex++];
+      }
+
+      return service.id;
+    });
+
+    const serviceById = new Map(
+      allAdminServices.map(service => [service.id, service])
+    );
+
+    const reorderedServices = newIdOrder.map((id, index) => ({
+      ...serviceById.get(id),
+      sort_order: index + 1
+    }));
+
+    try {
+      setServicesMsg('Saving sort order…', 'text-gray-600');
+
+      const results = await Promise.all(
+        reorderedServices.map(service =>
+          window.supabaseClient
+            .from('service')
+            .update({ sort_order: service.sort_order })
+            .eq('id', service.id)
+        )
+      );
+
+      const failed = results.find(result => result.error);
+
+      if (failed) {
+        throw failed.error;
+      }
+
+      allAdminServices = reorderedServices;
+      window.allAdminServices = allAdminServices;
+
+      setServicesMsg('Sort order saved.', 'text-green-600');
+
+      renderAdminServices();
+
+      setTimeout(() => {
+        setServicesMsg('', '');
+      }, 2000);
+    } catch (e) {
+      console.error('[admin-services] sort order save failed:', e);
+
+      setServicesMsg(
+        'Failed to save sort order: ' + e.message,
+        'text-red-600'
+      );
+
+      await loadAdminServices();
+    }
+  }
+
+  async function initServiceSorting() {
+    const list = document.getElementById('adminServicesList');
+    if (!list) return;
+
+    if (servicesSortable) {
+      servicesSortable.destroy();
+      servicesSortable = null;
+    }
+
+    const status =
+      document.getElementById('serviceStatusFilter')?.value || 'active';
+
+    const search =
+      (document.getElementById('serviceSearch')?.value || '').trim();
+
+    const canSort =
+      status === 'active' &&
+      search === '' &&
+      expandedServiceId !== 'new';
+
+    list.querySelectorAll('.service-drag-handle').forEach(handle => {
+      handle.classList.toggle('hidden', !canSort);
+    });
+
+    if (!canSort) return;
+
+    try {
+      await loadSortableJs();
+
+      servicesSortable = new window.Sortable(list, {
+        animation: 150,
+        handle: '.service-drag-handle',
+        draggable: '.service-card:not([data-service-id="new"])',
+        ghostClass: 'service-dragging',
+
+        onEnd: async function() {
+          await saveServiceSortOrder();
+        }
+      });
+    } catch (e) {
+      console.error('[admin-services] drag and drop failed to initialise:', e);
+
+      setServicesMsg(
+        'Drag and drop could not be loaded.',
+        'text-red-600'
+      );
+    }
   }
 
   function applyServiceFilters() {
@@ -398,9 +570,6 @@
         : '<span class="service-pill inactive" data-role="summary-status-pill">✗ Inactive</span>'
     );
 
-    const orderPillHtml = isNew ? '' :
-      `<span class="text-xs text-gray-700"><strong>Order:</strong> ${sortOrder}</span>`;
-
     const summarySection = isNew
       ? `<div class="text-sm text-gray-600">Fill in the required fields to create a new service</div>`
       : `<div class="service-summary">
@@ -415,9 +584,26 @@
                 <span>${escapeHtml(code || '—')}</span>
               </div>
 
-              <div class="whitespace-nowrap">
+              <div class="flex items-center gap-1 whitespace-nowrap">
                 <span class="font-medium">Order:</span>
                 <span>${sortOrder}</span>
+
+                <button
+                  type="button"
+                  class="service-drag-handle"
+                  aria-label="Drag to change service order"
+                  title="Drag to change service order"
+                  onclick="event.stopPropagation();"
+                >
+                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                    <circle cx="8" cy="6" r="1.5" fill="currentColor"></circle>
+                    <circle cx="16" cy="6" r="1.5" fill="currentColor"></circle>
+                    <circle cx="8" cy="12" r="1.5" fill="currentColor"></circle>
+                    <circle cx="16" cy="12" r="1.5" fill="currentColor"></circle>
+                    <circle cx="8" cy="18" r="1.5" fill="currentColor"></circle>
+                    <circle cx="16" cy="18" r="1.5" fill="currentColor"></circle>
+                  </svg>
+                </button>
               </div>
 
               <div class="whitespace-nowrap">
@@ -628,6 +814,7 @@
 
     list.innerHTML = newServiceCardHtml + html;
     restoreExpandedCard();
+    initServiceSorting();
   }
 
   async function loadServiceCategories() {

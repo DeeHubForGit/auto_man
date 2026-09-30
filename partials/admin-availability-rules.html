@@ -56,6 +56,23 @@
     .rule-grid {
       grid-template-columns: 1fr;
     }
+
+    #adminAvailabilityRulesList .rule-card input[type="time"] {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+  }
+
+  /* iPhone/iOS Safari native time input correction */
+  @supports (-webkit-touch-callout: none) {
+    @media (max-width: 639px) {
+      #adminAvailabilityRulesList .rule-card input[type="time"] {
+        width: calc(100% - 26px);
+        max-width: calc(100% - 26px);
+      }
+    }
   }
 </style>
 

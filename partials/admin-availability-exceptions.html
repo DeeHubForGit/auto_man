@@ -52,10 +52,21 @@
     gap: 0.75rem;
     align-items: end;
   }
-
+  
   @media (max-width: 639px) {
     .exception-grid {
       grid-template-columns: 1fr;
+    }
+  }
+
+  /* iPhone/iOS Safari native date/time input correction */
+  @supports (-webkit-touch-callout: none) {
+    @media (max-width: 639px) {
+      #adminAvailabilityExceptionsList .exception-card input[type="date"],
+      #adminAvailabilityExceptionsList .exception-card input[type="time"] {
+        width: calc(100% - 26px);
+        max-width: calc(100% - 26px);
+      }
     }
   }
 </style>

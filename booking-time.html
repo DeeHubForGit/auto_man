@@ -25,6 +25,119 @@
   <script src="assets/render-helpers.js"></script>
   <script src="assets/include.js" defer></script>
   <link href="assets/theme.css" rel="stylesheet">
+
+  <style>
+    .booking-calendar {
+      width: 100%;
+      max-width: 420px;
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .calendar-day {
+      min-height: 64px;
+      border: 1px solid #d1d5db;
+      border-radius: 0.5rem;
+      background: #ffffff;
+      color: #374151;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 7px 4px 5px;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .calendar-day.available:hover {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 1px #3b82f6;
+    }
+
+    .calendar-day.unavailable {
+      background: #e5e7eb;
+      color: #6b7280;
+      border-color: #e5e7eb;
+      cursor: default;
+    }
+
+    .calendar-day.selected {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 2px #2563eb;
+    }
+
+    .calendar-day-number {
+      font-size: 0.95rem;
+      line-height: 1.2;
+      font-weight: 600;
+    }
+
+    .calendar-symbols {
+      min-height: 20px;
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+    }
+
+    .calendar-symbol {
+      width: 15px;
+      height: 15px;
+      flex: 0 0 auto;
+    }
+
+    .calendar-symbol.morning {
+      color: #f59e0b;
+    }
+
+    .calendar-symbol.afternoon {
+      color: #eab308;
+    }
+
+    .calendar-symbol.evening {
+      color: #818cf8;
+    }
+
+    .calendar-nav-button {
+      width: 2.25rem;
+      height: 2.25rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 0.5rem;
+      color: #374151;
+      background: #f3f4f6;
+      border: 1px solid #d1d5db;
+    }
+
+    .calendar-nav-button:hover:not(:disabled) {
+      background: #e5e7eb;
+    }
+
+    .calendar-nav-button:disabled {
+      visibility: hidden;
+    }
+
+    @media (max-width: 639px) {
+      .calendar-grid {
+        gap: 4px;
+      }
+
+      .calendar-day {
+        min-height: 58px;
+        padding: 6px 2px 4px;
+      }
+
+      .calendar-symbol {
+        width: 13px;
+        height: 13px;
+      }
+    }
+  </style>
 </head>
 <body class="bg-slate-900 text-white">
   <!-- Auth scripts (global Supabase client) MUST load before header -->
@@ -36,19 +149,440 @@
   </div>
 
   <main class="min-h-screen pt-8 pb-16">
-    <section class="mx-auto max-w-5xl px-4 sm:px-6">
-      <h1 class="text-3xl font-bold mb-4">Select a Date &amp; Time</h1>
-      <p class="text-slate-400 mb-8">Choose an available date and time for your driving lesson.</p>
+    <section class="mx-auto max-w-6xl px-4 sm:px-6">
+      <h1 class="text-3xl font-bold mb-2">Select a Date &amp; Time</h1>
+      <p id="selected-service-name" class="text-slate-300 mb-8">Loading service…</p>
 
-      <!-- Calendar and time selection will be added next -->
-      <div class="rounded-2xl border border-slate-700 bg-slate-800/50 p-6">
-        <p class="text-slate-300">Booking calendar coming next.</p>
+      <div class="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6 items-start">
+        <!-- Calendar -->
+        <div class="booking-calendar rounded-2xl border border-slate-700 bg-slate-800/50 p-4 sm:p-5">
+          <div class="rounded-xl bg-white p-3 sm:p-4 text-gray-800">
+            <div class="grid grid-cols-[2.25rem_1fr_2.25rem] items-center gap-2 mb-4">
+              <button id="calendar-prev" type="button" class="calendar-nav-button" aria-label="Previous month">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+
+              <h2 id="calendar-month-title" class="text-lg font-semibold text-center"></h2>
+
+              <button id="calendar-next" type="button" class="calendar-nav-button" aria-label="Next month">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+
+            <div class="calendar-grid mb-2 text-xs font-semibold text-gray-500 text-center" aria-hidden="true">
+              <div>Mon</div>
+              <div>Tue</div>
+              <div>Wed</div>
+              <div>Thu</div>
+              <div>Fri</div>
+              <div>Sat</div>
+              <div>Sun</div>
+            </div>
+
+            <div id="calendar-days" class="calendar-grid"></div>
+
+            <!-- Legend -->
+            <div class="mt-5 pt-4 border-t border-gray-200 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-sm text-gray-600">
+              <div class="flex items-center gap-2">
+                <span id="legend-morning"></span>
+                <span>Morning</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span id="legend-afternoon"></span>
+                <span>Afternoon</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span id="legend-evening"></span>
+                <span>Evening</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Time area will be built next -->
+        <div class="rounded-2xl border border-slate-700 bg-slate-800/50 p-6 min-h-[220px]">
+          <h2 class="text-xl font-semibold mb-3">Available Times</h2>
+          <p id="date-selection-message" class="text-slate-300">Choose a date on the calendar to view available times.</p>
+        </div>
       </div>
+
+      <p id="booking-time-error" class="hidden mt-4 text-red-400"></p>
     </section>
   </main>
 
   <!-- Footer -->
   <div data-include="partials/footer.html"></div>
+
+  <script>
+    let businessHours = [];
+    let bookingSettings = null;
+    let selectedDateKey = null;
+    let currentMonthDate = null;
+    let todayDate = null;
+    let maximumDate = null;
+
+    document.addEventListener('DOMContentLoaded', async function () {
+      renderLegend();
+      wireCalendarButtons();
+
+      await waitForSupabaseClient();
+
+      if (!window.supabaseClient) {
+        showError('Booking availability could not be loaded.');
+        return;
+      }
+
+      try {
+        await loadBookingPageData();
+        initialiseCalendar();
+        renderCalendar();
+      } catch (error) {
+        console.error('[booking-time] Failed to initialise:', error);
+        showError('Booking availability could not be loaded.');
+      }
+    });
+
+    async function waitForSupabaseClient() {
+      let attempts = 0;
+
+      while (!window.supabaseClient && attempts < 50) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+    }
+
+    async function loadBookingPageData() {
+      const params = new URLSearchParams(window.location.search);
+      const serviceCode = params.get('service');
+
+      const [hoursResult, settingsResult] = await Promise.all([
+        window.supabaseClient
+          .from('business_hours')
+          .select('day_of_week,start_time,end_time')
+          .order('day_of_week', { ascending: true })
+          .order('start_time', { ascending: true }),
+
+        window.supabaseClient
+          .from('booking_settings')
+          .select('business_timezone,minimum_notice_minutes,maximum_booking_days_ahead,booking_buffer_minutes,default_slot_interval_minutes')
+          .limit(1)
+      ]);
+
+      if (hoursResult.error) throw hoursResult.error;
+      if (settingsResult.error) throw settingsResult.error;
+
+      businessHours = Array.isArray(hoursResult.data) ? hoursResult.data : [];
+      bookingSettings = settingsResult.data?.[0] || {
+        business_timezone: 'Australia/Melbourne',
+        minimum_notice_minutes: 240,
+        maximum_booking_days_ahead: 60,
+        booking_buffer_minutes: 15,
+        default_slot_interval_minutes: 15
+      };
+
+      if (serviceCode) {
+        const { data: services, error: serviceError } = await window.supabaseClient
+          .from('service')
+          .select('code,name,duration_minutes')
+          .eq('code', serviceCode)
+          .eq('is_active', true)
+          .limit(1);
+
+        if (serviceError) throw serviceError;
+
+        const service = services?.[0];
+        const serviceName = document.getElementById('selected-service-name');
+
+        if (serviceName) {
+          serviceName.textContent = service?.name || 'Driving Lesson';
+        }
+      } else {
+        const serviceName = document.getElementById('selected-service-name');
+        if (serviceName) serviceName.textContent = 'Driving Lesson';
+      }
+    }
+
+    function initialiseCalendar() {
+      todayDate = getTodayInTimeZone(bookingSettings.business_timezone);
+      currentMonthDate = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1, 12, 0, 0);
+      maximumDate = addDays(todayDate, bookingSettings.maximum_booking_days_ahead);
+    }
+
+    function wireCalendarButtons() {
+      document.getElementById('calendar-prev')?.addEventListener('click', function () {
+        const previous = new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() - 1, 1, 12, 0, 0);
+        const currentStart = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1, 12, 0, 0);
+
+        if (previous < currentStart) return;
+
+        currentMonthDate = previous;
+        selectedDateKey = null;
+        resetDateMessage();
+        renderCalendar();
+      });
+
+      document.getElementById('calendar-next')?.addEventListener('click', function () {
+        const next = new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() + 1, 1, 12, 0, 0);
+
+        if (next > maximumDate) return;
+
+        currentMonthDate = next;
+        selectedDateKey = null;
+        resetDateMessage();
+        renderCalendar();
+      });
+    }
+
+    function renderCalendar() {
+      const title = document.getElementById('calendar-month-title');
+      const daysContainer = document.getElementById('calendar-days');
+      const prevButton = document.getElementById('calendar-prev');
+      const nextButton = document.getElementById('calendar-next');
+
+      if (!title || !daysContainer || !prevButton || !nextButton) return;
+
+      title.textContent = currentMonthDate.toLocaleDateString('en-AU', {
+        month: 'long',
+        year: 'numeric'
+      });
+
+      const currentStart = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1, 12, 0, 0);
+      prevButton.disabled = currentMonthDate <= currentStart;
+
+      const nextMonthStart = new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() + 1, 1, 12, 0, 0);
+      nextButton.disabled = nextMonthStart > maximumDate;
+
+      daysContainer.replaceChildren();
+
+      const year = currentMonthDate.getFullYear();
+      const month = currentMonthDate.getMonth();
+      const firstDay = new Date(year, month, 1, 12, 0, 0);
+      const lastDayNumber = new Date(year, month + 1, 0, 12, 0, 0).getDate();
+
+      // Monday-first calendar. JavaScript getDay() uses Sunday = 0.
+      const leadingBlankCount = (firstDay.getDay() + 6) % 7;
+
+      for (let i = 0; i < leadingBlankCount; i++) {
+        const blank = document.createElement('div');
+        blank.setAttribute('aria-hidden', 'true');
+        daysContainer.appendChild(blank);
+      }
+
+      for (let day = 1; day <= lastDayNumber; day++) {
+        const date = new Date(year, month, day, 12, 0, 0);
+        daysContainer.appendChild(createCalendarDay(date));
+      }
+    }
+
+    function createCalendarDay(date) {
+      const button = document.createElement('button');
+      button.type = 'button';
+
+      const availability = getDateAvailability(date);
+      const dateKey = formatDateKey(date);
+      const isSelected = selectedDateKey === dateKey;
+
+      button.className = `calendar-day ${availability.available ? 'available' : 'unavailable'}${isSelected ? ' selected' : ''}`;
+      button.disabled = !availability.available;
+      button.setAttribute('aria-label', formatDateForDisplay(date));
+
+      const dayNumber = document.createElement('span');
+      dayNumber.className = 'calendar-day-number';
+      dayNumber.textContent = String(date.getDate());
+      button.appendChild(dayNumber);
+
+      const symbols = document.createElement('span');
+      symbols.className = 'calendar-symbols';
+
+      if (availability.available) {
+        if (availability.morning) symbols.insertAdjacentHTML('beforeend', getMorningIcon());
+        if (availability.afternoon) symbols.insertAdjacentHTML('beforeend', getAfternoonIcon());
+        if (availability.evening) symbols.insertAdjacentHTML('beforeend', getEveningIcon());
+      }
+
+      button.appendChild(symbols);
+
+      if (availability.available) {
+        button.addEventListener('click', function () {
+          selectedDateKey = dateKey;
+          updateSelectedDateMessage(date);
+          renderCalendar();
+        });
+      }
+
+      return button;
+    }
+
+    function getDateAvailability(date) {
+      if (date < todayDate || date > maximumDate) {
+        return { available: false, morning: false, afternoon: false, evening: false };
+      }
+
+      const periods = businessHours.filter(period => period.day_of_week === date.getDay());
+
+      if (periods.length === 0) {
+        return { available: false, morning: false, afternoon: false, evening: false };
+      }
+
+      // For today, honour minimum notice at a basic day level.
+      if (isSameDate(date, todayDate)) {
+        const nowMinutes = getCurrentMinutesInTimeZone(bookingSettings.business_timezone);
+        const earliestMinutes = nowMinutes + bookingSettings.minimum_notice_minutes;
+        const hasPeriodAfterNotice = periods.some(period => timeToMinutes(period.end_time) > earliestMinutes);
+
+        if (!hasPeriodAfterNotice) {
+          return { available: false, morning: false, afternoon: false, evening: false };
+        }
+      }
+
+      let morning = false;
+      let afternoon = false;
+      let evening = false;
+
+      periods.forEach(period => {
+        const start = timeToMinutes(period.start_time);
+        const end = timeToMinutes(period.end_time);
+
+        if (start < 12 * 60 && end > 0) morning = true;
+        if (start < 17 * 60 && end > 12 * 60) afternoon = true;
+        if (end > 17 * 60) evening = true;
+      });
+
+      return { available: true, morning, afternoon, evening };
+    }
+
+    function renderLegend() {
+      const morning = document.getElementById('legend-morning');
+      const afternoon = document.getElementById('legend-afternoon');
+      const evening = document.getElementById('legend-evening');
+
+      if (morning) morning.innerHTML = getMorningIcon();
+      if (afternoon) afternoon.innerHTML = getAfternoonIcon();
+      if (evening) evening.innerHTML = getEveningIcon();
+    }
+
+    function getMorningIcon() {
+      return `
+        <svg class="calendar-symbol morning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+          <path d="M5 16h14" />
+          <path d="M7.5 16a4.5 4.5 0 0 1 9 0" />
+          <path d="M12 5v3" />
+          <path d="M5.8 8.8l2.1 2.1" />
+          <path d="M18.2 8.8l-2.1 2.1" />
+        </svg>`;
+    }
+
+    function getAfternoonIcon() {
+      return `
+        <svg class="calendar-symbol afternoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v3" />
+          <path d="M12 19v3" />
+          <path d="M2 12h3" />
+          <path d="M19 12h3" />
+          <path d="M4.9 4.9L7 7" />
+          <path d="M17 17l2.1 2.1" />
+          <path d="M19.1 4.9L17 7" />
+          <path d="M7 17l-2.1 2.1" />
+        </svg>`;
+    }
+
+    function getEveningIcon() {
+      return `
+        <svg class="calendar-symbol evening" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M16.8 3.2a8.8 8.8 0 1 0 4 15.9 7.5 7.5 0 0 1-4-15.9Z" />
+        </svg>`;
+    }
+
+    function getTodayInTimeZone(timeZone) {
+      const parts = new Intl.DateTimeFormat('en-AU', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).formatToParts(new Date());
+
+      const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+
+      return new Date(
+        Number(values.year),
+        Number(values.month) - 1,
+        Number(values.day),
+        12,
+        0,
+        0
+      );
+    }
+
+    function getCurrentMinutesInTimeZone(timeZone) {
+      const parts = new Intl.DateTimeFormat('en-AU', {
+        timeZone,
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23'
+      }).formatToParts(new Date());
+
+      const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+      return (Number(values.hour) * 60) + Number(values.minute);
+    }
+
+    function timeToMinutes(value) {
+      const parts = String(value || '').split(':');
+      return (Number(parts[0] || 0) * 60) + Number(parts[1] || 0);
+    }
+
+    function addDays(date, days) {
+      const result = new Date(date.getTime());
+      result.setDate(result.getDate() + Number(days || 0));
+      return result;
+    }
+
+    function isSameDate(a, b) {
+      return a.getFullYear() === b.getFullYear() &&
+        a.getMonth() === b.getMonth() &&
+        a.getDate() === b.getDate();
+    }
+
+    function formatDateKey(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function formatDateForDisplay(date) {
+      return date.toLocaleDateString('en-AU', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+    }
+
+    function updateSelectedDateMessage(date) {
+      const message = document.getElementById('date-selection-message');
+      if (!message) return;
+
+      message.textContent = `${formatDateForDisplay(date)} selected. Time slots will be added next.`;
+    }
+
+    function resetDateMessage() {
+      const message = document.getElementById('date-selection-message');
+      if (message) message.textContent = 'Choose a date on the calendar to view available times.';
+    }
+
+    function showError(message) {
+      const error = document.getElementById('booking-time-error');
+      if (!error) return;
+
+      error.textContent = message;
+      error.classList.remove('hidden');
+    }
+  </script>
 
   <!-- Google Analytics -->
   <div data-include="partials/analytics.html"></div>

@@ -112,6 +112,16 @@
         : price.toFixed(2);
     }
 
+    function isDevEnvironment() {
+      const host = window.location.hostname;
+
+      return (
+        host === 'localhost' ||
+        host === '127.0.0.1' ||
+        host.startsWith('192.168.')
+      );
+    }
+
     function handleImageError(imgElement) {
       imgElement.onerror = null;
       imgElement.src = 'images/auto-man-small-logo120x120.png';
@@ -320,6 +330,15 @@
                      rel="noopener noreferrer"
                      class="btn btn-primary whitespace-nowrap">
                     Book Now
+                  </a>
+                `;
+              }
+              
+              if (isDevEnvironment()) {
+                contentHtml += `
+                  <a href="booking-time.html?service=${encodeURIComponent(service.code)}"
+                    class="btn btn-primary whitespace-nowrap">
+                    Test Booking
                   </a>
                 `;
               }

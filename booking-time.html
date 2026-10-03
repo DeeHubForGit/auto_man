@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Select a Date & Time - Auto-Man Driving School</title>
+
+  <script>
+    // Development-only page for the new Auto-Man booking flow.
+    (function () {
+      const host = window.location.hostname;
+      const isDev =
+        host === 'localhost' ||
+        host === '127.0.0.1' ||
+        host.startsWith('192.168.');
+
+      if (!isDev) {
+        window.location.replace('booking.html');
+      }
+    })();
+  </script>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="assets/config.js"></script>
+  <script src="assets/render-helpers.js"></script>
+  <script src="assets/include.js" defer></script>
+  <link href="assets/theme.css" rel="stylesheet">
+</head>
+<body class="bg-slate-900 text-white">
+  <!-- Auth scripts (global Supabase client) MUST load before header -->
+  <div data-include="partials/auth-scripts.html"></div>
+
+  <!-- Shared Header -->
+  <div id="header-container" class="hydrating" style="min-height: 70px;">
+    <div data-include="partials/header.html"></div>
+  </div>
+
+  <main class="min-h-screen pt-8 pb-16">
+    <section class="mx-auto max-w-5xl px-4 sm:px-6">
+      <h1 class="text-3xl font-bold mb-4">Select a Date &amp; Time</h1>
+      <p class="text-slate-400 mb-8">Choose an available date and time for your driving lesson.</p>
+
+      <!-- Calendar and time selection will be added next -->
+      <div class="rounded-2xl border border-slate-700 bg-slate-800/50 p-6">
+        <p class="text-slate-300">Booking calendar coming next.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <div data-include="partials/footer.html"></div>
+
+  <!-- Google Analytics -->
+  <div data-include="partials/analytics.html"></div>
+</body>
+</html>

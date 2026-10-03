@@ -29,17 +29,20 @@
   <style>
     .booking-calendar {
       width: 100%;
-      max-width: 420px;
+      max-width: 500px;
     }
 
     .calendar-grid {
       display: grid;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
+      grid-template-columns: repeat(7, 58px);
       gap: 6px;
+      justify-content: center;
     }
 
     .calendar-day {
-      min-height: 64px;
+      width: 58px;
+      height: 58px;
+      min-height: 0;
       border: 1px solid #d1d5db;
       border-radius: 0.5rem;
       background: #ffffff;
@@ -48,8 +51,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
-      padding: 7px 4px 5px;
-      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      padding: 7px 3px 4px;
     }
 
     .calendar-day.available:hover {
@@ -85,23 +87,13 @@
     }
 
     .calendar-symbol {
-      width: 15px;
-      height: 15px;
+      width: 18px;
+      height: 18px;
       flex: 0 0 auto;
+      display: block;
+      object-fit: contain;
     }
-
-    .calendar-symbol.morning {
-      color: #f59e0b;
-    }
-
-    .calendar-symbol.afternoon {
-      color: #eab308;
-    }
-
-    .calendar-symbol.evening {
-      color: #818cf8;
-    }
-
+    
     .calendar-nav-button {
       width: 2.25rem;
       height: 2.25rem;
@@ -123,18 +115,32 @@
     }
 
     @media (max-width: 639px) {
+      .booking-calendar {
+        width: 100%;
+        max-width: 100%;
+      }
+
       .calendar-grid {
+        grid-template-columns: repeat(7, minmax(0, 1fr));
         gap: 4px;
       }
 
       .calendar-day {
-        min-height: 58px;
-        padding: 6px 2px 4px;
+        width: 100%;
+        height: auto;
+        min-height: 0;
+        aspect-ratio: 1 / 1;
+        padding: 5px 1px 3px;
       }
 
-      .calendar-symbol {
+      .calendar-day .calendar-symbol {
         width: 13px;
         height: 13px;
+      }
+
+      .calendar-symbols {
+        margin-top: 2px;
+        min-height: 16px;
       }
     }
   </style>
@@ -149,13 +155,13 @@
   </div>
 
   <main class="min-h-screen pt-8 pb-16">
-    <section class="mx-auto max-w-6xl px-4 sm:px-6">
+    <section class="mx-auto max-w-6xl px-2 sm:px-6">
       <h1 class="text-3xl font-bold mb-2">Select a Date &amp; Time</h1>
       <p id="selected-service-name" class="text-slate-300 mb-8">Loading service…</p>
 
-      <div class="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6 items-start">
+      <div class="grid grid-cols-1 lg:grid-cols-[500px_1fr] gap-6 items-start">
         <!-- Calendar -->
-        <div class="booking-calendar rounded-2xl border border-slate-700 bg-slate-800/50 p-4 sm:p-5">
+        <div class="booking-calendar rounded-2xl border border-slate-700 bg-slate-800/50 p-2 sm:p-5">
           <div class="rounded-xl bg-white p-3 sm:p-4 text-gray-800">
             <div class="grid grid-cols-[2.25rem_1fr_2.25rem] items-center gap-2 mb-4">
               <button id="calendar-prev" type="button" class="calendar-nav-button" aria-label="Previous month">
@@ -467,35 +473,26 @@
 
     function getMorningIcon() {
       return `
-        <svg class="calendar-symbol morning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
-          <path d="M5 16h14" />
-          <path d="M7.5 16a4.5 4.5 0 0 1 9 0" />
-          <path d="M12 5v3" />
-          <path d="M5.8 8.8l2.1 2.1" />
-          <path d="M18.2 8.8l-2.1 2.1" />
-        </svg>`;
+        <img src="images/icons/morning.png"
+             class="calendar-symbol"
+             alt=""
+             aria-hidden="true">`;
     }
 
     function getAfternoonIcon() {
       return `
-        <svg class="calendar-symbol afternoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="4" />
-          <path d="M12 2v3" />
-          <path d="M12 19v3" />
-          <path d="M2 12h3" />
-          <path d="M19 12h3" />
-          <path d="M4.9 4.9L7 7" />
-          <path d="M17 17l2.1 2.1" />
-          <path d="M19.1 4.9L17 7" />
-          <path d="M7 17l-2.1 2.1" />
-        </svg>`;
+        <img src="images/icons/afternoon.png"
+             class="calendar-symbol"
+             alt=""
+             aria-hidden="true">`;
     }
 
     function getEveningIcon() {
       return `
-        <svg class="calendar-symbol evening" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M16.8 3.2a8.8 8.8 0 1 0 4 15.9 7.5 7.5 0 0 1-4-15.9Z" />
-        </svg>`;
+        <img src="images/icons/evening.png"
+             class="calendar-symbol"
+             alt=""
+             aria-hidden="true">`;
     }
 
     function getTodayInTimeZone(timeZone) {

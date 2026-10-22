@@ -213,10 +213,12 @@
           </div>
         </div>
 
-        <!-- Time area will be built next -->
+        <!-- Timeslots based on business hours and booking settings (conflict checks to follow) -->
         <div class="rounded-2xl border border-slate-700 bg-slate-800/50 p-6 min-h-[220px]">
           <h2 class="text-xl font-semibold mb-3">Available Times</h2>
           <p id="date-selection-message" class="text-slate-300">Choose a date on the calendar to view available times.</p>
+          <div id="timeslot-buttons" class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4"></div>
+          <p id="timeslot-preview-note" class="hidden mt-3 text-sm text-slate-400">Preview only. Existing bookings, availability rules and exceptions have not been checked yet.</p>
         </div>
       </div>
 
@@ -230,6 +232,7 @@
   <script>
     let businessHours = [];
     let bookingSettings = null;
+    let selectedService = null;
     let selectedDateKey = null;
     let currentMonthDate = null;
     let todayDate = null;
@@ -305,6 +308,7 @@
         if (serviceError) throw serviceError;
 
         const service = services?.[0];
+        selectedService = service || null;
         const serviceName = document.getElementById('selected-service-name');
 
         if (serviceName) {
@@ -591,15 +595,104 @@
     }
 
     function updateSelectedDateMessage(date) {
-      const message = document.getElementById('date-selection-message');
-      if (!message) return;
+      renderTimeslots(date);
+    }
 
-      message.textContent = `${formatDateForDisplay(date)} selected. Time slots will be added next.`;
+    function renderTimeslots(date) {
+      const message = document.getElementById('date-selection-message');
+      const container = document.getElementById('timeslot-buttons');
+      const note = document.getElementById('timeslot-preview-note');
+      if (!message || !container || !note) return;
+
+      container.replaceChildren();
+      note.classList.add('hidden');
+
+      if (!selectedService || Number(selectedService.duration_minutes) <= 0) {
+        message.textContent = 'Choose a valid service before viewing times.';
+        return;
+      }
+
+      const times = getCandidateTimes(date);
+      if (times.length === 0) {
+        message.textContent = `No times match the business hours and settings for ${formatDateForDisplay(date)}.`;
+        return;
+      }
+
+      message.textContent = `${formatDateForDisplay(date)} selected. Times shown in ${bookingSettings.business_timezone}.`;
+      note.classList.remove('hidden');
+
+      for (const minutes of times) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'btn btn-primary';
+        button.textContent = formatSlotTime(minutes);
+        container.appendChild(button);
+      }
+    }
+
+    function getCandidateTimes(date) {
+      const interval = Number(bookingSettings.default_slot_interval_minutes);
+      const duration = Number(selectedService.duration_minutes);
+      if (interval <= 0 || duration <= 0 || date < todayDate || date > maximumDate) return [];
+
+      const earliestStart = Date.now() + Number(bookingSettings.minimum_notice_minutes) * 60 * 1000;
+      const timeFormatter = new Intl.DateTimeFormat('en-AU', {
+        timeZone: bookingSettings.business_timezone,
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+      });
+      const times = new Set();
+
+      for (const period of businessHours) {
+        if (Number(period.day_of_week) !== date.getDay()) continue;
+
+        const startMinutes = timeToMinutes(period.start_time);
+        const endMinutes = timeToMinutes(period.end_time);
+
+        // Slot interval controls start-time spacing. The booking buffer is applied later when checking conflicts.
+        for (let minutes = startMinutes; minutes + duration <= endMinutes; minutes += interval) {
+          const startTimestamp = getSlotTimestamp(date, minutes, timeFormatter);
+          if (startTimestamp !== null && startTimestamp >= earliestStart) {
+            times.add(minutes);
+          }
+        }
+      }
+
+      return Array.from(times).sort((a, b) => a - b);
+    }
+
+    function getSlotTimestamp(date, minutes, formatter) {
+      // Convert the chosen business-local date/time to an instant, including daylight saving changes.
+      const expected = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(),
+        Math.floor(minutes / 60), minutes % 60);
+      let timestamp = expected;
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const parts = Object.fromEntries(formatter.formatToParts(new Date(timestamp))
+          .map(part => [part.type, part.value]));
+        const actual = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+          Number(parts.hour), Number(parts.minute));
+
+        if (actual === expected) return timestamp;
+        timestamp += expected - actual;
+      }
+
+      return null;
+    }
+
+    function formatSlotTime(minutes) {
+      const hour = Math.floor(minutes / 60);
+      const minute = String(minutes % 60).padStart(2, '0');
+      return `${hour % 12 || 12}:${minute} ${hour < 12 ? 'AM' : 'PM'}`;
     }
 
     function resetDateMessage() {
       const message = document.getElementById('date-selection-message');
+      const container = document.getElementById('timeslot-buttons');
+      const note = document.getElementById('timeslot-preview-note');
       if (message) message.textContent = 'Choose a date on the calendar to view available times.';
+      if (container) container.replaceChildren();
+      if (note) note.classList.add('hidden');
     }
 
     function showError(message) {

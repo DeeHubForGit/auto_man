@@ -458,41 +458,19 @@
     }
 
     function getDateAvailability(date) {
-      if (date < todayDate || date > maximumDate) {
+      if (!selectedService || Number(selectedService.duration_minutes) <= 0) {
         return { available: false, morning: false, afternoon: false, evening: false };
       }
 
-      const periods = businessHours.filter(period => period.day_of_week === date.getDay());
+      // Use the same valid start times as the timeslot panel.
+      const times = getCandidateTimes(date);
 
-      if (periods.length === 0) {
-        return { available: false, morning: false, afternoon: false, evening: false };
-      }
-
-      // For today, honour minimum notice at a basic day level.
-      if (isSameDate(date, todayDate)) {
-        const nowMinutes = getCurrentMinutesInTimeZone(bookingSettings.business_timezone);
-        const earliestMinutes = nowMinutes + bookingSettings.minimum_notice_minutes;
-        const hasPeriodAfterNotice = periods.some(period => timeToMinutes(period.end_time) > earliestMinutes);
-
-        if (!hasPeriodAfterNotice) {
-          return { available: false, morning: false, afternoon: false, evening: false };
-        }
-      }
-
-      let morning = false;
-      let afternoon = false;
-      let evening = false;
-
-      periods.forEach(period => {
-        const start = timeToMinutes(period.start_time);
-        const end = timeToMinutes(period.end_time);
-
-        if (start < 12 * 60 && end > 0) morning = true;
-        if (start < 17 * 60 && end > 12 * 60) afternoon = true;
-        if (end > 17 * 60) evening = true;
-      });
-
-      return { available: true, morning, afternoon, evening };
+      return {
+        available: times.length > 0,
+        morning: times.some(minutes => minutes < 12 * 60),
+        afternoon: times.some(minutes => minutes >= 12 * 60 && minutes < 17 * 60),
+        evening: times.some(minutes => minutes >= 17 * 60)
+      };
     }
 
     function renderLegend() {

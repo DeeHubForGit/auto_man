@@ -252,6 +252,7 @@
       try {
         await loadBookingPageData();
         initialiseCalendar();
+        selectNextAvailableDate();
         renderCalendar();
       } catch (error) {
         console.error('[booking-time] Failed to initialise:', error);
@@ -324,6 +325,22 @@
       todayDate = getTodayInTimeZone(bookingSettings.business_timezone);
       currentMonthDate = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1, 12, 0, 0);
       maximumDate = addDays(todayDate, bookingSettings.maximum_booking_days_ahead);
+    }
+
+    function selectNextAvailableDate() {
+      for (let date = todayDate; date <= maximumDate; date = addDays(date, 1)) {
+        if (getCandidateTimes(date).length === 0) continue;
+
+        selectedDateKey = formatDateKey(date);
+        currentMonthDate = new Date(date.getFullYear(), date.getMonth(), 1, 12, 0, 0);
+        updateSelectedDateMessage(date);
+        return;
+      }
+
+      const message = document.getElementById('date-selection-message');
+      if (message && selectedService) {
+        message.textContent = 'No times are available within the current booking window.';
+      }
     }
 
     function wireCalendarButtons() {

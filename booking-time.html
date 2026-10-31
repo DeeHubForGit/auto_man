@@ -218,7 +218,7 @@
           <h2 class="text-xl font-semibold mb-3">Available Times</h2>
           <p id="date-selection-message" class="text-slate-300">Choose a date on the calendar to view available times.</p>
           <div id="timeslot-buttons" class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4"></div>
-          <p id="timeslot-preview-note" class="hidden mt-3 text-sm text-slate-400">Preview only. Existing bookings, availability rules and exceptions have not been checked yet.</p>
+          <p id="timeslot-preview-note" class="hidden mt-3 text-sm text-slate-400">Preview only. Existing bookings and the booking buffer are checked. Availability rules, exceptions and payment holds are not checked yet.</p>
         </div>
       </div>
 
@@ -233,6 +233,7 @@
     let businessHours = [];
     let bookingSettings = null;
     let selectedService = null;
+    let unbookedTimesByDate = new Map();
     let selectedDateKey = null;
     let currentMonthDate = null;
     let todayDate = null;
@@ -252,10 +253,13 @@
       try {
         await loadBookingPageData();
         initialiseCalendar();
+        await loadUnbookedTimeslots();
         selectNextAvailableDate();
         renderCalendar();
       } catch (error) {
         console.error('[booking-time] Failed to initialise:', error);
+        const message = document.getElementById('date-selection-message');
+        if (message) message.textContent = 'Times are temporarily unavailable. Please refresh the page.';
         showError('Booking availability could not be loaded.');
       }
     });
@@ -325,6 +329,66 @@
       todayDate = getTodayInTimeZone(bookingSettings.business_timezone);
       currentMonthDate = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1, 12, 0, 0);
       maximumDate = addDays(todayDate, bookingSettings.maximum_booking_days_ahead);
+    }
+
+    // Fetch availability for the booking window without exposing customer booking records.
+    // The database function checks existing appointments and the configured booking buffer.
+    async function loadUnbookedTimeslots() {
+      unbookedTimesByDate = new Map();
+      if (!selectedService) return;
+
+      const candidateStarts = [];
+      const candidateDetails = new Map();
+      const timeFormatter = new Intl.DateTimeFormat('en-AU', {
+        timeZone: bookingSettings.business_timezone,
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+      });
+
+      for (let date = todayDate; date <= maximumDate; date = addDays(date, 1)) {
+        const dateKey = formatDateKey(date);
+
+        for (const minutes of getBusinessHourCandidateTimes(date)) {
+          const timestamp = getSlotTimestamp(date, minutes, timeFormatter);
+          if (timestamp === null) continue;
+
+          const startTime = new Date(timestamp).toISOString();
+          candidateStarts.push(startTime);
+          candidateDetails.set(startTime, { dateKey, minutes });
+        }
+      }
+
+      if (candidateStarts.length === 0) return;
+
+      // Keep each response below Supabase's default 1,000-row limit.
+      const batchSize = 400;
+      for (let index = 0; index < candidateStarts.length; index += batchSize) {
+        const batch = candidateStarts.slice(index, index + batchSize);
+        const { data, error } = await window.supabaseClient.rpc('get_unbooked_slot_starts', {
+          p_service_code: selectedService.code,
+          p_candidate_starts: batch
+        });
+
+        if (error) throw error;
+        if (!Array.isArray(data)) throw new Error('Invalid timeslot response');
+
+        for (const row of data) {
+          const timestamp = Date.parse(row.start_time);
+          if (!Number.isFinite(timestamp)) throw new Error('Invalid timeslot timestamp');
+
+          const detail = candidateDetails.get(new Date(timestamp).toISOString());
+          if (!detail) continue;
+
+          if (!unbookedTimesByDate.has(detail.dateKey)) {
+            unbookedTimesByDate.set(detail.dateKey, []);
+          }
+          unbookedTimesByDate.get(detail.dateKey).push(detail.minutes);
+        }
+      }
+
+      for (const times of unbookedTimesByDate.values()) {
+        times.sort((a, b) => a - b);
+      }
     }
 
     function selectNextAvailableDate() {
@@ -609,7 +673,7 @@
 
       const times = getCandidateTimes(date);
       if (times.length === 0) {
-        message.textContent = `No times match the business hours and settings for ${formatDateForDisplay(date)}.`;
+        message.textContent = `No times are available for ${formatDateForDisplay(date)}.`;
         return;
       }
 
@@ -626,6 +690,10 @@
     }
 
     function getCandidateTimes(date) {
+      return unbookedTimesByDate.get(formatDateKey(date)) || [];
+    }
+
+    function getBusinessHourCandidateTimes(date) {
       const interval = Number(bookingSettings.default_slot_interval_minutes);
       const duration = Number(selectedService.duration_minutes);
       if (interval <= 0 || duration <= 0 || date < todayDate || date > maximumDate) return [];

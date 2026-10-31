@@ -928,6 +928,96 @@ BEGIN
 END;
 $$;
 
+-- Function: Return non-conflicting candidate start times for public booking (no customer details)
+CREATE OR REPLACE FUNCTION public.get_unbooked_slot_starts(
+  p_service_code text,
+  p_candidate_starts timestamptz[]
+)
+RETURNS TABLE (start_time timestamptz)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_duration_minutes integer;
+  v_buffer_minutes integer;
+  v_notice_minutes integer;
+  v_booking_days integer;
+  v_slot_interval_minutes integer;
+  v_timezone text;
+BEGIN
+  IF p_service_code IS NULL OR p_candidate_starts IS NULL OR cardinality(p_candidate_starts) = 0 THEN
+    RETURN;
+  END IF;
+
+  IF cardinality(p_candidate_starts) > 5000 THEN
+    RAISE EXCEPTION 'Too many candidate timeslots';
+  END IF;
+
+  SELECT s.duration_minutes
+  INTO v_duration_minutes
+  FROM public.service AS s
+  WHERE s.code = p_service_code
+    AND s.is_active IS TRUE
+  LIMIT 1;
+
+  IF v_duration_minutes IS NULL OR v_duration_minutes <= 0 THEN
+    RETURN;
+  END IF;
+
+  SELECT bs.booking_buffer_minutes,
+         bs.minimum_notice_minutes,
+         bs.maximum_booking_days_ahead,
+         bs.default_slot_interval_minutes,
+         bs.business_timezone
+  INTO v_buffer_minutes,
+       v_notice_minutes,
+       v_booking_days,
+       v_slot_interval_minutes,
+       v_timezone
+  FROM public.booking_settings AS bs
+  LIMIT 1;
+
+  IF NOT FOUND OR v_slot_interval_minutes IS NULL OR v_slot_interval_minutes <= 0 THEN
+    RAISE EXCEPTION 'Booking settings are unavailable';
+  END IF;
+
+  RETURN QUERY
+  SELECT DISTINCT proposed.start_at
+  FROM unnest(p_candidate_starts) AS proposed(start_at)
+  WHERE proposed.start_at IS NOT NULL
+    AND proposed.start_at >= now() + make_interval(mins => v_notice_minutes)
+    AND (proposed.start_at AT TIME ZONE v_timezone)::date
+      BETWEEN (now() AT TIME ZONE v_timezone)::date
+          AND (now() AT TIME ZONE v_timezone)::date + v_booking_days
+    AND EXISTS (
+      SELECT 1
+      FROM public.business_hours AS bh
+      WHERE bh.day_of_week = EXTRACT(DOW FROM (proposed.start_at AT TIME ZONE v_timezone))::integer
+        AND (proposed.start_at AT TIME ZONE v_timezone)::time >= bh.start_time
+        AND EXTRACT(EPOCH FROM (
+          bh.end_time - (proposed.start_at AT TIME ZONE v_timezone)::time
+        )) >= v_duration_minutes * 60
+        AND MOD(
+          EXTRACT(EPOCH FROM (
+            (proposed.start_at AT TIME ZONE v_timezone)::time - bh.start_time
+          ))::integer,
+          v_slot_interval_minutes * 60
+        ) = 0
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM public.booking AS b
+      WHERE b.status = 'confirmed'::public.booking_status
+        AND b.is_deleted IS NOT TRUE
+        AND b.start_time < proposed.start_at + make_interval(mins => v_duration_minutes + v_buffer_minutes)
+        AND b.end_time + make_interval(mins => v_buffer_minutes) > proposed.start_at
+    )
+  ORDER BY proposed.start_at;
+END;
+$$;
+
 -- =====================================================================
 -- TRIGGERS
 -- =====================================================================
@@ -1536,6 +1626,10 @@ CREATE POLICY slot_select_free ON public.availability_slot_old FOR SELECT
 -- =====================================================================
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+
+-- Booking timeslot function grants (restrict default PUBLIC access)
+REVOKE ALL ON FUNCTION public.get_unbooked_slot_starts(text, timestamptz[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_unbooked_slot_starts(text, timestamptz[]) TO anon, authenticated;
 
 -- Service table grants
 GRANT SELECT ON TABLE public.service TO anon;

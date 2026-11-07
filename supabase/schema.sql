@@ -928,7 +928,11 @@ BEGIN
 END;
 $$;
 
--- Function: Return non-conflicting candidate start times for public booking (no customer details)
+-- Function: Return bookable candidate start times without exposing booking or customer details.
+-- Recurring availability precedence for one active instructor:
+-- Service > Type > Category > General. Same-scope periods are merged.
+-- No applicable active availability rule means no bookable times for that day.
+-- Availability Exceptions and payment holds are intentionally not checked yet.
 CREATE OR REPLACE FUNCTION public.get_unbooked_slot_starts(
   p_service_code text,
   p_candidate_starts timestamptz[]
@@ -940,6 +944,11 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
+  v_service_id uuid;
+  v_service_type_id uuid;
+  v_service_category_id uuid;
+  v_resource_id uuid;
+  v_resource_count integer;
   v_duration_minutes integer;
   v_buffer_minutes integer;
   v_notice_minutes integer;
@@ -955,15 +964,33 @@ BEGIN
     RAISE EXCEPTION 'Too many candidate timeslots';
   END IF;
 
-  SELECT s.duration_minutes
-  INTO v_duration_minutes
+  SELECT s.id,
+         s.service_type_id,
+         s.service_category_id,
+         s.duration_minutes
+  INTO v_service_id,
+       v_service_type_id,
+       v_service_category_id,
+       v_duration_minutes
   FROM public.service AS s
   WHERE s.code = p_service_code
     AND s.is_active IS TRUE
   LIMIT 1;
 
-  IF v_duration_minutes IS NULL OR v_duration_minutes <= 0 THEN
+  IF v_service_id IS NULL OR v_duration_minutes IS NULL OR v_duration_minutes <= 0 THEN
     RETURN;
+  END IF;
+
+  -- Version 1 has one instructor. Do not silently assign times to the wrong
+  -- resource if additional instructors are configured in the future.
+  SELECT count(*), (array_agg(r.id))[1]
+  INTO v_resource_count, v_resource_id
+  FROM public.resource AS r
+  WHERE r.is_active IS TRUE
+    AND lower(r.resource_type) = 'instructor';
+
+  IF v_resource_count <> 1 THEN
+    RAISE EXCEPTION 'Booking availability requires exactly one active instructor';
   END IF;
 
   SELECT bs.booking_buffer_minutes,
@@ -984,6 +1011,42 @@ BEGIN
   END IF;
 
   RETURN QUERY
+  WITH applicable_rules AS (
+    SELECT a.day_of_week,
+           a.start_time,
+           a.end_time,
+           CASE a.scope
+             WHEN 'service' THEN 4
+             WHEN 'type' THEN 3
+             WHEN 'category' THEN 2
+             WHEN 'general' THEN 1
+           END AS priority
+    FROM public.availability AS a
+    WHERE a.resource_id = v_resource_id
+      AND a.is_active IS TRUE
+      AND (
+        a.scope = 'general'
+        OR (a.scope = 'category' AND a.service_category_id = v_service_category_id)
+        OR (a.scope = 'type' AND a.service_type_id = v_service_type_id)
+        OR (a.scope = 'service' AND a.service_id = v_service_id)
+      )
+  ),
+  ranked_rules AS (
+    SELECT ar.*,
+           max(ar.priority) OVER (PARTITION BY ar.day_of_week) AS highest_priority
+    FROM applicable_rules AS ar
+  ),
+  permitted_periods AS (
+    SELECT rr.day_of_week,
+           range_agg(numrange(
+             EXTRACT(EPOCH FROM rr.start_time) / 60,
+             EXTRACT(EPOCH FROM rr.end_time) / 60,
+             '[)'
+           )) AS minutes_available
+    FROM ranked_rules AS rr
+    WHERE rr.priority = rr.highest_priority
+    GROUP BY rr.day_of_week
+  )
   SELECT DISTINCT proposed.start_at
   FROM unnest(p_candidate_starts) AS proposed(start_at)
   WHERE proposed.start_at IS NOT NULL
@@ -1005,6 +1068,16 @@ BEGIN
           ))::integer,
           v_slot_interval_minutes * 60
         ) = 0
+    )
+    AND EXISTS (
+      SELECT 1
+      FROM permitted_periods AS pp
+      WHERE pp.day_of_week = EXTRACT(DOW FROM (proposed.start_at AT TIME ZONE v_timezone))::integer
+        AND pp.minutes_available @> numrange(
+          EXTRACT(EPOCH FROM (proposed.start_at AT TIME ZONE v_timezone)::time) / 60,
+          EXTRACT(EPOCH FROM (proposed.start_at AT TIME ZONE v_timezone)::time) / 60 + v_duration_minutes,
+          '[)'
+        )
     )
     AND NOT EXISTS (
       SELECT 1

@@ -213,12 +213,12 @@
           </div>
         </div>
 
-        <!-- Timeslots based on business hours and booking settings (conflict checks to follow) -->
+        <!-- Timeslots based on booking settings, recurring availability and existing booking conflicts -->
         <div class="rounded-2xl border border-slate-700 bg-slate-800/50 p-6 min-h-[220px]">
           <h2 class="text-xl font-semibold mb-3">Available Times</h2>
           <p id="date-selection-message" class="text-slate-300">Choose a date on the calendar to view available times.</p>
           <div id="timeslot-buttons" class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4"></div>
-          <p id="timeslot-preview-note" class="hidden mt-3 text-sm text-slate-400">Preview only. Existing bookings and the booking buffer are checked. Availability rules, exceptions and payment holds are not checked yet.</p>
+          <p id="timeslot-preview-note" class="hidden mt-3 text-sm text-slate-400">Preview only. Business hours, minimum notice, booking window, slot interval, service duration, recurring availability rules, existing bookings and booking buffer are checked. Availability exceptions and payment holds are not checked yet.</p>
         </div>
       </div>
 
@@ -332,7 +332,7 @@
     }
 
     // Fetch availability for the booking window without exposing customer booking records.
-    // The database function checks existing appointments and the configured booking buffer.
+    // The database function checks recurring availability, existing appointments and the booking buffer.
     async function loadUnbookedTimeslots() {
       unbookedTimesByDate = new Map();
       if (!selectedService) return;
